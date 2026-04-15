@@ -10,13 +10,16 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## Cargamos los paquetes
+
 ```{r}
 library(dplyr)
 library(readr)
 library(stringr)
 library(stringi)
 ```
+
 ## Creación de una función para normalizar distrito
+
 ```{r}
 normalizar_distrito <- function(x) {
   x <- tolower(x)
@@ -35,14 +38,16 @@ normalizar_distrito <- function(x) {
 ```
 
 ## Lectura y exploración de la base de datos del censo
+
 ```{r}
-censo <- read_csv("censo_distritos_bilbao_agrupado.csv")
+censo <- read_csv("../../bases_de_datos/censo/censo_distritos_bilbao_agrupado.csv")
 
 head(censo)
 dim(censo)
 ```
 
 ## Creación del nuevo dataset base y columnas de identificación añadidas
+
 ```{r}
 # Creamos la base inicial de distritos de Bilbao
 
@@ -62,6 +67,7 @@ cat("Nulos en cod_distrito:", sum(is.na(distritos_bilbao_base$cod_distrito)), "\
 ```
 
 ## Columnas de datos poblacionales añadidas
+
 ```{r}
 distritos_bilbao_base <- distritos_bilbao_base %>%
   mutate(
@@ -76,6 +82,7 @@ summary(distritos_bilbao_base)
 ```
 
 ## Cálculo del índice de envejecimiento
+
 ```{r}
 distritos_bilbao_base$indice_envejecimiento <- 
   (distritos_bilbao_base$pob_mayor_65 / distritos_bilbao_base$pob_menor_16) * 100
@@ -84,6 +91,7 @@ head(distritos_bilbao_base)
 ```
 
 ## Comprobar valores faltantes
+
 ```{r}
 sum(is.na(distritos_bilbao_base$pob_total))
 sum(is.na(distritos_bilbao_base$pob_menor_16))
@@ -91,68 +99,91 @@ sum(is.na(distritos_bilbao_base$pob_mayor_65))
 sum(is.na(distritos_bilbao_base$indice_envejecimiento))
 ```
 
-## Obtencion del número de Centros Educativos (vacío)
-```{r}
-distritos_bilbao_base <- distritos_bilbao_base %>%
-  mutate(
-    num_colegios = NA,
-  )
-```
-
-## Obtención del ratio de Centros Educativos (vacío)
+## Obtencion del número de Centros Educativos
 
 ```{r}
+# Leemos el resumen generado en el script anterior
+bilbao_resumen <- read_delim(
+  "../../datasets/vizcaya-bilbao/bilbao_resumen.csv",
+  delim = ";",
+  show_col_types = FALSE
+)
+
+# Normalizamos el nombre del distrito en el resumen para que coincida con nombre_distrito_norm
+bilbao_resumen <- bilbao_resumen %>%
+  mutate(nombre_distrito_norm = normalizar_distrito(distrito))
+
+# Hacemos el join por el campo normalizado y extraemos num_colegios
 distritos_bilbao_base <- distritos_bilbao_base %>%
-  mutate(
-    ratio_colegio = NA,
+  left_join(
+    bilbao_resumen %>% select(nombre_distrito_norm, num_colegios),
+    by = "nombre_distrito_norm"
   )
 
 # Verificación
-head(distritos_bilbao_base[, c("nombre_distrito", "num_colegios", "ratio_colegio")])
-
+head(distritos_bilbao_base[, c("nombre_distrito", "num_colegios")])
 ```
 
-## Comprobar valores faltantes (por ahora todos faltantes)
+## Obtención del ratio de Centros Educativos
+
+```{r}
+# Obtención del ratio de Centros Educativos por población
+
+distritos_bilbao_base <- distritos_bilbao_base %>%
+  mutate(
+    ratio_colegio = round(num_colegios / pob_total*1000, 2)
+  )
+
+# Verificación
+head(distritos_bilbao_base[, c("nombre_distrito", "num_colegios", "ratio_colegio")]) %>%
+  mutate(ratio_colegio = format(ratio_colegio, scientific = FALSE, nsmall = 2))
+```
+
+## Comprobar valores faltantes
 
 ```{r}
 sum(is.na(distritos_bilbao_base$num_colegios))
 sum(is.na(distritos_bilbao_base$ratio_colegio))
 ```
 
-## Obtencion del número de Centros de Salud (vacío)
+## Obtencion del número de Hospitales
 
 ```{r}
 distritos_bilbao_base <- distritos_bilbao_base %>%
-  mutate(
-    num_centros_salud = NA,
-  )
-```
-
-
-## Obtencion del ratio de Centros de Salud (vacío)
-
-```{r}
-distritos_bilbao_base <- distritos_bilbao_base %>%
-  mutate(
-    ratio_centro_salud = NA,
+  left_join(
+    bilbao_resumen %>% select(nombre_distrito_norm, num_hospitales),
+    by = "nombre_distrito_norm"
   )
 
 # Verificación
-head(distritos_bilbao_base[, c("nombre_distrito", "num_centros_salud", "ratio_centro_salud")])
+head(distritos_bilbao_base[, c("nombre_distrito", "num_hospitales")])
+```
+
+## Obtencion del ratio de Hospitales
+
+```{r}
+distritos_bilbao_base <- distritos_bilbao_base %>%
+  mutate(
+    ratio_hospital = round(num_hospitales / pob_total * 10000, 2)
+  )
+
+# Verificación
+head(distritos_bilbao_base[, c("nombre_distrito", "num_hospitales", "ratio_hospital")]) %>%
+  mutate(ratio_hospital = format(ratio_hospital, scientific = FALSE, nsmall = 2))
 ```
 
 ## Comprobar valores faltantes (por ahora todos faltantes)
 
 ```{r}
-sum(is.na(distritos_bilbao_base$num_centros_salud))
-sum(is.na(distritos_bilbao_base$ratio_centro_salud))
+sum(is.na(distritos_bilbao_base$num_hospitales))
+sum(is.na(distritos_bilbao_base$ratio_hospital))
 ```
 
 ## Lectura y exploración de la base de datos de alquiler
 
 ```{r}
 alquiler <- readr::read_delim(
-  "alquiler_distritos_bilbao.csv",
+  "../../bases_de_datos/vivienda/alquiler_distritos_bilbao.csv",
   delim = ";",
   show_col_types = FALSE,
   locale = locale(encoding = "Latin1")
@@ -180,7 +211,7 @@ head(distritos_bilbao_base)
 
 ```{r}
 renta <- readr::read_delim(
-  "renta_distritos_bilbao.csv",
+  "../../bases_de_datos/renta/renta_distritos_bilbao.csv",
   delim = ";",
   show_col_types = FALSE,
   col_types = cols(Total = col_character())
@@ -207,7 +238,6 @@ distritos_bilbao_base <- distritos_bilbao_base %>%
 head(distritos_bilbao_base)
 ```
 
-
 ## Cálculo del esfuerzo de alquiler
 
 ```{r}
@@ -230,17 +260,20 @@ sum(is.na(distritos_bilbao_base$esfuerzo_alquiler))
 ## Obtención del número de espacios verdes
 
 ```{r}
-distritos_bilbao_base$espacios_verdes_si_no <- NA
-distritos_bilbao_base$num_espacios_verdes <- NA
+distritos_bilbao_base <- distritos_bilbao_base %>%
+  left_join(
+    bilbao_resumen %>% select(nombre_distrito_norm, num_zonas_verdes),
+    by = "nombre_distrito_norm"
+  )
 
-head(distritos_bilbao_base)
+# Verificación
+head(distritos_bilbao_base[, c("nombre_distrito", "num_zonas_verdes")])
 ```
 
 ## Comprobar valores faltantes de espacios verdes
 
 ```{r}
-sum(is.na(distritos_bilbao_base$espacios_verdes_si_no))
-sum(is.na(distritos_bilbao_base$num_espacios_verdes))
+sum(is.na(distritos_bilbao_base$num_zonas_verdes))
 ```
 
 ## Revisión de distritos con mayor esfuerzo de alquiler
@@ -303,8 +336,9 @@ str(distritos_bilbao_base)
 
 write.csv(
   distritos_bilbao_base,
-  "distritos_bilbao_base.csv",
+  "../../datasets/vizcaya-bilbao/distritos_bilbao_base.csv",
   row.names = FALSE
 )
 ```
-```
+
+\`\`\`
