@@ -8,7 +8,7 @@ date: "2026-04-11"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-##Cargamos los paquetes
+## Cargamos los paquetes
 
 ```{r}
 library(dplyr)
@@ -17,7 +17,7 @@ library(stringr)
 library(stringi)
 ```
 
-##Creación de una función para normalizar distrito
+## Creación de una función para normalizar distrito
 
 ```{r}
 normalizar_distrito <- function(x) {
@@ -44,16 +44,15 @@ normalizar_distrito <- function(x) {
 }
 ```
 
-##Lectura y esxploración de la base de datos del censo 
+## Lectura y esxploración de la base de datos del censo
 
 ```{r}
-censo <- readxl::read_excel("bases_de_datos/censo_distritos_valencia.xls", skip = 2)
+censo <- readxl::read_excel("../../bases_de_datos/censo/censo_distritos_valencia.xls", skip = 2)
 
 head(censo)
 dim(censo)
 
 ```
-
 
 ## Creación del nuevo dataset base y columnas de identificación añadidas
 
@@ -104,7 +103,6 @@ distritos_valencia_base$indice_envejecimiento <-
 head(distritos_valencia_base)
 ```
 
-
 ##Comprobar valores faltantes
 
 ```{r}
@@ -113,6 +111,7 @@ sum(is.na(distritos_valencia_base$pob_menor_16))
 sum(is.na(distritos_valencia_base$pob_mayor_65))
 sum(is.na(distritos_valencia_base$indice_envejecimiento))
 ```
+
 ## Normalizamos los nombres de los distritos
 
 ```{r}
@@ -128,7 +127,7 @@ normalizar_distrito <- function(x) {
 ## Obtencion del número de Centros Educativos
 
 ```{r}
-valencia_resumen <- read_csv2("datasets/valencia_resumen.csv", show_col_types = FALSE) %>%
+valencia_resumen <- read_csv2("../../datasets/valencia/valencia_resumen.csv", show_col_types = FALSE) %>%
   mutate(
     distrito_norm = normalizar_distrito(distrito)
   ) %>%
@@ -145,19 +144,19 @@ distritos_valencia_base <- distritos_valencia_base %>%
   )
 ```
 
-
 ## Obtención del ratio de Centros Educativos
 
 ```{r}
 distritos_valencia_base <- distritos_valencia_base %>%
   select(-any_of("ratio_colegio")) %>%
   mutate(
-    ratio_colegio = num_colegios / pob_total
+    ratio_colegio = (num_colegios / pob_total)*1000
   )
 
 # Verificación
 head(distritos_valencia_base[, c("nombre_distrito", "num_colegios", "ratio_colegio")])
 ```
+
 ##Comprobar valores faltantes
 
 ```{r}
@@ -168,7 +167,7 @@ sum(is.na(distritos_valencia_base$ratio_colegio))
 ## Obtencion del número de hospitales
 
 ```{r}
-valencia_resumen <- read_csv2("datasets/valencia_resumen.csv", show_col_types = FALSE) %>%
+valencia_resumen <- read_csv2("../../datasets/valencia/valencia_resumen.csv", show_col_types = FALSE) %>%
   mutate(
     distrito_norm = normalizar_distrito(distrito)
   ) %>%
@@ -188,14 +187,13 @@ distritos_valencia_base <- distritos_valencia_base %>%
 head(distritos_valencia_base[, c("nombre_distrito", "num_hospitales")])
 ```
 
-
 ## Obtencion del ratio de Centros de Salud
 
 ```{r}
 distritos_valencia_base <- distritos_valencia_base %>%
   select(-any_of("ratio_hospitales")) %>%
   mutate(
-    ratio_hospitales = num_hospitales / pob_total
+    ratio_hospitales = (num_hospitales / pob_total)*1000
   )
 
 # Verificación
@@ -212,7 +210,7 @@ sum(is.na(distritos_valencia_base$ratio_hospitales))
 ## Lectura y exploración de la base de datos de alquiler
 
 ```{r}
-alquiler <- readr::read_delim("bases_de_datos/alquiler_distritos_valencia.csv", delim = ";", show_col_types = FALSE)
+alquiler <- readr::read_delim("../../bases_de_datos/vivienda/alquiler_distritos_valencia.csv", delim = ";", show_col_types = FALSE)
 
 
 head(alquiler)
@@ -232,12 +230,10 @@ head(distritos_valencia_base)
 
 ## Lectura, limpieza y exploración de la base de datos de renta
 
-A la hora de unir la base de datos de la renta con el dataset principal, es necesario utilizar el número de distrito en vez del nombre, ya que en este caso los distritos no aparecen referenciados con su nombre, sino siguiendo la siguiente estructura:
-"4625001 València Distrito 01"
-Portanto será necesario un trabajo extra para limpiar esas expresiones y quedarnos únicamente con el número de distrito en formato numérico, además de limpiar y adaptar también el valor de la renta a formato numérico.
+A la hora de unir la base de datos de la renta con el dataset principal, es necesario utilizar el número de distrito en vez del nombre, ya que en este caso los distritos no aparecen referenciados con su nombre, sino siguiendo la siguiente estructura: "4625001 València Distrito 01" Portanto será necesario un trabajo extra para limpiar esas expresiones y quedarnos únicamente con el número de distrito en formato numérico, además de limpiar y adaptar también el valor de la renta a formato numérico.
 
 ```{r}
-renta <- readr::read_delim("bases_de_datos/renta_distritos_valencia.csv", 
+renta <- readr::read_delim("../../bases_de_datos/renta/renta_distritos_valencia.csv", 
                              delim = ";", 
                              show_col_types = FALSE,
                              col_types = cols(Total = col_character()))
@@ -270,7 +266,6 @@ head(distritos_valencia_base)
 
 ## Cálculo del Esfuerzo de Alquiler
 
-
 ```{r}
 distritos_valencia_base <- distritos_valencia_base %>%
   mutate(
@@ -288,12 +283,13 @@ sum(is.na(distritos_valencia_base$alquiler_m2))
 sum(is.na(distritos_valencia_base$renta_media_hogar))
 sum(is.na(distritos_valencia_base$esfuerzo_alquiler))
 ```
+
 Del distrito 17, "Pobles del Nord", no se tienen datos del alquiler y, por tanto, no se puede sacar su esfuerzo de alquiler.
 
 ## Obtención del número de zonas verdes por distrito
 
 ```{r}
-valencia_resumen <- read_csv2("datasets/valencia_resumen.csv", show_col_types = FALSE) %>%
+valencia_resumen <- read_csv2("../../datasets/valencia/valencia_resumen.csv", show_col_types = FALSE) %>%
   mutate(
     distrito_norm = normalizar_distrito(distrito)
   ) %>%
@@ -331,6 +327,7 @@ head(distritos_valencia_base)
 ```{r}
 sum(is.na(distritos_valencia_base$num_zonas_verdes))
 ```
+
 ## Revisión de distritos con mayor esfuerzo de alquiler
 
 Este listado permite identificar los municipios donde, según la estimación realizada, el alquiler de una vivienda de `80 m²` supondría un mayor esfuerzo económico para el hogar medio.
@@ -363,7 +360,6 @@ distritos_valencia_base %>%
   head(9)
 ```
 
-
 ## Redondeo de variables calculadas a dos decimales
 
 Para dejar las variables más limpias de cara a la presentación final, redondeamos las variables indice_envejecimiento y esfuerzo_alquiler a dos decimales.
@@ -381,7 +377,6 @@ head(distritos_valencia_base[, c("nombre_distrito_norm", "indice_envejecimiento"
 head(distritos_valencia_base)
 str(distritos_valencia_base)
 
-write.csv(distritos_valencia_base, "distritos_valencia_base.csv", row.names = FALSE)
+write.csv(distritos_valencia_base, "../../datasets/valencia/distritos_valencia_base.csv", row.names = FALSE)
 
 ```
-
