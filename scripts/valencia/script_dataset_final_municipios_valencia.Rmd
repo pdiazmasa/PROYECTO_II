@@ -51,7 +51,7 @@ normalizar_municipio <- function(x) {
 ### Lectura de la base de datos del censo
 
 ```{r}
-censo <- read_delim("censo_municipios_valencia.csv", delim = ";", show_col_types = FALSE)
+censo <- read_delim("../../bases_de_datos/censo/censo_municipios_valencia.csv", delim = ";", show_col_types = FALSE)
 ```
 
 ### Exploración inicial del censo
@@ -223,7 +223,7 @@ summary(municipios_valencia_base[, c("pob_total",
 ### Lectura y exploración inicial de la base de nivel educativo
 
 ```{r}
-estudios <- readr::read_delim("Nivel_educativo_municipios_valencia.csv",
+estudios <- readr::read_delim("../../bases_de_datos/educacion/Nivel_educativo_municipios_valencia.csv",
                               delim = ";",
                               show_col_types = FALSE,
                               locale = locale(encoding = "Latin1"))
@@ -335,7 +335,7 @@ head(municipios_valencia_base[, c("cod_municipio",
 ### Lectura y exploración inicial de la base de centros educativos
 
 ```{r}
-centros_edu <- readxl::read_excel("listado_centros_valencia.xls", sheet = "Listado de centros")
+centros_edu <- readxl::read_excel("../../bases_de_datos/educacion/listado_centros_valencia.xls", sheet = "Listado de centros")
 
 head(centros_edu)
 dim(centros_edu)
@@ -453,7 +453,7 @@ municipios_valencia_base$distancia_centro_educativo <- NA
 ### Lectura y exploración inicial de la base de atención primaria
 
 ```{r}
-ap <- read_delim("centros_AP_municipios_valencia.csv",
+ap <- read_delim("../../bases_de_datos/sanidad/centros_AP_municipios_valencia.csv",
                       delim = ";",
                       show_col_types = FALSE)
 head(ap)
@@ -599,7 +599,7 @@ sum(is.na(municipios_valencia_base$consultorio_local))
 ### Lectura y exploración inicial de la base de hospitales
 
 ```{r}
-hospitales <- read_csv("hospitales_valencia.csv", show_col_types = FALSE)
+hospitales <- read_csv("../../bases_de_datos/sanidad/hospitales_valencia.csv", show_col_types = FALSE)
 
 head(hospitales)
 dim(hospitales)
@@ -707,7 +707,7 @@ municipios_valencia_base$distancia_hospital <- NA
 ### Lectura y exploración inicial de la base de alquiler
 
 ```{r}
-alquiler <- read_delim("alquiler_municipios_valencia.csv",
+alquiler <- read_delim("../../bases_de_datos/vivienda/alquiler_municipios_valencia.csv",
                        delim = ";",
                        locale = locale(decimal_mark = ","),
                        show_col_types = FALSE)
@@ -800,7 +800,7 @@ summary(municipios_valencia_base$precio_m2_alquiler)
 ### Lectura y exploración inicial de la base de renta
 
 ```{r}
-renta <- read_delim("renta_municipios_valencia.csv",
+renta <- read_delim("../../bases_de_datos/renta/renta_municipios_valencia.csv",
                     delim = "\t",
                     locale = locale(encoding = "Latin1"),
                     show_col_types = FALSE)
@@ -898,7 +898,7 @@ summary(municipios_valencia_base$esfuerzo_alquiler)
 ### Lectura y exploración inicial de la base de internet
 
 ```{r}
-internet <- read_excel("acceso_internet_municipios.xlsx",
+internet <- read_excel("../../bases_de_datos/internet/acceso_internet_municipios.xlsx",
                        sheet = "Municipio_%hogar")
 
 head(internet)
@@ -1009,7 +1009,7 @@ table(municipios_valencia_base$internet_100mbps_mayor95, useNA = "ifany")
 ### Lectura y exploración inicial de la base de contratos
 
 ```{r}
-contratos <- read_delim("contratos_sectores_municipios.csv",
+contratos <- read_delim("../../bases_de_datos/trabajo/contratos_sectores_municipios.csv",
                         delim = ";",
                         locale = locale(encoding = "Latin1"),
                         skip = 1,
