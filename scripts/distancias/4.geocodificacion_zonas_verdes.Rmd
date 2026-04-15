@@ -1,0 +1,167 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# SCRIPT 3 — Geocodificación de zonas verdes (Valencia y Bilbao)
+
+-   Fuente: OpenStreetMap — API Overpass (gratuita, sin clave)
+
+-   Output: datasets/zonas_verdes_valencia_coords.csv
+
+-   datasets/zonas_verdes_bilbao_coords.csv
+
+-   API: osmdata (wrapper de R para Overpass)
+
+## 1. Librerías
+
+El paquete `osmdata` nos permite hacer consultas a OpenStreetMap desde R. El paquete `sf` gestiona los objetos geoespaciales (polígonos, puntos). El resto son para manipulación y exportación de datos.
+
+```{r}
+library(sf)
+library(dplyr)
+library(readr)
+```
+
+## 2. Rutas de entrada y salida
+
+Definimos dónde se guardarán los CSVs resultantes. Usamos rutas relativas desde la carpeta `scripts/` hacia la carpeta `datasets/`.
+
+```{r}
+# GeoJSON de entrada
+ruta_geojson_valencia <- "C:/Users/Universidad/OneDrive - UPV/2º CURSO/PROYECTO II/bases_de_datos/delimitacion_zonas_verdes_valencia.geojson"
+ruta_geojson_bilbao   <- "C:/Users/Universidad/OneDrive - UPV/2º CURSO/PROYECTO II/bases_de_datos/delimitacion_zonas_verdes_bilbao.geojson"
+
+# CSV de salida
+ruta_output_valencia <- "C:/Users/Universidad/OneDrive - UPV/2º CURSO/PROYECTO II/bases_de_datos/zonas_verdes_valencia_coords.csv"
+ruta_output_bilbao   <- "C:/Users/Universidad/OneDrive - UPV/2º CURSO/PROYECTO II/bases_de_datos/zonas_verdes_bilbao_coords.csv"
+```
+
+## 3. Parámetro de filtrado: tamaño mínimo del espacio verde
+
+Esta función recibe un bounding box (rectángulo geográfico que delimita el área de búsqueda) y lanza dos consultas a la API de Overpass: una para elementos etiquetados como `leisure` (parques, jardines, reservas naturales...) y otra para `landuse` (praderas, bosques, zonas de hierba...). Combina ambos resultados y devuelve un objeto espacial con todos los polígonos encontrados.
+
+```{r}
+# Umbral mínimo de superficie en metros cuadrados
+# Sube o baja este valor según veas el resultado
+umbral_area_m2 <- 5000
+```
+
+## 4. Función para leer y preparar zonas verdes
+
+Una vez tenemos los polígonos, calculamos el punto central (centroide) de cada zona verde. Esto nos dará una coordenada `lat/lon` por zona, que es el formato que necesitamos para el análisis posterior por distritos. También calculamos el área de cada zona en metros cuadrados.
+
+```{r}
+cargar_zonas_verdes <- function(ruta_geojson, nombre_ciudad) {
+  
+  cat("\nCargando zonas verdes de:", nombre_ciudad, "\n")
+  
+  zonas <- st_read(ruta_geojson, quiet = TRUE)
+  
+  if (is.null(zonas) || nrow(zonas) == 0) {
+    cat("  [!] No se encontraron geometrías.\n")
+    return(NULL)
+  }
+  
+  # Nos aseguramos de tener CRS
+  if (is.na(st_crs(zonas))) {
+    st_crs(zonas) <- 4326
+  }
+  
+  # Pasamos a sistema métrico para calcular áreas correctamente
+  zonas_metricas <- st_transform(zonas, 3857)
+  
+  zonas <- zonas |>
+    mutate(
+      ciudad = nombre_ciudad,
+      area_m2 = as.numeric(st_area(zonas_metricas))
+    ) |>
+    filter(area_m2 >= umbral_area_m2)
+  
+  cat("  Geometrías tras filtrar por tamaño:", nrow(zonas), "\n")
+  
+  return(zonas)
+}
+```
+
+## 5. Función para obtener coordenadas representativas
+
+Definimos el bounding box que cubre la ciudad de Valencia y llamamos a las dos funciones encadenadas. La descarga puede tardar entre 1 y 3 minutos dependiendo de la conexión.
+
+```{r}
+calcular_puntos <- function(zonas_sf) {
+  if (is.null(zonas_sf) || nrow(zonas_sf) == 0) return(NULL)
+  
+  # Punto dentro del polígono
+  puntos <- st_point_on_surface(zonas_sf)
+  coords <- st_coordinates(puntos)
+  
+  zonas_metricas <- st_transform(zonas_sf, 3857)
+  
+  zonas_sf |>
+    st_drop_geometry() |>
+    mutate(
+      parque  = paste0("parque_", row_number()),
+      lat     = coords[, 2],
+      lon     = coords[, 1],
+      area_m2 = as.numeric(st_area(zonas_metricas))
+    ) |>
+    select(parque, lat, lon, area_m2) |>
+    filter(!is.na(lat), !is.na(lon)) |>
+    arrange(desc(area_m2))
+}
+```
+
+## 6. Carga de datos
+
+Mismo proceso para Bilbao. El bounding box está ajustado al municipio de Bilbao, que es donde están definidos los distritos en el archivo que usaremos en el siguiente notebook.
+
+```{r}
+zonas_valencia <- cargar_zonas_verdes(ruta_geojson_valencia, "Valencia")
+zonas_bilbao   <- cargar_zonas_verdes(ruta_geojson_bilbao, "Bilbao")
+```
+
+## 7. Cálculo de coordenadas
+
+Exportamos los resultados con `write_csv2`, que usa punto y coma como separador y coma como decimal, el formato estándar en configuraciones regionales españolas.
+
+```{r}
+coords_valencia <- calcular_puntos(zonas_valencia)
+coords_bilbao   <- calcular_puntos(zonas_bilbao)
+```
+
+## 8. Revisión rápida
+```{r}
+cat("\nValencia:\n")
+print(head(coords_valencia))
+
+cat("\nBilbao:\n")
+print(head(coords_bilbao))
+```
+
+## 9. Exportación a CSV
+```{r}
+write_csv2(coords_valencia, ruta_output_valencia)
+write_csv2(coords_bilbao, ruta_output_bilbao)
+
+cat("\nCSV exportados correctamente.\n")
+cat(" -", ruta_output_valencia, "\n")
+cat(" -", ruta_output_bilbao, "\n")
+```
+
+## 10. Resumen estadístico
+```{r}
+resumen <- bind_rows(
+  coords_valencia |> mutate(ciudad = "Valencia"),
+  coords_bilbao   |> mutate(ciudad = "Bilbao")
+) |>
+  group_by(ciudad) |>
+  summarise(
+    n_zonas = n(),
+    area_min_m2 = min(area_m2, na.rm = TRUE),
+    area_media_m2 = mean(area_m2, na.rm = TRUE),
+    area_max_m2 = max(area_m2, na.rm = TRUE)
+  )
+
+print(resumen)
+```

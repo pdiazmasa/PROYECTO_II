@@ -1,0 +1,159 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# SCRIPT 1 — Geocodificación de municipios (Bizkaia y Valencia)
+
+-   Fuente: censo_municipios_bizkaia.csv / censo_municipios_valencia.csv
+
+-   Output: datasets/municipios_bizkaia_coords.csv
+
+-   datasets/municipios_valencia_coords.csv
+
+-   API: Nominatim (OpenStreetMap) — sin key, gratuita
+
+1.  Cargamos las librerías necesarias que vamos a necesitar:
+
+```{r}
+library(tidyverse) #Leer, limpiar, transformar datos
+library(httr) #Llamar a Nominatim para las coordenadas
+library(jsonlite) #Leer la respuesta JSON
+```
+
+2.  Fijamos las rutas de entrada (bases de datos) y de salida (datasets hechos)
+
+```{r}
+ruta_crudo_vizcaya   <- "../bases_de_datos/censo_municipios_bizkaia.csv"
+ruta_crudo_valencia  <- "../bases_de_datos/censo_municipios_valencia.csv"
+ruta_output_vizcaya  <- "../datasets/municipios_vizcaya_coords.csv"
+ruta_output_valencia <- "../datasets/municipios_valencia_coords.csv"
+```
+
+3.  Creamos la función para extraer los municipios y limpiarlos (aparecen como "CP + nombre del municipio)
+
+```{r}
+extraer_municipios <- function(ruta_csv, nombre_provincia) {
+  
+  read_delim(ruta_csv, delim = ";", show_col_types = FALSE) |>
+    # Nos quedamos solo con la columna Municipios y eliminamos las filas vacías
+    filter(!is.na(Municipios), Municipios != "") |>
+    # Quitamos municipios repetidos
+    distinct(Municipios) |>
+    # Renombramos la columna original para evitar nombres iguales
+    rename(municipio_raw = Municipios) |>
+    mutate(
+      # Extraemos el código INE a partir de los 5 primeros dígitos
+      codigo_ine = str_extract(municipio_raw, "^\\d{5}"),
+      # Lo quitamos
+      municipio  = str_remove(municipio_raw, "^\\d{5}\\s*") |> str_trim(),
+      # Añadimos la provincia como una columna fija
+      provincia  = nombre_provincia
+    ) |>
+    # Seleccionamos únicamente las columnas finales que nos interesan (CP, nombre_municipio, nombre_provincia)
+    select(codigo_ine, municipio, provincia)
+}
+
+head(extraer_municipios(ruta_crudo_vizcaya, "Bizkaia"), 5)
+```
+
+4.  Creamos la función para geocodificar un municipio dado, con Nominatim de OSM
+
+    Devuelve lat, lon y el nombre que devuelve OSM
+
+```{r}
+geocodificar_municipio <- function(municipio, provincia, pais = "España") {
+
+  # Construimos la query en formato "municipio, provincia, país"
+  query <- paste(municipio, provincia, pais, sep = ", ")
+
+  # Hacemos la petición a la API
+  resp <- GET(
+    url = "https://nominatim.openstreetmap.org/search",
+    query = list(
+      q = query,
+      format = "json",
+      limit = 1,
+      countrycodes = "es"
+    ),
+    add_headers(`User-Agent` = "ProyectoIICiudadVsPueblo")
+  )
+
+  # Convertimos la respuesta
+  resultado <- fromJSON(content(resp, "text", encoding = "UTF-8"))
+
+  # Extraemos latitud y longitud
+  tibble(
+    lat = as.numeric(resultado$lat[1]),
+    lon = as.numeric(resultado$lon[1])
+  )
+}
+
+# Prueba con Bilbao
+geocodificar_municipio("Bilbao", "Bizkaia")
+```
+
+5.  Creamos la función para geocodificar una lista dada de municipios
+    -   Creamos una función que recorre todos los municipios de un dataframe y les aplica la función de geocodificación uno a uno
+
+```{r}
+geocodificar_lista <- function(df_municipios) {
+  
+  # Guardamos el número total de municipios para mostrar progreso
+  total <- nrow(df_municipios)
+  cat(sprintf("Geocodificando %d municipios...\n", total))
+  
+  # Creamos una lista vacía donde iremos guardando los resultados
+  resultados <- vector("list", total)
+  
+  # Recorremos los municipios fila a fila
+  for (i in seq_len(total)) {
+    cat(sprintf("%d/%d %s\n", i, total, df_municipios$municipio[i]))
+    
+    resultados[[i]] <- geocodificar_municipio(
+      municipio = df_municipios$municipio[i],
+      provincia = df_municipios$provincia[i]
+    )
+    
+    # Esperamos 1 segundo entre peticiones para respetar el límite de Nominatim
+    Sys.sleep(1)
+  }
+  
+  # Unimos el dataframe original con las coordenadas obtenidas
+  bind_cols(df_municipios, bind_rows(resultados))
+}
+```
+
+6.  Ejecutamos la función para Vizcaya primero
+
+```{r}
+cat("--------- VIZCAYA --------\n")
+
+# Extraemos y limpiamos el listado de municipios de Vizcaya
+municipios_vizcaya <- extraer_municipios(ruta_crudo_vizcaya, "Bizkaia")
+
+# Aplicamos la geocodificación a todos los municipios
+coords_vizcaya <- geocodificar_lista(municipios_vizcaya)
+```
+
+7.  Ejecutamos la función para Valencia
+
+```{r}
+cat("========== VALENCIA ==========\n")
+
+# Extraemos y limpiamos el listado de municipios de Bizkaia
+municipios_valencia <- extraer_municipios(ruta_crudo_valencia, "Valencia")
+
+# Aplicamos la geocodificación a todos los municipios
+coords_valencia <- geocodificar_lista(municipios_valencia)
+```
+
+8.  Guardamos los archivos en cvs en la ruta que dimos
+
+```{r}
+#csv de Vizcaya
+write_csv(coords_vizcaya, ruta_output_vizcaya)
+
+#csv de Valencia
+write_csv(coords_valencia, ruta_output_valencia)
+```

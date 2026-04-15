@@ -1,0 +1,288 @@
+---
+title: "modificacion_censo_distritos_bilbao"
+author: "Emma Torres"
+date: "2026-04-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Preparaciones iniciales
+
+### Cargamos los paquetes
+
+```{r}
+library(dplyr)
+library(tidyr)
+```
+
+## Lectura de las bases de datos
+
+### Leemos la base del censo de distritos de Bilbao
+
+Esta base tiene una estructura algo especial: las dos primeras filas actúan como cabecera descriptiva y después empiezan los datos. Por eso la leemos sin cabecera (`header = FALSE`).
+
+Además, el fichero usa `;` como separador.
+
+```{r}
+censo_bilbao_raw <- read.csv(
+  "censo_distritos_bilbao.csv",
+  sep = ";",
+  header = FALSE,
+  stringsAsFactors = FALSE,
+  check.names = FALSE,
+  fileEncoding = "latin1"
+)
+
+head(censo_bilbao_raw, 3)
+dim(censo_bilbao_raw)
+```
+
+### Leemos la base con el listado de nombres de distrito
+
+Esta segunda base sí tiene cabecera y contiene el código y el nombre del distrito. También usa `;` como separador.
+
+```{r}
+listado_distritos_bilbao <- read.csv(
+  "nombre_distritos_bilbao.csv",
+  sep = ";",
+  stringsAsFactors = FALSE,
+  check.names = FALSE,
+  fileEncoding = "UTF-8"
+)
+
+head(listado_distritos_bilbao)
+dim(listado_distritos_bilbao)
+```
+
+## Exploración inicial
+
+### Revisamos la estructura de ambas bases
+
+Hacemos una comprobación inicial de dimensiones, nombres y estructura, como en los ejemplos de introducción a R.
+
+```{r}
+nrow(censo_bilbao_raw)
+ncol(censo_bilbao_raw)
+str(censo_bilbao_raw)
+
+nrow(listado_distritos_bilbao)
+ncol(listado_distritos_bilbao)
+str(listado_distritos_bilbao)
+```
+
+## Preparación de la base del censo
+
+### Eliminamos las dos primeras filas descriptivas
+
+La primera fila contiene las edades y la segunda fila contiene las etiquetas de sexo. Los datos reales empiezan a partir de la tercera fila.
+
+```{r}
+censo_bilbao <- censo_bilbao_raw[-c(1, 2), ]
+dim(censo_bilbao)
+head(censo_bilbao[, 1:10])
+```
+
+### Construimos nombres de columnas claros
+
+La base del censo tiene:
+
+- `4` primeras columnas de identificación
+- después, dos columnas por cada edad: una de hombres y otra de mujeres
+- edades desde `0` hasta `110` y una última categoría de `110_mas`
+
+Vamos a renombrar todas esas columnas para poder trabajar de forma cómoda.
+
+```{r}
+edades <- c(0:110, "110_mas")
+
+columnas_edad <- as.vector(rbind(
+  paste0("edad_", edades, "_hombre"),
+  paste0("edad_", edades, "_mujer")
+))
+
+nombres_columnas <- c(
+  "cod_distrito",
+  "cod_barrio",
+  "barrio",
+  "auzoa",
+  columnas_edad
+)
+
+colnames(censo_bilbao) <- nombres_columnas
+
+head(colnames(censo_bilbao), 12)
+tail(colnames(censo_bilbao), 12)
+```
+
+### Convertimos las columnas al tipo correcto
+
+Pasamos los códigos a numéricos y también todas las columnas de edades, porque ahora mismo se han leído como texto.
+
+```{r}
+censo_bilbao <- censo_bilbao %>%
+  mutate(
+    cod_distrito = as.integer(cod_distrito),
+    cod_barrio = as.integer(cod_barrio),
+    across(starts_with("edad_"), as.numeric)
+  )
+
+str(censo_bilbao[, 1:12])
+```
+
+## Preparación de la base de nombres de distrito
+
+### Nos quedamos solo con las columnas útiles
+
+El fichero trae una tercera columna vacía por el separador final, así que la eliminamos y renombramos las dos columnas importantes.
+
+```{r}
+listado_distritos_bilbao <- listado_distritos_bilbao %>%
+  select(where(~ !all(is.na(.)))) %>%
+  select(1:2) %>%
+  rename(
+    cod_distrito = TDIS_COD_DISEST,
+    nombre_distrito = TDIS_DES_DISEST
+  ) %>%
+  mutate(cod_distrito = as.integer(cod_distrito))
+
+head(listado_distritos_bilbao)
+str(listado_distritos_bilbao)
+```
+
+## Agrupación de edades
+
+### Definimos qué columnas pertenecen a cada grupo de edad
+
+Queremos construir estos tres grupos:
+
+- `0-15`
+- `16-64`
+- `65 y más`
+
+Como para cada edad hay dos columnas, una de hombres y una de mujeres, vamos a generar automáticamente la lista de columnas de cada tramo.
+
+```{r}
+seleccionar_columnas_edad <- function(vector_edades) {
+  as.vector(rbind(
+    paste0("edad_", vector_edades, "_hombre"),
+    paste0("edad_", vector_edades, "_mujer")
+  ))
+}
+
+cols_0_15 <- seleccionar_columnas_edad(0:15)
+cols_16_64 <- seleccionar_columnas_edad(16:64)
+cols_65_mas <- seleccionar_columnas_edad(c(65:110, "110_mas"))
+
+length(cols_0_15)
+length(cols_16_64)
+length(cols_65_mas)
+```
+
+### Calculamos los tres grupos de edad para cada fila
+
+Primero sumamos, dentro de cada fila, toda la población correspondiente a cada tramo de edad.
+
+```{r}
+censo_bilbao_grupos <- censo_bilbao %>%
+  mutate(
+    pob_0_15 = rowSums(across(all_of(cols_0_15)), na.rm = TRUE),
+    pob_16_64 = rowSums(across(all_of(cols_16_64)), na.rm = TRUE),
+    pob_65_mas = rowSums(across(all_of(cols_65_mas)), na.rm = TRUE)
+  )
+
+head(censo_bilbao_grupos %>%
+       select(cod_distrito, cod_barrio, barrio, pob_0_15, pob_16_64, pob_65_mas))
+```
+
+### Agregamos la información a nivel de distrito
+
+La base del censo está a nivel de barrio dentro de distrito, así que ahora sumamos los barrios que pertenecen al mismo distrito para obtener una sola fila por distrito.
+
+```{r}
+censo_distritos_bilbao <- censo_bilbao_grupos %>%
+  group_by(cod_distrito) %>%
+  summarise(
+    pob_0_15 = sum(pob_0_15, na.rm = TRUE),
+    pob_16_64 = sum(pob_16_64, na.rm = TRUE),
+    pob_65_mas = sum(pob_65_mas, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    pob_total = pob_0_15 + pob_16_64 + pob_65_mas
+  )
+
+censo_distritos_bilbao
+```
+
+## Unión de las dos bases de datos
+
+### Unimos por el código de distrito
+
+Ahora hacemos la unión entre:
+
+- la tabla de nombres de distrito
+- la tabla del censo ya agregada por distrito
+
+```{r}
+dataset_final_bilbao <- listado_distritos_bilbao %>%
+  left_join(censo_distritos_bilbao, by = "cod_distrito") %>%
+  arrange(cod_distrito)
+
+dataset_final_bilbao
+```
+
+## Comprobaciones finales
+
+### Comprobamos dimensiones y estructura del resultado
+
+Aquí verificamos que el resultado final tiene una fila por distrito y las variables que queríamos construir.
+
+```{r}
+dim(dataset_final_bilbao)
+nrow(dataset_final_bilbao)
+ncol(dataset_final_bilbao)
+str(dataset_final_bilbao)
+```
+
+### Comprobamos si hay distritos sin emparejar
+
+Estas comprobaciones sirven para ver si algún código aparece en una base pero no en la otra.
+
+```{r}
+anti_join(listado_distritos_bilbao, censo_distritos_bilbao, by = "cod_distrito")
+anti_join(censo_distritos_bilbao, listado_distritos_bilbao, by = "cod_distrito")
+```
+
+### Comprobamos el total de población agregado
+
+Esto nos ayuda a revisar que la suma de los tres grupos de edad está bien calculada.
+
+```{r}
+sum(dataset_final_bilbao$pob_0_15, na.rm = TRUE)
+sum(dataset_final_bilbao$pob_16_64, na.rm = TRUE)
+sum(dataset_final_bilbao$pob_65_mas, na.rm = TRUE)
+sum(dataset_final_bilbao$pob_total, na.rm = TRUE)
+```
+
+## Resultado final
+
+### Visualizamos el dataset final
+
+```{r}
+dataset_final_bilbao
+```
+
+### Guardamos el resultado en un csv nuevo
+
+```{r}
+write.csv(
+  dataset_final_bilbao,
+  "dataset_distritos_bilbao_agrupado.csv",
+  row.names = FALSE,
+  fileEncoding = "UTF-8"
+)
+```
+

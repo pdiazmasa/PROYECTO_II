@@ -1,0 +1,331 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# SCRIPT 3 — Cálculo de distancias de municipios a hospitales y centros educativos
+
+En este tercer script construímos los datasets finales de distancias para Vizcaya y Valencia. Para ello, partimos de los municipios geocodificados y de los servicios geocodificados en el script anterior. Primero estandarizaremos los nombres de municipio para mejorar los cruces textuales. Después, comprobamos si cada municipio ya dispone de hospital o centro educativo propio; si es así, asignamos distancia 0 (está en el propio municipio). En caso contrario, calculamos la distancia euclídea desde el municipio a todos los servicios válidos de su provincia, seleccionamos el más cercano y entonces intentamos obtener la distancia real en coche mediante OSRM. Si no es posible calcular la ruta, utilizamos la distancia euclídea como valor de respaldo. El resultado final son dos tablas, una para Valencia y otra para Vizcaya, con las columnas municipio, distancia_centro_educativo y distancia_hospital.
+
+1.  Cargamos las librerías necesarias para el script
+
+```{r}
+# Cargamos las librerías necesarias para leer, limpiar y calcular distancias
+library(tidyverse)
+library(sf)
+library(osrm)
+
+# Fijamos el servidor público de OSRM para calcular distancias en coche
+options(
+  osrm.server = "https://router.project-osrm.org/",
+  osrm.profile = "car"
+)
+```
+
+2.  Fijamos las rutas de entrada (bases de datos) y de salida (datasets hechos)
+
+```{r}
+# Definimos las rutas de entrada
+ruta_municipios_vizcaya <- "../datasets/municipios_vizcaya_coords.csv"
+ruta_municipios_valencia <- "../datasets/municipios_valencia_coords.csv"
+
+ruta_hospitales_vizcaya <- "../datasets/hospitales_vizcaya_coords.csv"
+ruta_hospitales_valencia <- "../datasets/hospitales_valencia_coords.csv"
+
+ruta_centros_vizcaya <- "../datasets/centros_educativos_vizcaya_coords.csv"
+ruta_centros_valencia <- "../datasets/centros_educativos_valencia_coords.csv"
+
+# Definimos las rutas de salida
+ruta_output_distancias_vizcaya <- "../datasets/dataset_distancias_vizcaya.csv"
+ruta_output_distancias_valencia <- "../datasets/dataset_distancias_valencia.csv"
+```
+
+3.  Leemos los datasets
+
+```{r}
+# Leemos los municipios, que vienen con separador ,
+leer_municipios <- function(ruta_csv) {
+  read_csv(ruta_csv, show_col_types = FALSE) |>
+    transmute(
+      municipio,
+      lat = as.numeric(lat),
+      lon = as.numeric(lon)
+    )
+}
+
+# Leemos los hospitales, que vienen con separador ; y decimal con coma
+leer_hospitales <- function(ruta_csv) {
+  read_delim(
+    ruta_csv,
+    delim = ";",
+    show_col_types = FALSE,
+    locale = locale(decimal_mark = ","),
+    na = c("NA", "")
+  ) |>
+    transmute(
+      nombre_hospital,
+      municipio,
+      lat = as.numeric(lat),
+      lon = as.numeric(lon)
+    )
+}
+
+# Leemos los centros educativos, que vienen con separador ; y decimal con punto
+leer_centros <- function(ruta_csv) {
+  read_delim(
+    ruta_csv,
+    delim = ";",
+    show_col_types = FALSE,
+    na = c("NA", "")
+  ) |>
+    transmute(
+      nombre_centro,
+      municipio,
+      lat = as.numeric(lat),
+      lon = as.numeric(lon)
+    )
+}
+```
+
+4.  Limpieza y normalización de municipios (csv no admite ciertos caracteres)
+
+```{r}
+# Leemos los municipios
+municipios_vizcaya <- leer_municipios(ruta_municipios_vizcaya)
+municipios_valencia <- leer_municipios(ruta_municipios_valencia)
+
+# Leemos los hospitales
+hospitales_vizcaya <- leer_hospitales(ruta_hospitales_vizcaya)
+hospitales_valencia <- leer_hospitales(ruta_hospitales_valencia)
+
+# Leemos los centros educativos
+centros_vizcaya <- leer_centros(ruta_centros_vizcaya)
+centros_valencia <- leer_centros(ruta_centros_valencia)
+```
+
+5.  Hacemos las funciones mismo_municipio, distancias_euclideas_km, distancia_coche_km y calcular_distancia_servicio
+
+```{r}
+# Creamos una función para normalizar nombres de municipio
+normalizar_municipio <- function(x) {
+  x |>
+    iconv(from = "UTF-8", to = "ASCII//TRANSLIT") |>
+    str_to_lower() |>
+    str_replace_all("[^a-z0-9]", " ") |>
+    str_squish()
+}
+
+# Limpiamos los municipios
+municipios_vizcaya <- municipios_vizcaya |>
+  filter(!is.na(lat), !is.na(lon)) |>
+  mutate(municipio_norm = normalizar_municipio(municipio))
+
+municipios_valencia <- municipios_valencia |>
+  filter(!is.na(lat), !is.na(lon)) |>
+  mutate(municipio_norm = normalizar_municipio(municipio))
+
+# Limpiamos los hospitales
+hospitales_vizcaya <- hospitales_vizcaya |>
+  filter(!is.na(lat), !is.na(lon)) |>
+  mutate(municipio_norm = normalizar_municipio(municipio))
+
+hospitales_valencia <- hospitales_valencia |>
+  filter(!is.na(lat), !is.na(lon)) |>
+  mutate(municipio_norm = normalizar_municipio(municipio))
+
+# Limpiamos los centros educativos
+centros_vizcaya <- centros_vizcaya |>
+  filter(!is.na(lat), !is.na(lon)) |>
+  mutate(municipio_norm = normalizar_municipio(municipio))
+
+centros_valencia <- centros_valencia |>
+  filter(!is.na(lat), !is.na(lon)) |>
+  mutate(municipio_norm = normalizar_municipio(municipio))
+```
+
+6.  Hacemos las funciones para el cálculo de distancias
+
+```{r}
+# Comprobamos si un municipio ya tiene un servicio propio
+# Permitimos tanto coincidencia exacta como coincidencia por inclusión
+mismo_municipio <- function(municipio_norm, vector_servicios_norm) {
+  vector_servicios_norm <- vector_servicios_norm[!is.na(vector_servicios_norm)]
+
+  if (length(vector_servicios_norm) == 0) {
+    return(FALSE)
+  }
+
+  any(
+    vector_servicios_norm == municipio_norm |
+      str_detect(vector_servicios_norm, fixed(municipio_norm)) |
+      str_detect(municipio_norm, fixed(vector_servicios_norm)),
+    na.rm = TRUE
+  )
+}
+
+# Calculamos las distancias euclídeas en km desde un municipio a todos los servicios
+distancias_euclideas_km <- function(lat_origen, lon_origen, servicios_df) {
+
+  if (nrow(servicios_df) == 0) {
+    return(numeric(0))
+  }
+
+  origen_sf <- tibble(lon = lon_origen, lat = lat_origen) |>
+    st_as_sf(coords = c("lon", "lat"), crs = 4326) |>
+    st_transform(25830)
+
+  servicios_sf <- servicios_df |>
+    st_as_sf(coords = c("lon", "lat"), crs = 4326) |>
+    st_transform(25830)
+
+  as.numeric(st_distance(origen_sf, servicios_sf)) / 1000
+}
+
+# Intentamos calcular la distancia en coche con OSRM
+distancia_coche_km <- function(lat_origen, lon_origen, lat_destino, lon_destino) {
+
+  if (
+    is.na(lat_origen) || is.na(lon_origen) ||
+    is.na(lat_destino) || is.na(lon_destino)
+  ) {
+    return(NA_real_)
+  }
+
+  origen <- data.frame(id = "origen", lon = lon_origen, lat = lat_origen)
+  destino <- data.frame(id = "destino", lon = lon_destino, lat = lat_destino)
+
+  resultado <- tryCatch({
+    osrmTable(src = origen, dst = destino)
+  }, error = function(e) NULL)
+
+  if (is.null(resultado) || is.null(resultado$distances)) {
+    return(NA_real_)
+  }
+
+  as.numeric(resultado$distances[1, 1])
+}
+
+# Calculamos la distancia final desde un municipio a un tipo de servicio
+calcular_distancia_final <- function(lat_mun, lon_mun, municipio_norm, servicios_df) {
+
+  # Si no hay servicios válidos, devolvemos NA
+  if (nrow(servicios_df) == 0) {
+    return(NA_real_)
+  }
+
+  # Si el municipio ya tiene ese servicio, devolvemos 0
+  if (mismo_municipio(municipio_norm, servicios_df$municipio_norm)) {
+    return(0)
+  }
+
+  # Si no, buscamos el servicio más cercano por distancia euclídea
+  dist_euclideas <- distancias_euclideas_km(lat_mun, lon_mun, servicios_df)
+
+  if (length(dist_euclideas) == 0 || all(is.na(dist_euclideas))) {
+    return(NA_real_)
+  }
+
+  idx_min <- which.min(dist_euclideas)
+  servicio_cercano <- servicios_df[idx_min, ]
+  dist_euclidea_min <- dist_euclideas[idx_min]
+
+  # Intentamos calcular la distancia en coche
+  dist_coche <- distancia_coche_km(
+    lat_origen = lat_mun,
+    lon_origen = lon_mun,
+    lat_destino = servicio_cercano$lat,
+    lon_destino = servicio_cercano$lon
+  )
+
+  # Si falla OSRM, usamos la euclídea
+  if (is.na(dist_coche)) {
+    return(round(dist_euclidea_min, 2))
+  }
+
+  round(dist_coche, 2)
+}
+```
+
+7.  Calculamos las distancias para Vizcaya
+
+```{r}
+# Calculamos la distancia a hospitales para Vizcaya
+dist_hospital_vizcaya <- map_dbl(
+  seq_len(nrow(municipios_vizcaya)),
+  function(i) {
+    calcular_distancia_final(
+      lat_mun = municipios_vizcaya$lat[i],
+      lon_mun = municipios_vizcaya$lon[i],
+      municipio_norm = municipios_vizcaya$municipio_norm[i],
+      servicios_df = hospitales_vizcaya
+    )
+  }
+)
+
+# Calculamos la distancia a centros educativos para Vizcaya
+dist_centro_vizcaya <- map_dbl(
+  seq_len(nrow(municipios_vizcaya)),
+  function(i) {
+    calcular_distancia_final(
+      lat_mun = municipios_vizcaya$lat[i],
+      lon_mun = municipios_vizcaya$lon[i],
+      municipio_norm = municipios_vizcaya$municipio_norm[i],
+      servicios_df = centros_vizcaya
+    )
+  }
+)
+
+# Construimos el dataset final de Vizcaya
+dataset_distancias_vizcaya <- municipios_vizcaya |>
+  transmute(
+    municipio,
+    distancia_centro_educativo = dist_centro_vizcaya,
+    distancia_hospital = dist_hospital_vizcaya
+  )
+```
+
+9.  Calculamos las distancias finales para Valencia
+
+```{r}
+# Calculamos la distancia a hospitales para Valencia
+dist_hospital_valencia <- map_dbl(
+  seq_len(nrow(municipios_valencia)),
+  function(i) {
+    calcular_distancia_final(
+      lat_mun = municipios_valencia$lat[i],
+      lon_mun = municipios_valencia$lon[i],
+      municipio_norm = municipios_valencia$municipio_norm[i],
+      servicios_df = hospitales_valencia
+    )
+  }
+)
+
+# Calculamos la distancia a centros educativos para Valencia
+dist_centro_valencia <- map_dbl(
+  seq_len(nrow(municipios_valencia)),
+  function(i) {
+    calcular_distancia_final(
+      lat_mun = municipios_valencia$lat[i],
+      lon_mun = municipios_valencia$lon[i],
+      municipio_norm = municipios_valencia$municipio_norm[i],
+      servicios_df = centros_valencia
+    )
+  }
+)
+
+# Construimos el dataset final de Valencia
+dataset_distancias_valencia <- municipios_valencia |>
+  transmute(
+    municipio,
+    distancia_centro_educativo = dist_centro_valencia,
+    distancia_hospital = dist_hospital_valencia
+  )
+```
+
+9.  Guardamos los datasets
+
+```{r}
+# Guardamos los datasets finales de distancias
+write_csv(dataset_distancias_vizcaya, ruta_output_distancias_vizcaya)
+write_csv(dataset_distancias_valencia, ruta_output_distancias_valencia)
+```

@@ -1,0 +1,1316 @@
+---
+title: "dataset_final_valencia"
+output: html_document
+date: "2026-04-12"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## PREPARACIONES INICIALES
+
+### Carga de paquetes
+
+```{r}
+library(dplyr)
+library(readr)
+library(readxl)
+library(stringr)
+library(stringi)
+```
+
+### Función de normalización de municipios
+
+```{r}
+normalizar_municipio <- function(x) {
+  x <- tolower(x)
+  x <- stringi::stri_trans_general(x, "Latin-ASCII")
+  x <- str_squish(x)
+  
+  # Recolocar articulos al principio
+  x <- str_replace(x, "^(.*),\\s*la$", "la \\1")
+  x <- str_replace(x, "^(.*),\\s*el$", "el \\1")
+  x <- str_replace(x, "^(.*),\\s*les$", "les \\1")
+  x <- str_replace(x, "^(.*),\\s*els$", "els \\1")
+  x <- str_replace(x, "^(.*),\\s*l'$", "l'\\1")
+  
+  # Si hay nombres bilingues con "/", quedarse con la parte de la derecha
+  x <- ifelse(str_detect(x, "/"),
+              str_trim(word(x, 2, sep = fixed("/"))),
+              x)
+  
+  x <- str_squish(x)
+  
+  return(x)
+}
+```
+
+## CONSTRUCCIÓN DE LA BASE PRINCIPAL DE MUNICIPIOS
+
+### Lectura de la base de datos del censo
+
+```{r}
+censo <- read_delim("censo_municipios_valencia.csv", delim = ";", show_col_types = FALSE)
+```
+
+### Exploración inicial del censo
+
+```{r}
+head(censo)
+dim(censo)
+colnames(censo)
+str(censo)
+```
+
+### Transformación de variables numéricas
+
+```{r}
+# Eliminar separadores de miles y convertir la población a formato numérico
+censo$Total <- as.numeric(gsub("\\.", "", censo$Total))
+```
+
+### Eliminación de filas no municipales
+
+```{r}
+# Eliminar filas que corresponden a totales provinciales y no a municipios concretos
+censo_muni <- filter(censo, !is.na(Municipios) & Municipios != "")
+```
+
+### Separación del código y nombre de municipio
+
+```{r}
+censo_muni$cod_municipio <- str_sub(censo_muni$Municipios, 1, 5)
+censo_muni$nombre_municipio_original <- str_sub(censo_muni$Municipios, 7)
+
+head(censo_muni[, c("Municipios", "cod_municipio", "nombre_municipio_original")])
+```
+
+### Estandarización del nombre de municipio
+
+```{r}
+censo_muni$nombre_municipio_norm <- normalizar_municipio(censo_muni$nombre_municipio_original)
+
+head(censo_muni[, c("nombre_municipio_original", "nombre_municipio_norm")])
+```
+
+### Construcción de la tabla base de municipios
+
+```{r}
+municipios_valencia_base <- filter(censo_muni,
+                                   Nacionalidad == "Total" &
+                                   `Edad (grandes grupos)` == "Todas las edades")
+
+municipios_valencia_base <- municipios_valencia_base[, c("cod_municipio",
+                                                         "nombre_municipio_original",
+                                                         "nombre_municipio_norm",
+                                                         "Total")]
+
+colnames(municipios_valencia_base) <- c("cod_municipio",
+                                        "nombre_municipio",
+                                        "nombre_municipio_norm",
+                                        "pob_total")
+
+head(municipios_valencia_base)
+dim(municipios_valencia_base)
+```
+
+### Comprobación de duplicados y cobertura
+
+```{r}
+sum(duplicated(municipios_valencia_base$cod_municipio))
+sum(duplicated(municipios_valencia_base$nombre_municipio))
+sum(duplicated(municipios_valencia_base$nombre_municipio_norm))
+
+dim(municipios_valencia_base)
+```
+
+## BLOQUE DEMOGRÁFICO
+
+### Obtención de la población extranjera
+
+```{r}
+extranjeros_muni <- filter(censo_muni,
+                           Nacionalidad == "Extranjera" &
+                           `Edad (grandes grupos)` == "Todas las edades")
+
+extranjeros_muni <- extranjeros_muni[, c("cod_municipio", "Total")]
+
+colnames(extranjeros_muni) <- c("cod_municipio", "pob_extranjera")
+
+head(extranjeros_muni)
+dim(extranjeros_muni)
+```
+
+### Obtención de la población menor de 16 años
+
+```{r}
+menores16_muni <- filter(censo_muni,
+                         Nacionalidad == "Total" &
+                         `Edad (grandes grupos)` == "Menos de 16 años")
+
+menores16_muni <- menores16_muni[, c("cod_municipio", "Total")]
+
+colnames(menores16_muni) <- c("cod_municipio", "pob_menor_16")
+
+head(menores16_muni)
+dim(menores16_muni)
+```
+
+### Obtención de la población de 65 y más años
+
+```{r}
+mayores65_muni <- filter(censo_muni,
+                         Nacionalidad == "Total" &
+                         `Edad (grandes grupos)` == "65 y más años")
+
+mayores65_muni <- mayores65_muni[, c("cod_municipio", "Total")]
+
+colnames(mayores65_muni) <- c("cod_municipio", "pob_mayor_65")
+
+head(mayores65_muni)
+dim(mayores65_muni)
+```
+
+### Incorporación de variables demográficas auxiliares
+
+```{r}
+municipios_valencia_base <- left_join(municipios_valencia_base,
+                                      extranjeros_muni,
+                                      by = "cod_municipio")
+
+municipios_valencia_base <- left_join(municipios_valencia_base,
+                                      menores16_muni,
+                                      by = "cod_municipio")
+
+municipios_valencia_base <- left_join(municipios_valencia_base,
+                                      mayores65_muni,
+                                      by = "cod_municipio")
+
+head(municipios_valencia_base)
+```
+
+### Creación de indicadores demográficos
+
+```{r}
+municipios_valencia_base$pct_extranjeros <- 
+  (municipios_valencia_base$pob_extranjera / municipios_valencia_base$pob_total) * 100
+
+municipios_valencia_base$indice_envejecimiento <- ifelse(
+  municipios_valencia_base$pob_menor_16 == 0,
+  NA, (municipios_valencia_base$pob_mayor_65 / municipios_valencia_base$pob_menor_16) * 100)
+
+head(municipios_valencia_base)
+```
+
+### Comprobación de resultados del bloque demográfico
+
+```{r}
+head(municipios_valencia_base)
+
+summary(municipios_valencia_base[, c("pob_total",
+                                     "pob_extranjera",
+                                     "pob_menor_16",
+                                     "pob_mayor_65",
+                                     "pct_extranjeros",
+                                     "indice_envejecimiento")])
+```
+
+## BLOQUE EDUCATIVO
+
+### Nivel educativo por municipio
+
+### Lectura y exploración inicial de la base de nivel educativo
+
+```{r}
+estudios <- readr::read_delim("Nivel_educativo_municipios_valencia.csv",
+                              delim = ";",
+                              show_col_types = FALSE,
+                              locale = locale(encoding = "Latin1"))
+
+head(estudios)
+dim(estudios)
+colnames(estudios)
+```
+
+### Limpieza de la base de datos de nivel educativo
+
+En este apartado se transforma la variable `Total` a formato numérico y se construyen las variables identificativas del municipio a partir de la columna `Municipios de 500 habitantes o más`.
+
+```{r}
+estudios$Total <- gsub("\\.", "", estudios$Total)
+estudios$Total <- as.numeric(estudios$Total)
+
+estudios$cod_municipio <- str_sub(estudios$`Municipios de 500 habitantes o más`, 1, 5)
+estudios$nombre_municipio_original <- str_sub(estudios$`Municipios de 500 habitantes o más`, 7)
+
+estudios$nombre_municipio <- str_squish(estudios$nombre_municipio_original)
+estudios$nombre_municipio_norm <- normalizar_municipio(estudios$nombre_municipio)
+
+head(estudios[, c("Municipios de 500 habitantes o más",
+                  "cod_municipio",
+                  "nombre_municipio",
+                  "nombre_municipio_norm")], 5)
+```
+
+### Selección de la población total
+
+A continuación, se selecciona la población total de 15 y más años para cada municipio. Esta variable se utilizará como denominador para calcular el porcentaje de población con estudios superiores.
+
+```{r}
+total_estudios <- estudios %>%
+  filter(Sexo == "Total",
+         `País de nacimiento` == "Total",
+         `Nivel de estudios` != "Total") %>%
+  group_by(cod_municipio) %>%
+  summarise(total_estudios = sum(Total, na.rm = TRUE),
+            .groups = "drop")
+
+head(total_estudios)
+dim(total_estudios)
+```
+
+### Selección de la población con estudios superiores
+
+Seguidamente, se selecciona la población con estudios superiores para cada municipio. En este caso, se suman las categorías de grados universitarios, máster y doctorado.
+
+```{r}
+estudios_sup_muni <- estudios %>%
+  filter(Sexo == "Total",
+         `País de nacimiento` == "Total",
+         `Nivel de estudios` %in% c(
+           "Grados universitarios de hasta 240 créditos ECTS, diplomados universitarios y equivalentes",
+           "Grados universitarios de más de 240 créditos ECTS, licenciados y equivalentes",
+           "Másteres, especialidades en Ciencias de la Salud por el sistema de residencia y similares",
+           "Doctorado universitario"
+         )) %>%
+  group_by(cod_municipio) %>%
+  summarise(pob_estudios_sup = sum(Total, na.rm = TRUE),
+            .groups = "drop")
+
+head(estudios_sup_muni)
+dim(estudios_sup_muni)
+```
+
+### Cálculo de la variable `pct_estudios_sup`
+
+Una vez obtenidos el total de población y la población con estudios superiores, se calcula el porcentaje correspondiente para cada municipio.
+
+```{r}
+pct_estudios_sup <- left_join(total_estudios,
+                              estudios_sup_muni,
+                              by = "cod_municipio")
+
+pct_estudios_sup$pct_estudios_sup <- 
+  (pct_estudios_sup$pob_estudios_sup / pct_estudios_sup$total_estudios) * 100
+
+head(pct_estudios_sup)
+dim(pct_estudios_sup)
+```
+
+### Incorporación de la variable a la base principal
+
+```{r}
+municipios_valencia_base <- left_join(
+  municipios_valencia_base,
+  pct_estudios_sup[, c("cod_municipio", "pct_estudios_sup")],
+  by = "cod_municipio"
+)
+
+head(municipios_valencia_base)
+```
+
+### Comprobación de resultados del nivel educativo
+
+```{r}
+summary(municipios_valencia_base$pct_estudios_sup)
+sum(is.na(municipios_valencia_base$pct_estudios_sup))
+head(municipios_valencia_base[, c("cod_municipio",
+                                  "nombre_municipio",
+                                  "pct_estudios_sup")])
+```
+
+### Centros educativos
+
+### Lectura y exploración inicial de la base de centros educativos
+
+```{r}
+centros_edu <- readxl::read_excel("listado_centros_valencia.xls", sheet = "Listado de centros")
+
+head(centros_edu)
+dim(centros_edu)
+colnames(centros_edu)
+```
+
+### Selección de tipos de centro
+
+```{r}
+centros_edu <- centros_edu %>%
+  filter(`DENOMINACIÓN GENÉRICA` %in% c(
+    "Colegio Rural Agrupado",
+    "Instituto de Educación Secundaria",
+    "Colegio de Educación Infantil y Primaria",
+    "Centro Privado de Educación Infantil Primaria y Secundaria",
+    "Centro Privado de Educación Infantil y Primaria",
+    "Centro Privado de Educación Secundaria",
+    "Colegio de Educación Primaria"
+  ))
+
+head(centros_edu)
+dim(centros_edu)
+```
+
+### Construcción y normalización de la variable municipio
+
+```{r}
+centros_edu$nombre_municipio <- str_squish(centros_edu$LOCALIDAD)
+centros_edu$nombre_municipio_norm <- normalizar_municipio(centros_edu$nombre_municipio)
+
+head(centros_edu[, c("LOCALIDAD",
+                     "nombre_municipio",
+                     "nombre_municipio_norm")])
+```
+
+### Corrección manual de nombres
+
+En algunos casos, la base de centros educativos utiliza denominaciones distintas a las del censo municipal. Para evitar pérdidas de información en el cruce, construimos una variable auxiliar con algunas equivalencias manuales detectadas durante la revisión de los municipios sin coincidencia.
+
+```{r}
+centros_edu$nombre_municipio_join <- centros_edu$nombre_municipio_norm
+
+centros_edu$nombre_municipio_join[centros_edu$nombre_municipio_join == "villanueva de castellon"] <- "castello"
+centros_edu$nombre_municipio_join[centros_edu$nombre_municipio_join == "genoves"] <- "el genoves"
+centros_edu$nombre_municipio_join[centros_edu$nombre_municipio_join == "algimia de alfara"] <- "algimia d'alfara"
+centros_edu$nombre_municipio_join[centros_edu$nombre_municipio_join == "bellreguard poble"] <- "bellreguard"
+
+head(centros_edu[, c("nombre_municipio_norm", "nombre_municipio_join")])
+```
+
+### Conteo de centros educativos por municipio
+
+```{r}
+colegios_muni <- centros_edu %>%
+  group_by(nombre_municipio_join) %>%
+  summarise(num_colegios = n(),
+            .groups = "drop")
+
+head(colegios_muni)
+dim(colegios_muni)
+```
+
+### Incorporación de la variable `num_colegios`
+
+```{r}
+municipios_valencia_base <- left_join(
+  municipios_valencia_base,
+  colegios_muni,
+  by = c("nombre_municipio_norm" = "nombre_municipio_join")
+)
+
+municipios_valencia_base$num_colegios[is.na(municipios_valencia_base$num_colegios)] <- 0
+
+head(municipios_valencia_base[, c("nombre_municipio",
+                                  "nombre_municipio_norm",
+                                  "num_colegios")])
+```
+
+### Cálculo de la variable `ratio_colegios`
+
+```{r}
+municipios_valencia_base$ratio_colegios <- 
+  (municipios_valencia_base$num_colegios / municipios_valencia_base$pob_total) * 1000
+
+head(municipios_valencia_base[, c("nombre_municipio",
+                                  "num_colegios",
+                                  "pob_total",
+                                  "ratio_colegios")])
+```
+
+### Comprobación de resultados de los centros educativos
+
+```{r}
+summary(municipios_valencia_base$ratio_colegios)
+sum(is.na(municipios_valencia_base$num_colegios))
+sum(is.na(municipios_valencia_base$ratio_colegios))
+
+head(municipios_valencia_base[, c("nombre_municipio",
+                                  "num_colegios",
+                                  "ratio_colegios")])
+```
+
+### Columna reservada de distancia al centro educativo
+
+Aunque en esta parte del trabajo no se calcula todavía la distancia al centro educativo más cercano, se crea ya la columna (vacía con valores faltantes que serán numéricos) correspondiente en la tabla principal para dejar preparada la estructura del dataset final. Esta variable será completada posteriormente con los valores calculados para cada municipio.
+
+```{r}
+municipios_valencia_base$distancia_centro_educativo <- NA
+```
+
+## BLOQUE SANITARIO
+
+### Atención primaria y centros de salud
+
+### Lectura y exploración inicial de la base de atención primaria
+
+```{r}
+ap <- read_delim("centros_AP_municipios_valencia.csv",
+                      delim = ";",
+                      show_col_types = FALSE)
+head(ap)
+dim(ap)
+colnames(ap)
+```
+
+### Revisión de tipos de centro
+
+Antes de construir las variables, revisamos qué categorías aparecen en la variable TIPO CENTRO, ya que nos interesa distinguir entre CENTRO SALUD y CONSULTORIO LOCAL.
+
+```{r}
+table(ap$`TIPO CENTRO`)
+unique(ap$`TIPO CENTRO`)
+```
+
+### Construcción y normalización de la variable municipio
+
+```{r}
+ap$LOCALIDAD <- str_replace_all(ap$LOCALIDAD, "[´`’]", "'")
+ap$LOCALIDAD <- str_replace_all(ap$LOCALIDAD, "'\\s+", "'")
+
+ap$nombre_municipio <- str_squish(ap$LOCALIDAD)
+ap$nombre_municipio_norm <- normalizar_municipio(ap$nombre_municipio)
+
+head(ap[, c("LOCALIDAD",
+            "nombre_municipio",
+            "nombre_municipio_norm")])
+```
+
+### Corrección manual de nombres
+
+Igual que en la base de centros educativos, algunos municipios pueden aparecer con nombres distintos respecto al censo. Por eso creamos una variable auxiliar para el cruce y aplicamos algunas equivalencias manuales.
+
+```{r}
+ap$nombre_municipio_join <- ap$nombre_municipio_norm
+
+ap$nombre_municipio_join[ap$nombre_municipio_join == "villanueva de castellon"] <- "castello"
+ap$nombre_municipio_join[ap$nombre_municipio_join == "s antonio de benageber"] <- "san antonio de benageber"
+ap$nombre_municipio_join[ap$nombre_municipio_join == "guadasequies"] <- "guadassequies"
+ap$nombre_municipio_join[ap$nombre_municipio_join == "real de gandia"] <- "el real de gandia"
+ap$nombre_municipio_join[ap$nombre_municipio_join == "masalaves"] <- "massalaves"
+ap$nombre_municipio_join[ap$nombre_municipio_join == "san juan de enova"] <- "sant joanet"
+ap$nombre_municipio_join[ap$nombre_municipio_join == "alfarp"] <- "alfarb"
+ap$nombre_municipio_join[ap$nombre_municipio_join == "llosa de ranes"] <- "la llosa de ranes"
+ap$nombre_municipio_join[ap$nombre_municipio_join == "benicull"] <- "benicull de xuquer"
+ap$nombre_municipio_join[ap$nombre_municipio_join == "alfara de algimia"] <- "alfara de la baronia"
+ap$nombre_municipio_join[ap$nombre_municipio_join == "genoves"] <- "el genoves"
+ap$nombre_municipio_join[ap$nombre_municipio_join == "castellonet"] <- "castellonet de la conquesta"
+ap$nombre_municipio_join[ap$nombre_municipio_join == "palomar"] <- "el palomar"
+ap$nombre_municipio_join[ap$nombre_municipio_join == "algimia de alfara"] <- "algimia d'alfara"
+ap$nombre_municipio_join[ap$nombre_municipio_join == "bellreguard poble"] <- "bellreguard"
+ap$nombre_municipio_join[ap$nombre_municipio_join == "l alqueria de la comtessa"] <- "l'alqueria de la comtessa"
+ap$nombre_municipio_join[ap$nombre_municipio_join == "pobla de vallbona"] <- "la pobla de vallbona"
+
+head(ap[, c("LOCALIDAD", "nombre_municipio_norm", "nombre_municipio_join")], 10)
+```
+
+### Construcción de la variable `num_centros_salud`
+
+```{r}
+centros_salud_muni <- ap %>%
+  filter(`TIPO CENTRO` == "CENTRO SALUD") %>%
+  group_by(nombre_municipio_join) %>%
+  summarise(num_centros_salud = n(),
+            .groups = "drop")
+
+municipios_valencia_base <- left_join(
+  municipios_valencia_base,
+  centros_salud_muni,
+  by = c("nombre_municipio_norm" = "nombre_municipio_join")
+)
+
+municipios_valencia_base$num_centros_salud[is.na(municipios_valencia_base$num_centros_salud)] <- 0
+
+head(municipios_valencia_base[, c("nombre_municipio",
+                                  "nombre_municipio_norm",
+                                  "num_centros_salud")])
+```
+
+### Cálculo de la variable `ratio_centros_salud`
+
+```{r}
+municipios_valencia_base$ratio_centros_salud <- 
+  (municipios_valencia_base$num_centros_salud / municipios_valencia_base$pob_total) * 1000
+
+head(municipios_valencia_base[, c("nombre_municipio",
+                                  "pob_total",
+                                  "num_centros_salud",
+                                  "ratio_centros_salud")])
+```
+
+### Comprobación de resultados de centros de salud
+
+```{r}
+summary(municipios_valencia_base$ratio_centros_salud)
+sum(is.na(municipios_valencia_base$num_centros_salud))
+sum(is.na(municipios_valencia_base$ratio_centros_salud))
+```
+
+### Consultorio local
+
+### Construcción de la variable `consultorio_local`
+
+Construimos una variable binaria que valga 1 si el municipio tiene al menos un registro con TIPO CENTRO == "CONSULTORIO LOCAL" y 0 en caso contrario.
+
+```{r}
+consultorio_muni <- ap %>%
+  filter(`TIPO CENTRO` == "CONSULTORIO LOCAL") %>%
+  group_by(nombre_municipio_join) %>%
+  summarise(consultorio_local = 1,
+            .groups = "drop")
+
+head(consultorio_muni)
+dim(consultorio_muni)
+```
+
+### Incorporación a la base principal
+
+```{r}
+municipios_valencia_base <- left_join(
+  municipios_valencia_base,
+  consultorio_muni,
+  by = c("nombre_municipio_norm" = "nombre_municipio_join")
+)
+
+municipios_valencia_base$consultorio_local[is.na(municipios_valencia_base$consultorio_local)] <- 0
+
+head(municipios_valencia_base[, c("nombre_municipio",
+                                  "nombre_municipio_norm",
+                                  "consultorio_local")])
+```
+
+### Comprobación de resultados del consultorio local
+
+```{r}
+table(municipios_valencia_base$consultorio_local)
+sum(is.na(municipios_valencia_base$consultorio_local))
+```
+
+### Hospitales
+
+### Lectura y exploración inicial de la base de hospitales
+
+```{r}
+hospitales <- read_csv("hospitales_valencia.csv", show_col_types = FALSE)
+
+head(hospitales)
+dim(hospitales)
+colnames(hospitales)
+```
+
+### Construcción y normalización de la variable municipio
+
+```{r}
+hospitales$nombre_municipio <- str_squish(hospitales$Municipio)
+hospitales$nombre_municipio_norm <- normalizar_municipio(hospitales$nombre_municipio)
+
+head(hospitales[, c("Municipio",
+                    "nombre_municipio",
+                    "nombre_municipio_norm")])
+```
+
+### Corrección manual de nombres
+
+```{r}
+hospitales$nombre_municipio_join <- hospitales$nombre_municipio_norm
+
+hospitales$nombre_municipio_join[hospitales$nombre_municipio_join == "villanueva de castellon"] <- "castello"
+hospitales$nombre_municipio_join[hospitales$nombre_municipio_join == "s antonio de benageber"] <- "san antonio de benageber"
+hospitales$nombre_municipio_join[hospitales$nombre_municipio_join == "guadasequies"] <- "guadassequies"
+hospitales$nombre_municipio_join[hospitales$nombre_municipio_join == "real de gandia"] <- "el real de gandia"
+hospitales$nombre_municipio_join[hospitales$nombre_municipio_join == "masalaves"] <- "massalaves"
+hospitales$nombre_municipio_join[hospitales$nombre_municipio_join == "san juan de enova"] <- "sant joanet"
+hospitales$nombre_municipio_join[hospitales$nombre_municipio_join == "alfarp"] <- "alfarb"
+hospitales$nombre_municipio_join[hospitales$nombre_municipio_join == "llosa de ranes"] <- "la llosa de ranes"
+hospitales$nombre_municipio_join[hospitales$nombre_municipio_join == "benicull"] <- "benicull de xuquer"
+hospitales$nombre_municipio_join[hospitales$nombre_municipio_join == "alfara de algimia"] <- "alfara de la baronia"
+hospitales$nombre_municipio_join[hospitales$nombre_municipio_join == "genoves"] <- "el genoves"
+hospitales$nombre_municipio_join[hospitales$nombre_municipio_join == "castellonet"] <- "castellonet de la conquesta"
+hospitales$nombre_municipio_join[hospitales$nombre_municipio_join == "palomar"] <- "el palomar"
+hospitales$nombre_municipio_join[hospitales$nombre_municipio_join == "algimia de alfara"] <- "algimia d'alfara"
+hospitales$nombre_municipio_join[hospitales$nombre_municipio_join == "bellreguard poble"] <- "bellreguard"
+hospitales$nombre_municipio_join[hospitales$nombre_municipio_join == "l alqueria de la comtessa"] <- "l'alqueria de la comtessa"
+hospitales$nombre_municipio_join[hospitales$nombre_municipio_join == "pobla de vallbona"] <- "la pobla de vallbona"
+
+head(hospitales[, c("Municipio", "nombre_municipio_norm", "nombre_municipio_join")], 10)
+```
+
+### Construcción de la variable `num_hospitales`
+
+```{r}
+hospitales_muni <- hospitales %>%
+  group_by(nombre_municipio_join) %>%
+  summarise(num_hospitales = n(),
+            .groups = "drop")
+
+municipios_valencia_base <- left_join(
+  municipios_valencia_base,
+  hospitales_muni,
+  by = c("nombre_municipio_norm" = "nombre_municipio_join")
+)
+
+municipios_valencia_base$num_hospitales[is.na(municipios_valencia_base$num_hospitales)] <- 0
+
+head(municipios_valencia_base[, c("nombre_municipio",
+                                  "nombre_municipio_norm",
+                                  "num_hospitales")])
+```
+
+### Cálculo de la variable `ratio_hospital`
+
+```{r}
+municipios_valencia_base$ratio_hospital <- 
+  (municipios_valencia_base$num_hospitales / municipios_valencia_base$pob_total) * 1000
+
+head(municipios_valencia_base[, c("nombre_municipio",
+                                  "pob_total",
+                                  "num_hospitales",
+                                  "ratio_hospital")])
+```
+
+### Incorporación a la base principal
+
+```{r}
+head(municipios_valencia_base[, c("nombre_municipio",
+                                  "num_hospitales",
+                                  "ratio_hospital")])
+```
+
+### Comprobación de resultados de hospitales
+
+```{r}
+summary(municipios_valencia_base$ratio_hospital)
+sum(is.na(municipios_valencia_base$num_hospitales))
+sum(is.na(municipios_valencia_base$ratio_hospital))
+```
+
+### Columna reservada de distancia al hospital
+
+Aunque en esta parte del trabajo no se calcula todavía la distancia al hospital más cercano, se crea ya la columna correspondiente en la tablaprincipal para dejar preparada la estructura del dataset final.
+
+```{r}
+municipios_valencia_base$distancia_hospital <- NA
+```
+
+## BLOQUE DE VIVIENDA Y RENTA
+
+### Alquiler
+
+### Lectura y exploración inicial de la base de alquiler
+
+```{r}
+alquiler <- read_delim("alquiler_municipios_valencia.csv",
+                       delim = ";",
+                       locale = locale(decimal_mark = ","),
+                       show_col_types = FALSE)
+head(alquiler)
+dim(alquiler)
+```
+
+### Construcción y normalización de la variable municipio
+
+```{r}
+alquiler$nombre_municipio <- str_squish(alquiler$Municipio)
+alquiler$nombre_municipio_norm <- normalizar_municipio(alquiler$nombre_municipio)
+
+head(alquiler[, c("Municipio", "nombre_municipio", "nombre_municipio_norm")], 10)
+```
+
+### Corrección manual de nombres
+
+```{r}
+alquiler$nombre_municipio_join <- alquiler$nombre_municipio_norm
+
+alquiler$nombre_municipio_join[alquiler$nombre_municipio_join == "villanueva de castellon"] <- "castello"
+alquiler$nombre_municipio_join[alquiler$nombre_municipio_join == "genoves"] <- "el genoves"
+alquiler$nombre_municipio_join[alquiler$nombre_municipio_join == "algimia de alfara"] <- "algimia d'alfara"
+alquiler$nombre_municipio_join[alquiler$nombre_municipio_join == "guadasequies"] <- "guadassequies"
+alquiler$nombre_municipio_join[alquiler$nombre_municipio_join == "pobla de vallbona"] <- "la pobla de vallbona"
+alquiler$nombre_municipio_join[alquiler$nombre_municipio_join == "masalaves"] <- "massalaves"
+alquiler$nombre_municipio_join[alquiler$nombre_municipio_join == "llosa de ranes"] <- "la llosa de ranes"
+alquiler$nombre_municipio_join[alquiler$nombre_municipio_join == "palomar"] <- "el palomar"
+alquiler$nombre_municipio_join[alquiler$nombre_municipio_join == "benicull"] <- "benicull de xuquer"
+alquiler$nombre_municipio_join[alquiler$nombre_municipio_join == "puig"] <- "el puig de santa maria"
+alquiler$nombre_municipio_join[alquiler$nombre_municipio_join == "real de gandia"] <- "el real de gandia"
+alquiler$nombre_municipio_join[alquiler$nombre_municipio_join == "alfarp"] <- "alfarb"
+alquiler$nombre_municipio_join[alquiler$nombre_municipio_join == "benisano"] <- "benissano"
+alquiler$nombre_municipio_join[alquiler$nombre_municipio_join == "benisuera"] <- "benissuera"
+
+head(alquiler[, c("Municipio", "nombre_municipio_norm", "nombre_municipio_join")], 10)
+```
+
+### Cálculo de la variable `precio_m2_alquiler`
+
+En este apartado se construye la variable `precio_m2_alquiler`, que resume el precio medio del alquiler por municipio a partir de la información disponible en la base de vivienda.
+
+```{r}
+alquiler$precio_m2_alquiler <- with(alquiler,
+  ifelse(!is.na(Precio_Mensual_VC) & !is.na(Precio_Mensual_VU) &
+           !is.na(Recuento_VC) & !is.na(Recuento_VU) &
+           (Recuento_VC + Recuento_VU) > 0,
+         ((Recuento_VC * Precio_Mensual_VC) + (Recuento_VU * Precio_Mensual_VU)) /
+           (Recuento_VC + Recuento_VU),
+         ifelse(!is.na(Precio_Mensual_VC),
+                Precio_Mensual_VC,
+                ifelse(!is.na(Precio_Mensual_VU),
+                       Precio_Mensual_VU,
+                       NA_real_))))
+
+
+head(alquiler[, c("Municipio", "Precio_Mensual_VC", "Precio_Mensual_VU",
+                  "Recuento_VC", "Recuento_VU", "precio_m2_alquiler")], 10)
+```
+
+### Incorporación a la base principal
+
+```{r}
+alquiler_muni <- alquiler %>%
+  select(nombre_municipio_join, precio_m2_alquiler)
+
+municipios_valencia_base <- left_join(
+  municipios_valencia_base,
+  alquiler_muni,
+  by = c("nombre_municipio_norm" = "nombre_municipio_join")
+)
+
+head(municipios_valencia_base[, c("nombre_municipio",
+                                  "nombre_municipio_norm",
+                                  "precio_m2_alquiler")])
+```
+
+### Comprobación de resultados del alquiler
+
+Tras incorporar la variable a la base principal, se comprueba cuántos municipios no disponen de información de alquiler. Estos valores faltantes son esperables en esta fuente, ya que en algunos municipios pequeños no hay suficientes transacciones para generar el indicador.
+
+```{r}
+sum(is.na(municipios_valencia_base$precio_m2_alquiler))
+summary(municipios_valencia_base$precio_m2_alquiler)
+```
+
+### Renta media por hogar
+
+### Lectura y exploración inicial de la base de renta
+
+```{r}
+renta <- read_delim("renta_municipios_valencia.csv",
+                    delim = "\t",
+                    locale = locale(encoding = "Latin1"),
+                    show_col_types = FALSE)
+
+head(renta)
+dim(renta)
+```
+
+### Limpieza de la base de datos de renta
+
+```{r}
+renta$Total <- gsub("\\.", "", renta$Total)
+renta$Total <- as.numeric(renta$Total)
+
+renta$cod_municipio <- str_sub(renta$Municipios, 1, 5)
+renta$nombre_municipio_original <- str_sub(renta$Municipios, 7)
+
+renta$nombre_municipio <- str_squish(renta$nombre_municipio_original)
+renta$nombre_municipio_norm <- normalizar_municipio(renta$nombre_municipio)
+
+head(renta[, c("Municipios", "cod_municipio", "nombre_municipio",
+               "nombre_municipio_norm", "Total")], 5)
+str(renta)
+```
+
+### Selección del indicador de renta
+
+```{r}
+renta_muni <- renta %>%
+  filter(`Indicadores de renta media y mediana` == "Renta neta media por hogar",
+         Periodo == 2022) %>%
+  select(cod_municipio, renta_media_hogar = Total) %>%
+  distinct()
+
+head(renta_muni)
+dim(renta_muni)
+str(renta_muni)
+```
+
+### Comprobación de duplicados y cobertura
+
+```{r}
+sum(duplicated(renta_muni$cod_municipio))
+length(unique(renta_muni$cod_municipio))
+summary(renta_muni$renta_media_hogar)
+```
+
+### Incorporación de la variable `renta_media_hogar`
+
+A continuación, se calcula la variable `esfuerzo_alquiler`, que aproxima el porcentaje de renta media del hogar destinado al pago del alquiler.
+
+```{r}
+municipios_valencia_base <- left_join(municipios_valencia_base,
+                                      renta_muni,
+                                      by = "cod_municipio")
+
+head(municipios_valencia_base[, c("cod_municipio",
+                                  "nombre_municipio",
+                                  "renta_media_hogar")])
+```
+
+### Comprobación de resultados de la renta
+
+Como esta variable depende del precio del alquiler, los municipios sin dato de alquiler también quedarán sin valor en `esfuerzo_alquiler`.
+
+```{r}
+sum(is.na(municipios_valencia_base$renta_media_hogar))
+summary(municipios_valencia_base$renta_media_hogar)
+```
+
+### Esfuerzo de alquiler
+
+### Construcción de la variable `esfuerzo_alquiler`
+
+```{r}
+municipios_valencia_base$esfuerzo_alquiler <- 
+  ((municipios_valencia_base$precio_m2_alquiler * 80) / 
+     (municipios_valencia_base$renta_media_hogar / 12)) * 100
+
+head(municipios_valencia_base[, c("nombre_municipio",
+                                  "precio_m2_alquiler",
+                                  "renta_media_hogar",
+                                  "esfuerzo_alquiler")])
+```
+
+### Comprobación de resultados del esfuerzo de alquiler
+
+```{r}
+sum(is.na(municipios_valencia_base$esfuerzo_alquiler))
+summary(municipios_valencia_base$esfuerzo_alquiler)
+```
+
+## BLOQUE DE INTERNET
+
+### Lectura y exploración inicial de la base de internet
+
+```{r}
+internet <- read_excel("acceso_internet_municipios.xlsx",
+                       sheet = "Municipio_%hogar")
+
+head(internet)
+dim(internet)
+colnames(internet)
+```
+
+### Selección de municipios de Valencia
+
+```{r}
+internet_valencia <- internet %>%
+  filter(Provincia %in% c("Valencia", "València", "Valencia/València"))
+
+head(internet_valencia)
+dim(internet_valencia)
+```
+
+### Construcción del código de municipio
+
+```{r}
+internet_valencia$cod_municipio <- str_pad(internet_valencia$CMUN,
+                                           width = 5,
+                                           side = "left",
+                                           pad = "0")
+
+internet_valencia$nombre_municipio <- str_squish(internet_valencia$Municipio)
+internet_valencia$nombre_municipio_norm <- normalizar_municipio(internet_valencia$nombre_municipio)
+
+head(internet_valencia[, c("CMUN",
+                           "cod_municipio",
+                           "Municipio",
+                           "nombre_municipio_norm")], 5)
+```
+
+### Selección de la variable de cobertura
+
+```{r}
+col_internet <- grep("^Cob\\. 100Mbps.*junio 2023", colnames(internet_valencia), value = TRUE)
+
+col_internet
+
+internet_valencia <- internet_valencia[, c("cod_municipio",
+                                           "nombre_municipio",
+                                           "nombre_municipio_norm",
+                                           col_internet)]
+
+colnames(internet_valencia) <- c("cod_municipio",
+                                 "nombre_municipio",
+                                 "nombre_municipio_norm",
+                                 "pct_hogares_100mbps")
+
+head(internet_valencia)
+```
+
+### Creación de la variable `pct_hogares_100mbps`
+
+```{r}
+internet_valencia$pct_hogares_100mbps <- 
+  as.numeric(internet_valencia$pct_hogares_100mbps) * 100
+
+head(internet_valencia[, c("cod_municipio", "pct_hogares_100mbps")])
+summary(internet_valencia$pct_hogares_100mbps)
+```
+
+### Creación de la variable `internet_100mbps_mayor95`
+
+```{r}
+internet_valencia$internet_100mbps_mayor95 <- ifelse(
+  internet_valencia$pct_hogares_100mbps > 95,
+  1,
+  0
+)
+
+head(internet_valencia[, c("cod_municipio",
+                           "pct_hogares_100mbps",
+                           "internet_100mbps_mayor95")])
+```
+
+### Incorporación a la base principal
+
+```{r}
+municipios_valencia_base <- left_join(
+  municipios_valencia_base,
+  internet_valencia[, c("cod_municipio",
+                        "pct_hogares_100mbps",
+                        "internet_100mbps_mayor95")],
+  by = "cod_municipio"
+)
+
+head(municipios_valencia_base[, c("cod_municipio",
+                                  "nombre_municipio",
+                                  "pct_hogares_100mbps",
+                                  "internet_100mbps_mayor95")])
+```
+
+### Comprobación de resultados del bloque de internet
+
+```{r}
+sum(is.na(municipios_valencia_base$pct_hogares_100mbps))
+sum(is.na(municipios_valencia_base$internet_100mbps_mayor95))
+
+summary(municipios_valencia_base$pct_hogares_100mbps)
+table(municipios_valencia_base$internet_100mbps_mayor95, useNA = "ifany")
+```
+
+## BLOQUE DE CONTRATOS
+
+### Lectura y exploración inicial de la base de contratos
+
+```{r}
+contratos <- read_delim("contratos_sectores_municipios.csv",
+                        delim = ";",
+                        locale = locale(encoding = "Latin1"),
+                        skip = 1,
+                        show_col_types = FALSE)
+
+head(contratos)
+dim(contratos)
+```
+
+### Selección de municipios de Valencia
+
+```{r}
+contratos_valencia <- contratos %>%
+  filter(str_detect(Provincia, "^Valencia")) %>%
+  mutate(
+    cod_municipio = str_pad(as.character(`Codigo Municipio`),
+                            width = 5,
+                            side = "left",
+                            pad = "0"),
+    nombre_municipio = str_squish(` Municipio`)
+  )
+
+dim(contratos_valencia)
+head(contratos_valencia[, c("Código mes ", "mes", "Provincia",
+                            "Codigo Municipio", "cod_municipio",
+                            " Municipio", "nombre_municipio")], 10)
+```
+
+### Limpieza de variables de contratos
+
+Las columnas de contratos vienen como texto y en algunos casos aparece el valor "\<5". Para poder agregarlas después, se sustituye por 3 y se transforman todas las variables a formato numérico.
+
+```{r}
+limpiar_contratos <- function(x) {
+  x <- as.character(x)
+  x <- str_squish(x)
+  x[x == "<5"] <- "3"
+  as.numeric(x)
+}
+
+contratos_valencia$total_contratos_mes <- limpiar_contratos(contratos_valencia$`Total Contratos`)
+contratos_valencia$contratos_agricultura_mes <- limpiar_contratos(contratos_valencia$`Contratos  Agricultura`)
+contratos_valencia$contratos_industria_mes <- limpiar_contratos(contratos_valencia$`Contratos  Industria`)
+contratos_valencia$contratos_construccion_mes <- limpiar_contratos(contratos_valencia$`Contratos Construcción`)
+contratos_valencia$contratos_servicios_mes <- limpiar_contratos(contratos_valencia$`Contratos  Servicios`)
+
+summary(contratos_valencia$total_contratos_mes)
+summary(contratos_valencia$contratos_agricultura_mes)
+summary(contratos_valencia$contratos_industria_mes)
+summary(contratos_valencia$contratos_construccion_mes)
+summary(contratos_valencia$contratos_servicios_mes)
+```
+
+### Construcción de variables anuales por municipio
+
+```{r}
+contratos_muni <- contratos_valencia %>%
+  group_by(cod_municipio) %>%
+  summarise(
+    total_contratos_anual = sum(total_contratos_mes, na.rm = TRUE),
+    contratos_agricultura_abs = sum(contratos_agricultura_mes, na.rm = TRUE),
+    contratos_industria_abs = sum(contratos_industria_mes, na.rm = TRUE),
+    contratos_construccion_abs = sum(contratos_construccion_mes, na.rm = TRUE),
+    contratos_servicios_abs = sum(contratos_servicios_mes, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+head(contratos_muni)
+dim(contratos_muni)
+str(contratos_muni)
+```
+
+### Cálculo de la variable `contratos_total`
+
+```{r}
+contratos_muni$contratos_total <- round(contratos_muni$total_contratos_anual)
+
+head(contratos_muni[, c("cod_municipio", "contratos_total")])
+summary(contratos_muni$contratos_total)
+```
+
+### Cálculo de los porcentajes sectoriales
+
+```{r}
+contratos_muni$suma_abs_sectores <- 
+  contratos_muni$contratos_agricultura_abs +
+  contratos_muni$contratos_industria_abs +
+  contratos_muni$contratos_construccion_abs +
+  contratos_muni$contratos_servicios_abs
+
+contratos_muni$pct_contratos_agricultura <- ifelse(
+  contratos_muni$suma_abs_sectores > 0,
+  (contratos_muni$contratos_agricultura_abs / contratos_muni$suma_abs_sectores) * 100,
+  NA
+)
+
+contratos_muni$pct_contratos_industria <- ifelse(
+  contratos_muni$suma_abs_sectores > 0,
+  (contratos_muni$contratos_industria_abs / contratos_muni$suma_abs_sectores) * 100,
+  NA
+)
+
+contratos_muni$pct_contratos_construccion <- ifelse(
+  contratos_muni$suma_abs_sectores > 0,
+  (contratos_muni$contratos_construccion_abs / contratos_muni$suma_abs_sectores) * 100,
+  NA
+)
+
+contratos_muni$pct_contratos_servicios <- ifelse(
+  contratos_muni$suma_abs_sectores > 0,
+  (contratos_muni$contratos_servicios_abs / contratos_muni$suma_abs_sectores) * 100,
+  NA
+)
+
+contratos_muni <- contratos_muni[, c("cod_municipio",
+                                     "contratos_total",
+                                     "pct_contratos_agricultura",
+                                     "pct_contratos_industria",
+                                     "pct_contratos_construccion",
+                                     "pct_contratos_servicios")]
+
+head(contratos_muni)
+```
+
+### Incorporación a la base principal
+
+```{r}
+municipios_valencia_base <- left_join(municipios_valencia_base,
+                                      contratos_muni,
+                                      by = "cod_municipio")
+
+head(municipios_valencia_base[, c("cod_municipio",
+                                  "nombre_municipio",
+                                  "contratos_total",
+                                  "pct_contratos_agricultura",
+                                  "pct_contratos_industria",
+                                  "pct_contratos_construccion",
+                                  "pct_contratos_servicios")])
+```
+
+### Comprobación de resultados del bloque de contratos
+
+```{r}
+summary(
+  municipios_valencia_base$pct_contratos_agricultura +
+  municipios_valencia_base$pct_contratos_industria +
+  municipios_valencia_base$pct_contratos_construccion +
+  municipios_valencia_base$pct_contratos_servicios
+)
+```
+
+## COMPROBACIÓN DE LA BASE FINAL
+
+### Comprobación final de nombres de variables
+
+```{r}
+colnames(municipios_valencia_base)
+```
+
+### Vista general de la base final
+
+```{r}
+head(municipios_valencia_base)
+dim(municipios_valencia_base)
+str(municipios_valencia_base)
+```
+
+## ANÁLISIS EXPLORATORIO DE LA BASE FINAL
+
+### Descripción general del dataset final
+
+```{r}
+head(municipios_valencia_base)
+dim(municipios_valencia_base)
+str(municipios_valencia_base)
+```
+
+### Análisis de faltantes reales
+
+```{r}
+colSums(is.na(municipios_valencia_base[, c(
+  "cod_municipio",
+  "nombre_municipio",
+  "nombre_municipio_norm",
+  "pob_total",
+  "pob_extranjera",
+  "pob_menor_16",
+  "pob_mayor_65",
+  "pct_extranjeros",
+  "indice_envejecimiento",
+  "pct_estudios_sup",
+  "num_colegios",
+  "ratio_colegios",
+  "num_centros_salud",
+  "ratio_centros_salud",
+  "consultorio_local",
+  "num_hospitales",
+  "ratio_hospital",
+  "precio_m2_alquiler",
+  "renta_media_hogar",
+  "esfuerzo_alquiler",
+  "pct_hogares_100mbps",
+  "internet_100mbps_mayor95",
+  "contratos_total",
+  "pct_contratos_agricultura",
+  "pct_contratos_industria",
+  "pct_contratos_construccion",
+  "pct_contratos_servicios"
+)]))
+```
+
+En general, la base final presenta un buen nivel de completitud. La mayoría de las variables no tienen valores faltantes, lo que indica que el proceso de integración de las distintas fuentes se ha realizado correctamente. Los faltantes se concentran en un número reducido de variables y responden, en general, a limitaciones propias de las fuentes utilizadas y no a errores de lectura o de cruce.
+
+En concreto, `pct_estudios_sup` presenta 46 valores faltantes porque la base de nivel educativo solo ofrece información para municipios de 500 habitantes o más. Por su parte, `precio_m2_alquiler` y `esfuerzo_alquiler` presentan 71 valores faltantes, algo esperable en municipios donde no hay suficientes transacciones de vivienda para estimar el indicador. Además, `renta_media_hogar` presenta 2 valores faltantes y `indice_envejecimiento` presenta 1, en este último caso debido a un municipio con población menor de16 años igual a 0, lo que impide calcular el cociente correspondiente.
+
+### Revisión de valores atípicos
+
+```{r}
+boxplot(municipios_valencia_base$pct_extranjeros,
+        main = "Boxplot de pct_extranjeros")
+
+boxplot(municipios_valencia_base$indice_envejecimiento,
+        main = "Boxplot de indice_envejecimiento")
+
+boxplot(municipios_valencia_base$pct_estudios_sup,
+        main = "Boxplot de pct_estudios_sup")
+
+boxplot(municipios_valencia_base$precio_m2_alquiler,
+        main = "Boxplot de precio_m2_alquiler")
+
+boxplot(municipios_valencia_base$esfuerzo_alquiler,
+        main = "Boxplot de esfuerzo_alquiler")
+```
+
+En general, los diagramas de caja muestran la presencia de algunos valores atípicos, especialmente en `indice_envejecimiento`, `pct_extranjeros` y `pct_estudios_sup`. En el caso de `indice_envejecimiento`, la existencia de muchos valores extremos parece responder a municipios con estructuras de edad muy envejecidas, más que a errores de construcción de la variable. Por su parte, `precio_m2_alquiler` y `esfuerzo_alquiler` presentan una distribución más concentrada y un número menor de valores atípicos.
+
+### Distribución de variables numéricas
+
+```{r}
+hist(municipios_valencia_base$pct_extranjeros,
+     main = "Histograma de pct_extranjeros",
+     xlab = "pct_extranjeros")
+
+hist(municipios_valencia_base$indice_envejecimiento,
+     main = "Histograma de indice_envejecimiento",
+     xlab = "indice_envejecimiento")
+
+hist(municipios_valencia_base$pct_estudios_sup,
+     main = "Histograma de pct_estudios_sup",
+     xlab = "pct_estudios_sup")
+
+hist(municipios_valencia_base$precio_m2_alquiler,
+     main = "Histograma de precio_m2_alquiler",
+     xlab = "precio_m2_alquiler")
+
+hist(municipios_valencia_base$esfuerzo_alquiler,
+     main = "Histograma de esfuerzo_alquiler",
+     xlab = "esfuerzo_alquiler")
+```
+
+Los histogramas permiten observar que `pct_extranjeros` y `pct_estudios_sup` presentan distribuciones asimétricas a la derecha, aunque con una mayor concentración de municipios en valores intermedios. La variable `indice_envejecimiento` muestra una asimetría mucho más acusada, con una gran acumulación de municipios en valores relativamente bajos y una cola larga hacia la derecha. En cambio, `precio_m2_alquiler` y `esfuerzo_alquiler` presentan distribuciones más compactas y regulares.
+
+### Revisión de variables binarias
+
+```{r}
+table(municipios_valencia_base$consultorio_local)
+table(municipios_valencia_base$internet_100mbps_mayor95)
+```
+
+En cuanto a las variables binarias, se observa que la mayoría de los municipios dispone de `consultorio_local`, mientras que una proporción algo menor supera el umbral del 95% de cobertura en `internet_100mbps_mayor95`. Esto sugiere que ambas variables pueden aportar información útil para diferenciar perfiles de municipios.
+
+### Relaciones entre variables
+
+```{r}
+plot(municipios_valencia_base$pct_extranjeros,
+     municipios_valencia_base$pct_estudios_sup,
+     xlab = "pct_extranjeros",
+     ylab = "pct_estudios_sup",
+     main = "pct_extranjeros vs pct_estudios_sup")
+
+plot(municipios_valencia_base$precio_m2_alquiler,
+     municipios_valencia_base$esfuerzo_alquiler,
+     xlab = "precio_m2_alquiler",
+     ylab = "esfuerzo_alquiler",
+     main = "precio_m2_alquiler vs esfuerzo_alquiler")
+
+plot(municipios_valencia_base$renta_media_hogar,
+     municipios_valencia_base$esfuerzo_alquiler,
+     xlab = "renta_media_hogar",
+     ylab = "esfuerzo_alquiler",
+     main = "renta_media_hogar vs esfuerzo_alquiler")
+```
+
+En las relaciones bivariantes analizadas no se aprecia una asociación lineal clara entre `pct_extranjeros` y `pct_estudios_sup`, ya que los puntos aparecen bastante dispersos. En cambio, sí se observa una relación positiva muy marcada entre `precio_m2_alquiler` y `esfuerzo_alquiler`, algo esperable dado que esta última variable depende directamente del precio del alquiler. Por su parte, la relación entre `renta_media_hogar` y `esfuerzo_alquiler` no muestra una pauta lineal tan clara.
+
+## GUARDADO DE LA BASE FINAL
+
+El análisis exploratorio muestra que los municipios de la provincia de Valencia presentan una notable heterogeneidad en dimensiones como la estructura demográfica, el nivel educativo, el acceso a servicios y el mercado de la vivienda. Variables como el índice de envejecimiento, la proporción de población extranjera, el porcentaje de estudios superiores y el esfuerzo de alquiler parecen especialmente útiles para diferenciar perfiles de municipios. En conjunto, la base final construida resulta adecuada para abordarposteriormente la caracterización de municipios planteada en el proyecto.
+
+### Exportación del dataset final
+
+```{r}
+write.csv(municipios_valencia_base,"municipios_valencia_base_final.csv",row.names = FALSE)
+```

@@ -1,0 +1,326 @@
+---
+title: "2."
+output: html_notebook
+---
+
+# SCRIPT 2 — Geocodificación de hospitales y centros educativos
+
+En este segundo script geocodificamos los servicios que después utilizaremos para calcular la accesibilidad territorial de cada municipio. En concreto, trabajamos con dos tipos de equipamientos: hospitales y centros educativos. Para ello, partimos de las bases de datos crudas de Vizcaya y Valencia, limpiamos las variables mínimas necesarias para geocodificar cada registro y, a continuación, consultamos la API de Nominatim para obtener sus coordenadas geográficas. En el caso de educación, no consideramos todos los centros de la base, sino únicamente aquellos vinculados con educación primaria y secundaria, ya que son los que utilizaremos después en las variables `num_colegios`, `ratio_colegios` y `distancia_centro_educativo`. El resultado final del script son cuatro datasets geocodificados: hospitales de Vizcaya, hospitales de Valencia, centros educativos de Vizcaya y centros educativos de Valencia.
+
+1.  Cargamos las librerías que necesitaremos
+
+```{r}
+library(tidyverse) #Leer, limpiar, transformar datos
+library(httr) #Llamar a Nominatim para las coordenadas
+library(jsonlite) #Leer la respuesta JSON
+library(readxl) #Leer los archivos .xls
+```
+
+2.  Fijamos las rutas de entrada (bases de datos) y de salida (datasets hechos)
+
+```{r}
+#Entrada
+ruta_hospitales_bizkaia  <- "../bases_de_datos/hospitales_bizkaia.csv"
+ruta_hospitales_valencia <- "../bases_de_datos/hospitales_valencia.csv"
+
+ruta_centros_bizkaia     <- "../bases_de_datos/listado_centros_bizkaia.xls"
+ruta_centros_valencia    <- "../bases_de_datos/listado_centros_valencia.xls"
+
+#Salida
+ruta_output_hospitales_bizkaia  <- "../datasets/hospitales_vizcaya_coords.csv"
+ruta_output_hospitales_valencia <- "../datasets/hospitales_valencia_coords.csv"
+
+ruta_output_centros_bizkaia     <- "../datasets/centros_educativos_vizcaya_coords.csv"
+ruta_output_centros_valencia    <- "../datasets/centros_educativos_valencia_coords.csv"
+```
+
+3.  Creamos la función para leer y limpiar la base de hospitales
+
+```{r}
+limpiar_hospitales <- function(ruta_csv) {
+
+  read_csv(ruta_csv, show_col_types = FALSE) |>
+    filter(
+      !is.na(Municipio),
+      !is.na(Dirección),
+      !is.na(`Código Postal`)
+    ) |>
+    transmute(
+      # Construimos un nombre identificativo del hospital
+      nombre_hospital = paste("Hospital", Municipio, sep = " - "),
+
+      # Conservamos la dirección original
+      direccion = str_squish(Dirección),
+
+      # Creamos una dirección limpia para la geocodificación
+      direccion_limpia = Direccion <- as.character(Dirección) |>
+        str_replace(",.*", "") |>
+        str_replace("^Avenida\\s+Avda\\.?\\s*", "Avenida ") |>
+        str_replace("^Calle\\s+", "") |>
+        str_squish(),
+
+      # Normalizamos código postal y municipio
+      codigo_postal = str_pad(as.character(`Código Postal`), width = 5, pad = "0"),
+      municipio = str_squish(Municipio)
+    ) |>
+    distinct(direccion_limpia, codigo_postal, municipio, .keep_all = TRUE)
+}
+```
+
+4.  Creamos la función para limpiar los centros educativos
+
+```{r}
+# Creamos una función para leer y limpiar la base de centros educativos
+# y quedarnos solo con los centros relevantes para nuestro análisis
+limpiar_centros_educativos <- function(ruta_xls) {
+
+  read_xls(ruta_xls, sheet = "Listado de centros") |>
+    filter(
+      !is.na(PROVINCIA),
+      !is.na(LOCALIDAD),
+      !is.na(DOMICILIO),
+      !is.na(`CÓD POSTAL`)
+    ) |>
+    
+    # Filtramos únicamente los tipos de centros educativos que nos interesan
+    # para el cálculo del número y ratio de colegios
+    filter(
+      `DENOMINACIÓN GENÉRICA` %in% c(
+        "Colegio Rural Agrupado",
+        "Instituto de Educación Secundaria",
+        "Colegio de Educación Infantil y Primaria",
+        "Centro Privado de Educación Infantil Primaria y Secundaria",
+        "Centro Privado de Educación Infantil y Primaria",
+        "Centro Privado de Educación Secundaria",
+        "Colegio de Educación Primaria"
+      )
+    ) |>
+    
+    transmute(
+      # Usamos la denominación específica como nombre del centro
+      nombre_centro = coalesce(
+        as.character(`DENOMINACIÓN ESPECÍFICA`),
+        as.character(`DENOMINACIÓN GENÉRICA`)
+      ) |> str_squish(),
+
+      # Normalizamos dirección, código postal y municipio
+      direccion = as.character(DOMICILIO) |> str_squish(),
+      codigo_postal = as.character(`CÓD POSTAL`) |> str_pad(width = 5, pad = "0"),
+      municipio = as.character(LOCALIDAD) |> str_squish()
+    ) |>
+    
+    # Eliminamos duplicados por nombre + dirección
+    distinct(nombre_centro, direccion, municipio, .keep_all = TRUE)
+}
+
+head(limpiar_centros_educativos(ruta_centros_bizkaia), 5)
+```
+
+5.  Creamos la función para geocodificar UN servicio
+
+```{r}
+geocodificar_servicio <- function(direccion_limpia, codigo_postal, municipio, pais = "España") {
+
+  # Construimos la query compacta
+  query <- paste(direccion_limpia, codigo_postal, municipio, pais, sep = ", ")
+
+  # Hacemos la petición a la API
+  resp <- tryCatch({
+    GET(
+      url = "https://nominatim.openstreetmap.org/search",
+      query = list(
+        q = query,
+        format = "jsonv2",
+        limit = 1,
+        countrycodes = "es"
+      ),
+      add_headers(`User-Agent` = "ProyectoIICiudadVsPueblo")
+    )
+  }, error = function(e) NULL)
+
+  # Si falla la petición, devolvemos una fila con NA
+  if (is.null(resp) || http_error(resp)) {
+    return(
+      tibble(
+        lat = NA_real_,
+        lon = NA_real_,
+        osm_display = NA_character_,
+        query_usada = query
+      )
+    )
+  }
+
+  # Convertimos la respuesta
+  resultado <- fromJSON(content(resp, "text", encoding = "UTF-8"))
+
+  # Si no hay resultados, devolvemos una fila con NA
+  if (length(resultado) == 0 || nrow(as.data.frame(resultado)) == 0) {
+    return(
+      tibble(
+        lat = NA_real_,
+        lon = NA_real_,
+        osm_display = NA_character_,
+        query_usada = query
+      )
+    )
+  }
+
+  # Si sí hay resultado, extraemos la primera coincidencia
+  tibble(
+    lat = as.numeric(resultado$lat[1]),
+    lon = as.numeric(resultado$lon[1]),
+    osm_display = resultado$display_name[1],
+    query_usada = query
+  )
+}
+```
+
+6.  Creamos la función para geocodificar una lista de servicios
+
+```{r}
+geocodificar_lista_servicios <- function(df_servicios) {
+
+  # Guardamos el número total de servicios para mostrar el progreso
+  total <- nrow(df_servicios)
+  cat(sprintf("Geocodificando %d servicios...\n", total))
+
+  # Preparamos una lista vacía donde iremos guardando los resultados
+  resultados <- vector("list", total)
+
+  # Detectamos automáticamente qué columna identificadora tiene el dataset
+  columna_nombre <- case_when(
+    "nombre_hospital" %in% names(df_servicios) ~ "nombre_hospital",
+    "nombre_centro" %in% names(df_servicios) ~ "nombre_centro",
+    TRUE ~ NA_character_
+  )
+
+  # Recorremos los servicios uno a uno
+  for (i in seq_len(total)) {
+
+    # Mostramos el progreso en consola
+    cat(sprintf("  [%d/%d] %s\n", i, total, df_servicios[[columna_nombre]][i]))
+
+    resultados[[i]] <- geocodificar_servicio(
+      direccion_limpia = df_servicios$direccion_limpia[i],
+      codigo_postal = df_servicios$codigo_postal[i],
+      municipio = df_servicios$municipio[i]
+    )
+
+    # Esperamos 1 segundo entre peticiones para respetar el uso de Nominatim
+    Sys.sleep(1)
+  }
+
+  # Unimos el dataset original con las coordenadas obtenidas
+  bind_cols(df_servicios, bind_rows(resultados))
+}
+
+test <- head(limpiar_hospitales(ruta_hospitales_bizkaia), 5)
+
+geocodificar_lista_servicios(test) |>
+  select(nombre_hospital, direccion_limpia, codigo_postal, municipio, lat, lon, osm_display)
+```
+
+7.  Geocodificamos los hospitales de Vizcaya
+
+```{r}
+# Leemos y limpiamos la base de hospitales de Vizcaya
+hospitales_bizkaia <- limpiar_hospitales(ruta_hospitales_bizkaia)
+
+# Aplicamos la geocodificación a todos los hospitales
+hospitales_bizkaia_coords <- geocodificar_lista_servicios(hospitales_bizkaia)
+
+# Mostramos las primeras filas para comprobar el resultado
+head(hospitales_bizkaia_coords, 5)
+
+# Prueba rápida
+hospitales_bizkaia_coords |>
+  select(nombre_hospital, municipio, lat, lon) |>
+  head(5)
+```
+
+8.  Geocodificamos los hospitales de Valencia
+
+```{r}
+# Leemos y limpiamos la base de hospitales de Valencia
+hospitales_valencia <- limpiar_hospitales(ruta_hospitales_valencia)
+
+# Aplicamos la geocodificación a todos los hospitales
+hospitales_valencia_coords <- geocodificar_lista_servicios(hospitales_valencia)
+
+# Mostramos las primeras filas para comprobar el resultado
+head(hospitales_valencia_coords, 5)
+
+# Prueba rápida
+hospitales_valencia_coords |>
+  select(nombre_hospital, municipio, lat, lon) |>
+  head(5)
+```
+
+9.  Geocodificamos los centros educativos de Vizcaya
+
+```{r}
+# Leemos y limpiamos la base de centros educativos de Bizkaia
+centros_bizkaia <- limpiar_centros_educativos(ruta_centros_bizkaia)
+
+# Si no tenemos direccion_limpia, usamos la dirección original
+centros_bizkaia <- centros_bizkaia |>
+  mutate(direccion_limpia = direccion)
+
+# Aplicamos la geocodificación a todos los centros educativos
+centros_bizkaia_coords <- geocodificar_lista_servicios(centros_bizkaia)
+
+# Mostramos las primeras filas para comprobar el resultado
+head(centros_bizkaia_coords, 5)
+
+# Prueba rápida
+centros_bizkaia_coords |>
+  select(nombre_centro, municipio, lat, lon) |>
+  head(5)
+```
+
+10. Geocodificamos los centros educativos de Valencia
+
+```{r}
+# Leemos y limpiamos la base de centros educativos de Valencia
+centros_valencia <- limpiar_centros_educativos(ruta_centros_valencia)
+
+# Si no tenemos direccion_limpia, usamos la dirección original
+centros_valencia <- centros_valencia |>
+  mutate(direccion_limpia = direccion)
+
+# Aplicamos la geocodificación a todos los centros educativos
+centros_valencia_coords <- geocodificar_lista_servicios(centros_valencia)
+
+# Mostramos las primeras filas para comprobar el resultado
+head(centros_valencia_coords, 5)
+
+# Prueba rápida
+centros_valencia_coords |>
+  select(nombre_centro, municipio, lat, lon) |>
+  head(5)
+```
+
+11. Guardamos los resultados
+
+```{r}
+# Nos quedamos solo con las columnas que necesitaremos en el Script 3
+hospitales_vizcaya_export <- hospitales_bizkaia_coords |>
+  select(nombre_hospital, municipio, lat, lon)
+
+hospitales_valencia_export <- hospitales_valencia_coords |>
+  select(nombre_hospital, municipio, lat, lon)
+
+centros_vizcaya_export <- centros_bizkaia_coords |>
+  select(nombre_centro, municipio, lat, lon)
+
+centros_valencia_export <- centros_valencia_coords |>
+  select(nombre_centro, municipio, lat, lon)
+
+# Guardamos en formato delimitado por ;
+write_delim(hospitales_vizcaya_export, ruta_output_hospitales_bizkaia, delim = ";")
+write_delim(hospitales_valencia_export, ruta_output_hospitales_valencia, delim = ";")
+write_delim(centros_vizcaya_export, ruta_output_centros_bizkaia, delim = ";")
+write_delim(centros_valencia_export, ruta_output_centros_valencia, delim = ";")
+
+cat("Archivos guardados correctamente.\n")
+```

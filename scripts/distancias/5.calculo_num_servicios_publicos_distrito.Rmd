@@ -1,0 +1,200 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# SCRIPT 4 — Cálculo de servicios públicos por distrito (Valencia y Bilbao)
+
+-   Fuente: datasets/zonas_verdes_valencia_coords.csv / zonas_verdes_bilbao_coords.csv
+
+-   Fuente: bases_de_datos/centros_educativos_valencia_coords.csv / centros_educativos_vizcaya_coords.csv
+
+-   Fuente: bases_de_datos/hospitales_valencia_coords.csv / hospitales_vizcaya_coords.csv
+
+-   Fuente: bases_de_datos/delimitacion_distritos_valencia.json / delimitacion_distritos_bilbao.geojson
+
+-   Output: datasets/valencia_resumen.csv / datasets/bilbao_resumen.csv
+
+## 1. Cargamos las librerías necesarias
+
+El paquete `sf` es el núcleo de este notebook: nos permite leer geometrías, reproyectar coordenadas y hacer el cruce espacial entre puntos y polígonos. El resto son para lectura y transformación de datos.
+
+```{r}
+library(sf)      # Geometría espacial y spatial join
+library(dplyr)   # Transformación de datos
+library(readr)   # Lectura y escritura de CSVs
+library(tidyr)
+```
+
+## 2. Fijamos las rutas de entrada y salida
+
+Definimos todas las rutas en un único lugar para que sea fácil modificarlas si cambia la estructura del proyecto.
+
+```{r}
+# --- Distritos ---
+ruta_distritos_valencia <- "C:/Users/Universidad/OneDrive - UPV/2º CURSO/PROYECTO II/bases_de_datos/delimitacion_distritos_valencia.json"
+ruta_distritos_bilbao   <- "C:/Users/Universidad/OneDrive - UPV/2º CURSO/PROYECTO II/bases_de_datos/delimitacion_distritos_bilbao.geojson"
+
+# --- Colegios ---
+ruta_colegios_valencia  <- "C:/Users/Universidad/OneDrive - UPV/2º CURSO/PROYECTO II/datasets/centros_educativos_valencia_coords.csv"
+ruta_colegios_bilbao    <- "C:/Users/Universidad/OneDrive - UPV/2º CURSO/PROYECTO II/datasets/centros_educativos_vizcaya_coords.csv"
+
+# --- Hospitales ---
+ruta_hospitales_valencia <- "C:/Users/Universidad/OneDrive - UPV/2º CURSO/PROYECTO II/datasets/hospitales_valencia_coords.csv"
+ruta_hospitales_bilbao   <- "C:/Users/Universidad/OneDrive - UPV/2º CURSO/PROYECTO II/datasets/hospitales_vizcaya_coords.csv"
+
+# --- Zonas verdes ---
+ruta_zonas_valencia <- "C:/Users/Universidad/OneDrive - UPV/2º CURSO/PROYECTO II/datasets/zonas_verdes_valencia_coords.csv"
+ruta_zonas_bilbao   <- "C:/Users/Universidad/OneDrive - UPV/2º CURSO/PROYECTO II/datasets/zonas_verdes_bilbao_coords.csv"
+
+# --- Outputs ---
+ruta_output_valencia <- "C:/Users/Universidad/OneDrive - UPV/2º CURSO/PROYECTO II/datasets/valencia_resumen.csv"
+ruta_output_bilbao   <- "C:/Users/Universidad/OneDrive - UPV/2º CURSO/PROYECTO II/datasets/bilbao_resumen.csv"
+```
+
+## 3. Cargamos y preparamos los distritos
+
+Los dos archivos de distritos vienen en sistemas de coordenadas proyectadas (no en latitud/longitud directamente): Valencia en EPSG:25830 y Bilbao en EPSG:3042. Los reproyectamos ambos a WGS84 (EPSG:4326) para que sean compatibles con nuestros puntos. Además, el archivo de Bilbao contiene barrios, no distritos, así que los agrupamos por su campo `distrito` para obtener los polígonos a ese nivel.
+
+```{r}
+# --- Valencia ---
+distritos_valencia <- st_read(ruta_distritos_valencia, quiet = TRUE) |>
+  st_transform(4326) |>
+  # Disolvemos por nombre de distrito para eliminar polígonos duplicados
+  group_by(nombre) |>
+  summarise(geometry = st_union(geometry), .groups = "drop") |>
+  rename(distrito = nombre)
+
+cat("Distritos Valencia:", nrow(distritos_valencia), "\n")
+
+# --- Bilbao ---
+distritos_bilbao <- st_read(ruta_distritos_bilbao, quiet = TRUE) |>
+  st_make_valid() |>
+  st_transform(4326)
+
+if ("distrito" %in% names(distritos_bilbao)) {
+  distritos_bilbao <- distritos_bilbao |>
+    group_by(distrito) |>
+    summarise(do_union = FALSE, .groups = "drop") |>
+    st_as_sf() |>
+    st_make_valid()
+}
+cat("Distritos Bilbao:", nrow(distritos_bilbao), "\n")
+```
+
+## 4. Creamos la función para leer los CSVs de puntos y convertirlos a objetos espaciales
+
+Nuestros CSVs de colegios, hospitales y zonas verdes tienen coordenadas en texto, pero necesitamos convertirlos a objetos `sf` para poder hacer geometría con ellos. Esta función también elimina las filas sin coordenadas y acepta tanto punto como coma como separador decimal, ya que los archivos no son consistentes entre sí.
+
+```{r}
+csv_a_sf <- function(ruta, col_lat = "lat", col_lon = "lon", decimal = ".") {
+  
+  # Elegimos la función de lectura según el separador decimal
+  df <- if (decimal == ",") {
+    read_csv2(ruta, show_col_types = FALSE)
+  } else {
+    read_delim(ruta, delim = ";", show_col_types = FALSE)
+  }
+  
+  # Limpiamos coordenadas: eliminamos filas con NA o valores no numéricos
+  df <- df |>
+    mutate(
+      lat = as.numeric(gsub(",", ".", .data[[col_lat]])),
+      lon = as.numeric(gsub(",", ".", .data[[col_lon]]))
+    ) |>
+    filter(!is.na(lat), !is.na(lon))
+  
+  # Convertimos a objeto sf con CRS WGS84
+  df |> st_as_sf(coords = c("lon", "lat"), crs = 4326)
+}
+```
+
+## 5. Cargamos los puntos de cada ciudad
+
+Leemos los seis archivos de puntos y los convertimos a objetos espaciales usando la función anterior. Los hospitales usan coma como separador decimal y los colegios usan punto, así que lo indicamos en cada llamada.
+
+```{r}
+# --- Valencia ---
+colegios_valencia   <- csv_a_sf(ruta_colegios_valencia,  decimal = ".")
+hospitales_valencia <- csv_a_sf(ruta_hospitales_valencia, decimal = ",")
+zonas_valencia      <- csv_a_sf(ruta_zonas_valencia,      decimal = ",")
+
+cat("Colegios Valencia:   ", nrow(colegios_valencia),   "\n")
+cat("Hospitales Valencia: ", nrow(hospitales_valencia), "\n")
+cat("Zonas verdes Valencia:", nrow(zonas_valencia),     "\n")
+
+# --- Bilbao ---
+colegios_bilbao   <- csv_a_sf(ruta_colegios_bilbao,   decimal = ".")
+hospitales_bilbao <- csv_a_sf(ruta_hospitales_bilbao,  decimal = ",")
+zonas_bilbao      <- csv_a_sf(ruta_zonas_bilbao,       decimal = ",")
+
+cat("\nColegios Bilbao:    ", nrow(colegios_bilbao),   "\n")
+cat("Hospitales Bilbao:  ", nrow(hospitales_bilbao), "\n")
+cat("Zonas verdes Bilbao:", nrow(zonas_bilbao),      "\n")
+```
+
+## 6. Creamos la función de spatial join y conteo
+
+Esta es la función principal del notebook. Recibe una capa de puntos y los polígonos de distritos, y devuelve cuántos puntos caen dentro de cada distrito. El `st_join` asigna a cada punto el distrito cuyo polígono lo contiene. Luego simplemente contamos cuántos puntos hay por distrito y nos aseguramos de que los distritos sin ningún punto aparezcan con un 0 en vez de desaparecer de la tabla.
+
+```{r}
+contar_por_distrito <- function(puntos_sf, distritos_sf, nombre_columna) {
+  
+  st_join(puntos_sf, distritos_sf, join = st_within) |>
+    st_drop_geometry() |>
+    group_by(distrito) |>
+    summarise(n = n(), .groups = "drop") |>
+    # Completamos con todos los distritos para que ninguno quede fuera
+    right_join(st_drop_geometry(distritos_sf), by = "distrito") |>
+    mutate(n = replace_na(n, 0)) |>
+    rename(!!nombre_columna := n) |>
+    select(distrito, all_of(nombre_columna))
+}
+```
+
+## 7. Aplicamos el conteo para Valencia
+
+Llamamos a la función tres veces (colegios, hospitales, zonas verdes) y unimos los tres resultados en una única tabla por distrito.
+
+```{r}
+conteo_colegios_val   <- contar_por_distrito(colegios_valencia,   distritos_valencia, "num_colegios")
+conteo_hospitales_val <- contar_por_distrito(hospitales_valencia, distritos_valencia, "num_hospitales")
+conteo_zonas_val      <- contar_por_distrito(zonas_valencia,      distritos_valencia, "num_zonas_verdes")
+
+resumen_valencia <- conteo_colegios_val |>
+  left_join(conteo_hospitales_val, by = "distrito") |>
+  left_join(conteo_zonas_val,      by = "distrito") |>
+  arrange(distrito)
+
+print(resumen_valencia)
+```
+
+## 8. Aplicamos el conteo para Bilbao
+
+Mismo proceso para Bilbao.
+
+```{r}
+conteo_colegios_bil   <- contar_por_distrito(colegios_bilbao,   distritos_bilbao, "num_colegios")
+conteo_hospitales_bil <- contar_por_distrito(hospitales_bilbao, distritos_bilbao, "num_hospitales")
+conteo_zonas_bil      <- contar_por_distrito(zonas_bilbao,      distritos_bilbao, "num_zonas_verdes")
+
+resumen_bilbao <- conteo_colegios_bil |>
+  left_join(conteo_hospitales_bil, by = "distrito") |>
+  left_join(conteo_zonas_bil,      by = "distrito") |>
+  arrange(distrito)
+
+print(resumen_bilbao)
+```
+
+## 9. Exportamos los CSVs finales
+
+Guardamos los dos resúmenes con `write_csv2` para mantener el formato español (punto y coma como separador, coma como decimal).
+
+```{r}
+write_csv2(resumen_valencia, ruta_output_valencia)
+write_csv2(resumen_bilbao,   ruta_output_bilbao)
+
+cat("Archivos guardados correctamente:\n")
+cat(" -", ruta_output_valencia, "\n")
+cat(" -", ruta_output_bilbao,   "\n")
+```
