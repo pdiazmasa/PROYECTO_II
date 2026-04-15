@@ -44,7 +44,7 @@ normalizar_municipio <- function(x) {
 
 ### Lectura de la base de datos del censo
 ```{r}
-censo <- read_delim("censo_municipios_bizkaia.csv",
+censo <- read_delim("../../bases_de_datos/censo/censo_municipios_bizkaia.csv",
                     delim = ";",
                     show_col_types = FALSE)
 ```
@@ -206,7 +206,7 @@ summary(municipios_bizkaia_base[, c("pob_total",
 
 ### Lectura y exploración inicial de la base de nivel educativo
 ```{r}
-estudios <- read_delim("Nivel_educativo_municipios_bizkaia.csv",
+estudios <- read_delim("../../bases_de_datos/educacion/Nivel_educativo_municipios_bizkaia.csv",
                        delim = ";",
                        show_col_types = FALSE,
                        locale = locale(encoding = "Latin1"))
@@ -307,7 +307,7 @@ head(municipios_bizkaia_base[, c("cod_municipio",
 
 ### Lectura y exploración inicial de la base de centros educativos
 ```{r}
-centros_edu <- read_excel("listado_centros_bizkaia.xls",
+centros_edu <- read_excel("../../bases_de_datos/censo/listado_centros_bizkaia.xls",
                           sheet = "Listado de centros")
 
 head(centros_edu)
@@ -400,7 +400,30 @@ head(municipios_bizkaia_base[, c("nombre_municipio",
 ### Columna reservada de distancia al centro educativo
 Aunque en esta parte del trabajo no se calcula todavía la distancia al centro educativo más cercano, se crea ya la columna (vacía con valores faltantes que serán numéricos) correspondiente en la tabla principal para dejar preparada la estructura del dataset final. Esta variable será completada posteriormente con los valores calculados para cada municipio.
 ```{r}
-municipios_bizkaia_base$distancia_centro_educativo <- NA
+distancias <- read_csv("../../datasets/vizcaya-bilbao/dataset_distancias_vizcaya.csv",
+                       show_col_types = FALSE)
+
+distancias$nombre_municipio_norm <- normalizar_municipio(distancias$municipio)
+
+municipios_bizkaia_base <- left_join(
+  municipios_bizkaia_base,
+  distancias[, c("nombre_municipio_norm", "distancia_centro_educativo")],
+  by = "nombre_municipio_norm"
+)
+```
+
+Validación:
+```{r}
+# Validación
+head(municipios_bizkaia_base[, c("nombre_municipio",
+                                 "nombre_municipio_norm",
+                                 "distancia_centro_educativo")])
+summary(municipios_bizkaia_base$distancia_centro_educativo)
+```
+
+Comprobación de faltantes:
+```{r}
+sum(is.na(municipios_bizkaia_base$distancia_centro_educativo))
 ```
 
 ## BLOQUE SANITARIO
@@ -409,7 +432,7 @@ municipios_bizkaia_base$distancia_centro_educativo <- NA
 
 ### Lectura y exploración inicial de la base de atención primaria
 ```{r}
-ap <- read_delim("centros_AP_municipios_vizcaya.csv",
+ap <- read_delim("../../bases_de_datos/sanidad/centros_AP_municipios_vizcaya.csv",
                  delim = ";",
                  show_col_types = FALSE)
 
@@ -515,7 +538,7 @@ sum(is.na(municipios_bizkaia_base$consultorio_local))
 
 ### Lectura y exploración inicial de la base de hospitales
 ```{r}
-hospitales <- read.csv("hospitales_bizkaia.csv", fileEncoding = "latin1")
+hospitales <- read.csv("../../bases_de_datos/sanidad/hospitales_bizkaia.csv", fileEncoding = "latin1")
 
 
 head(hospitales)
@@ -588,7 +611,24 @@ sum(is.na(municipios_bizkaia_base$ratio_hospital))
 ### Columna reservada de distancia al hospital
 Aunque en esta parte del trabajo no se calcula todavía la distancia al hospital más cercano, se crea ya la columna correspondiente en la tablaprincipal para dejar preparada la estructura del dataset final.
 ```{r}
-municipios_bizkaia_base$distancia_hospital <- NA
+municipios_bizkaia_base <- left_join(
+  municipios_bizkaia_base,
+  distancias[, c("nombre_municipio_norm", "distancia_hospital")],
+  by = "nombre_municipio_norm"
+)
+```
+
+Validación:
+```{r}
+head(municipios_bizkaia_base[, c("nombre_municipio",
+                                 "nombre_municipio_norm",
+                                 "distancia_hospital")])
+summary(municipios_bizkaia_base$distancia_hospital)
+```
+
+Comprobación de faltantes:
+```{r}
+sum(is.na(municipios_bizkaia_base$distancia_hospital))
 ```
 
 ## BLOQUE DE VIVIENDA Y RENTA
@@ -597,7 +637,7 @@ municipios_bizkaia_base$distancia_hospital <- NA
 
 ### Lectura y exploración inicial de la base de alquiler
 ```{r}
-alquiler <- read_delim("alquiler_municipios_vizcaya.csv",
+alquiler <- read_delim("../../bases_de_datos/vivienda/alquiler_municipios_vizcaya.csv",
                        delim = ";",
                        show_col_types = FALSE)
 
@@ -663,7 +703,7 @@ summary(municipios_bizkaia_base$precio_m2_alquiler)
 
 ### Lectura y exploración inicial de la base de renta
 ```{r}
-renta <- read_delim("renta_municipios_vizcaya.csv",
+renta <- read_delim("../../bases_de_datos/renta/renta_municipios_vizcaya.csv",
                     delim = ";",
                     locale = locale(encoding = "Latin1"),
                     show_col_types = FALSE)
@@ -801,7 +841,7 @@ renta_muni[renta_muni$renta_media_hogar < 10000, ]
 
 ### Lectura y exploración inicial de la base de internet
 ```{r}
-internet <- read_excel("acceso_internet_municipios.xlsx",
+internet <- read_excel("../../bases_de_datos/internet/acceso_internet_municipios.xlsx",
                        sheet = "Municipio_%hogar")
 
 head(internet)
@@ -896,7 +936,7 @@ table(municipios_bizkaia_base$internet_100mbps_mayor95, useNA = "ifany")
 
 ### Lectura y exploración inicial de la base de contratos
 ```{r}
-contratos <- read_delim("contratos_sectores_municipios.csv",
+contratos <- read_delim("../../bases_de_datos/trabajo/contratos_sectores_municipios.csv",
                         delim = ";",
                         locale = locale(encoding = "Latin1"),
                         skip = 1,
@@ -1208,6 +1248,8 @@ En conjunto, el análisis exploratorio indica que la base final de municipios de
 
 ### Exportación del dataset final
 ```{r}
-write.csv(municipios_bizkaia_base, "municipios_vizcaya_base_final.csv", row.names = FALSE)
+write.csv(municipios_bizkaia_base, "../../datasets/vizcaya-bilbao/municipios_vizcaya_base_final.csv", row.names = FALSE)
 
 ```
+
+

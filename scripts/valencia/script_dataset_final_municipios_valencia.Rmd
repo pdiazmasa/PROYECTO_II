@@ -443,7 +443,32 @@ head(municipios_valencia_base[, c("nombre_municipio",
 Aunque en esta parte del trabajo no se calcula todavía la distancia al centro educativo más cercano, se crea ya la columna (vacía con valores faltantes que serán numéricos) correspondiente en la tabla principal para dejar preparada la estructura del dataset final. Esta variable será completada posteriormente con los valores calculados para cada municipio.
 
 ```{r}
-municipios_valencia_base$distancia_centro_educativo <- NA
+distancias <- read_csv("../../datasets/valencia/dataset_distancias_valencia.csv",
+                       show_col_types = FALSE)
+
+distancias$nombre_municipio_norm <- normalizar_municipio(distancias$municipio)
+
+municipios_valencia_base <- left_join(
+  municipios_valencia_base,
+  distancias[, c("nombre_municipio_norm", "distancia_centro_educativo")],
+  by = "nombre_municipio_norm"
+)
+```
+
+Validación:
+
+```{r}
+# Validación
+head(municipios_valencia_base[, c("nombre_municipio",
+                                  "nombre_municipio_norm",
+                                  "distancia_centro_educativo")])
+summary(municipios_valencia_base$distancia_centro_educativo)
+```
+
+Comprobación de faltantes:
+
+```{r}
+sum(is.na(municipios_valencia_base$distancia_centro_educativo))
 ```
 
 ## BLOQUE SANITARIO
@@ -697,7 +722,26 @@ sum(is.na(municipios_valencia_base$ratio_hospital))
 Aunque en esta parte del trabajo no se calcula todavía la distancia al hospital más cercano, se crea ya la columna correspondiente en la tablaprincipal para dejar preparada la estructura del dataset final.
 
 ```{r}
-municipios_valencia_base$distancia_hospital <- NA
+municipios_valencia_base <- left_join(
+  municipios_valencia_base,
+  distancias[, c("nombre_municipio_norm", "distancia_hospital")],
+  by = "nombre_municipio_norm"
+)
+```
+
+Validación
+
+```{r}
+head(municipios_valencia_base[, c("nombre_municipio",
+                                  "nombre_municipio_norm",
+                                  "distancia_hospital")])
+summary(municipios_valencia_base$distancia_hospital)
+```
+
+Comprobación de faltantes:
+
+```{r}
+sum(is.na(municipios_valencia_base$distancia_hospital))
 ```
 
 ## BLOQUE DE VIVIENDA Y RENTA
@@ -1312,5 +1356,5 @@ El análisis exploratorio muestra que los municipios de la provincia de Valencia
 ### Exportación del dataset final
 
 ```{r}
-write.csv(municipios_valencia_base,"municipios_valencia_base_final.csv",row.names = FALSE)
+write.csv(municipios_valencia_base,"../../datasets/valencia/municipios_valencia_base_final.csv",row.names = FALSE)
 ```
