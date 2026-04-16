@@ -980,7 +980,7 @@ head(internet_valencia[, c("CMUN",
 ### Selección de la variable de cobertura
 
 ```{r}
-col_internet <- grep("^Cob\\. 100Mbps.*junio 2023", colnames(internet_valencia), value = TRUE)
+col_internet <- grep("^Cob\\. 100Mbps.*junio 2024", colnames(internet_valencia), value = TRUE)
 
 col_internet
 
@@ -1010,15 +1010,15 @@ summary(internet_valencia$pct_hogares_100mbps)
 ### Creación de la variable `internet_100mbps_mayor95`
 
 ```{r}
-internet_valencia$internet_100mbps_mayor95 <- ifelse(
-  internet_valencia$pct_hogares_100mbps > 95,
+internet_valencia$internet_100mbps_mayor90 <- ifelse(
+  internet_valencia$pct_hogares_100mbps > 90,
   1,
   0
 )
 
 head(internet_valencia[, c("cod_municipio",
                            "pct_hogares_100mbps",
-                           "internet_100mbps_mayor95")])
+                           "internet_100mbps_mayor90")])
 ```
 
 ### Incorporación a la base principal
@@ -1028,25 +1028,37 @@ municipios_valencia_base <- left_join(
   municipios_valencia_base,
   internet_valencia[, c("cod_municipio",
                         "pct_hogares_100mbps",
-                        "internet_100mbps_mayor95")],
+                        "internet_100mbps_mayor90")],
   by = "cod_municipio"
 )
 
 head(municipios_valencia_base[, c("cod_municipio",
                                   "nombre_municipio",
                                   "pct_hogares_100mbps",
-                                  "internet_100mbps_mayor95")])
+                                  "internet_100mbps_mayor90")])
 ```
 
 ### Comprobación de resultados del bloque de internet
 
 ```{r}
 sum(is.na(municipios_valencia_base$pct_hogares_100mbps))
-sum(is.na(municipios_valencia_base$internet_100mbps_mayor95))
+sum(is.na(municipios_valencia_base$internet_100mbps_mayor90))
 
 summary(municipios_valencia_base$pct_hogares_100mbps)
-table(municipios_valencia_base$internet_100mbps_mayor95, useNA = "ifany")
+table(municipios_valencia_base$internet_100mbps_mayor90, useNA = "ifany")
 ```
+### Eliminación de los pueblos con mala conectividad a internet
+
+```{r}
+municipios_valencia_base <- municipios_valencia_base %>%
+  filter(internet_100mbps_mayor90 == 1)
+
+head(municipios_valencia_base)
+dim(municipios_valencia_base)
+sum(municipios_valencia_base$internet_100mbps_mayor90 == 0, na.rm = TRUE)
+nrow(municipios_valencia_base)
+```
+
 
 ## BLOQUE DE CONTRATOS
 
