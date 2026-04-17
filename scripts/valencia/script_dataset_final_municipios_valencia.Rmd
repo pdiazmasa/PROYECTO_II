@@ -1270,10 +1270,10 @@ colSums(is.na(municipios_valencia_base[, c(
 ```
 En general, la base final presenta un buen nivel de completitud. La mayoría de las variables no tienen valores faltantes, lo que indica que el proceso de integración de las distintas fuentes se ha realizado correctamente. Los faltantes se concentran en un número reducido de variables y responden, en general, a limitaciones propias de las fuentes utilizadas y no a errores de lectura o de cruce.
 
-En concreto, *pct_estudios_sup* presenta 25 valores faltantes porque la base de nivel educativo solo ofrece información para municipios de 500 habitantes o más. Por su parte, *precio_m2_alquile*r y *esfuerzo_alquiler* presentan 44 valores faltantes, algo esperable en municipios donde no hay suficientes transacciones de vivienda para estimar el indicador. Además, *renta_media_hogar presenta* e *indice_envejecimiento* presentan un valor faltante.
+En concreto, *pct_estudios_sup* presenta 25 valores faltantes porque la base de nivel educativo solo ofrece información para municipios de 500 habitantes o más. Por su parte, *precio_m2_alquiler* y *esfuerzo_alquiler* presentan 44 valores faltantes, algo esperable en municipios donde no hay suficientes transacciones de vivienda para estimar el indicador. Además, *renta_media_hogar* e *indice_envejecimiento* presentan un valor faltante.
 
 
-## ANÁLISIS EXPLORATORIO DE LAs VARIABLES PARA CLUSTERING
+## ANÁLISIS EXPLORATORIO DE LAS VARIABLES PARA CLUSTERING
 
 Con el fin de dar respuesta al objetivo 1 del proyecto, se va a aplicar una técnica de clustering sobre los municipios de la provincia de Valencia, con el propósito de identificar perfiles municipales homogéneos a partir de sus características demográficas, socioeconómicas y de acceso a servicios. Antes de realizar este análisis, resulta necesario estudiar en profundidad las variables que formarán parte del mismo.
 
@@ -1303,7 +1303,7 @@ colSums(is.na(municipios_valencia_base[, c(
   "pct_contratos_construccion"
 )]))
 ```
-En las variables seleccionadas para clustering se mantiene el patrón de faltantes ya comentado previamente. En particular, esfuerzo_alquiler presenta 44 valores ausentes, lo que resulta especialmente relevante al tratarse de una de las variables seleccionadas para la formación de los clústeres. Por ello, antes de continuar con el análisis exploratorio en profundidad, se plantea un proceso de imputación que permita resolver este problema y trabajar posteriormente con una base más completa.
+En las variables seleccionadas para clustering se mantiene el patrón de faltantes ya comentado previamente. En particular, *esfuerzo_alquiler* presenta 44 valores ausentes, lo que resulta especialmente relevante al tratarse de una de las variables seleccionadas para la formación de los clústeres. Por ello, antes de continuar con el análisis exploratorio en profundidad, se plantea un proceso de imputación que permita resolver este problema y trabajar posteriormente con una base más completa.
 
 ### Imputación
 
@@ -1505,7 +1505,7 @@ En cuanto a las variables binarias, *consultorio_local* sí presenta variabilida
 
 En esta fase del AED no se profundiza en las relaciones bivariantes entre las variables seleccionadas, ya que dicho análisis se desarrolla de forma específica en el documento de correlaciones. En consecuencia, aquí se ha priorizado la revisión individual de cada variable, atendiendo a su completitud, distribución y posibles valores atípicos. El estudio posterior de las correlaciones permitirá valorar con mayor precisión el grado de asociación entre variables y la posible existencia de redundancias antes de aplicar el clustering.
 
-### Conlusión
+### Conclusión
 El análisis exploratorio realizado sobre las variables seleccionadas para clustering muestra que los municipios de la provincia de Valencia presentan una notable heterogeneidad en dimensiones como la estructura demográfica, el nivel educativo, el acceso a servicios, la conectividad digital, la especialización productiva y el mercado de la vivienda. En conjunto, las variables analizadas presentan capacidad para diferenciar perfiles municipales, aunque varias de ellas muestran asimetrías y algunos valores extremos, algo coherente con la diversidad territorial existente. Por ello, la base final construida se considera adecuada para abordar posteriormente la caracterización de municipios planteada en el proyecto.
 
 
