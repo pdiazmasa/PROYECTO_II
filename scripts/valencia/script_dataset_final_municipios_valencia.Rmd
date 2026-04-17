@@ -1232,7 +1232,7 @@ head(municipios_valencia_base)
 dim(municipios_valencia_base)
 str(municipios_valencia_base)
 ```
-##IMPUTACIÓN
+## IMPUTACIÓN
 
 ### Carga del paquete necesario
 
@@ -1248,8 +1248,7 @@ renta_mediana <- median(municipios_valencia_base$renta_media_hogar, na.rm = TRUE
 municipios_valencia_base$renta_usada <- ifelse(
   is.na(municipios_valencia_base$renta_media_hogar),
   renta_mediana,
-  municipios_valencia_base$renta_media_hogar
-)
+  municipios_valencia_base$renta_media_hogar)
 ```
 
 ### Ajuste del modelo de imputación del alquiler
@@ -1262,8 +1261,7 @@ modelo_alquiler <- lm(
     distancia_hospital +
     pct_hogares_100mbps,
   data = municipios_valencia_base,
-  subset = !is.na(precio_m2_alquiler)
-)
+  subset = !is.na(precio_m2_alquiler))
 
 summary(modelo_alquiler)
 coef(modelo_alquiler)
@@ -1280,10 +1278,15 @@ municipios_valencia_base$precio_m2_alquiler[is.na(municipios_valencia_base$preci
   round(
     predict(
       modelo_alquiler,
-      newdata = municipios_valencia_base[is.na(municipios_valencia_base$precio_m2_alquiler), ]
-    ),
-    1
-  )
+      newdata = municipios_valencia_base[is.na(municipios_valencia_base$precio_m2_alquiler), ]),1)
+```
+
+### Cálculo esfuerzo_alquiler tras la imputación
+
+```{r}
+municipios_valencia_base$esfuerzo_alquiler <- 
+  ((municipios_valencia_base$precio_m2_alquiler * 80) / 
+     (municipios_valencia_base$renta_media_hogar / 12)) * 100
 ```
 
 ### Revisión de algunos municipios cuyo alquiler ha sido imputado
@@ -1295,13 +1298,18 @@ municipios_imputados <- municipios_valencia_base %>%
          nombre_municipio,
          pob_total,
          renta_media_hogar,
-         consultorio_local,
-         distancia_hospital,
-         pct_hogares_100mbps,
-         precio_m2_alquiler) %>%
+         precio_m2_alquiler,
+         esfuerzo_alquiler) %>%
   head(10)
 
 municipios_imputados
+```
+
+### Eliminación de variables auxiliares creadas en la imputación
+
+```{r}
+municipios_valencia_base <- municipios_valencia_base %>%
+  select(-renta_usada, -alquiler_faltaba)
 ```
 
 
