@@ -184,10 +184,7 @@ sum(is.na(distritos_bilbao_base$ratio_hospital))
 ```{r}
 alquiler <- readr::read_delim(
   "../../bases_de_datos/vivienda/alquiler_distritos_bilbao.csv",
-  delim = ";",
-  show_col_types = FALSE,
-  locale = locale(encoding = "Latin1")
-)
+  
 
 head(alquiler)
 dim(alquiler)
