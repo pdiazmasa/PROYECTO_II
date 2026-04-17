@@ -1232,6 +1232,78 @@ head(municipios_valencia_base)
 dim(municipios_valencia_base)
 str(municipios_valencia_base)
 ```
+##IMPUTACIÓN
+
+### Carga del paquete necesario
+
+```{r}
+library(dplyr)
+```
+
+### Cálculo de un valor de respaldo para la renta faltante
+
+```{r}
+renta_mediana <- median(municipios_valencia_base$renta_media_hogar, na.rm = TRUE)
+
+municipios_valencia_base$renta_usada <- ifelse(
+  is.na(municipios_valencia_base$renta_media_hogar),
+  renta_mediana,
+  municipios_valencia_base$renta_media_hogar
+)
+```
+
+### Ajuste del modelo de imputación del alquiler
+
+```{r}
+modelo_alquiler <- lm(
+  precio_m2_alquiler ~ log(pob_total + 1) +
+    renta_usada +
+    consultorio_local +
+    distancia_hospital +
+    pct_hogares_100mbps,
+  data = municipios_valencia_base,
+  subset = !is.na(precio_m2_alquiler)
+)
+
+summary(modelo_alquiler)
+coef(modelo_alquiler)
+```
+```{r}
+municipios_valencia_base$alquiler_faltaba <- is.na(municipios_valencia_base$precio_m2_alquiler)
+```
+
+
+### Imputación directa de los valores faltantes de alquiler
+
+```{r}
+municipios_valencia_base$precio_m2_alquiler[is.na(municipios_valencia_base$precio_m2_alquiler)] <-
+  round(
+    predict(
+      modelo_alquiler,
+      newdata = municipios_valencia_base[is.na(municipios_valencia_base$precio_m2_alquiler), ]
+    ),
+    1
+  )
+```
+
+### Revisión de algunos municipios cuyo alquiler ha sido imputado
+
+```{r}
+municipios_imputados <- municipios_valencia_base %>%
+  filter(alquiler_faltaba == TRUE) %>%
+  select(cod_municipio,
+         nombre_municipio,
+         pob_total,
+         renta_media_hogar,
+         consultorio_local,
+         distancia_hospital,
+         pct_hogares_100mbps,
+         precio_m2_alquiler) %>%
+  head(10)
+
+municipios_imputados
+```
+
 
 ## ANÁLISIS EXPLORATORIO DE LA BASE FINAL
 
