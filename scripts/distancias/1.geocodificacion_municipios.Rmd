@@ -24,10 +24,10 @@ library(jsonlite) #Leer la respuesta JSON
 2.  Fijamos las rutas de entrada (bases de datos) y de salida (datasets hechos)
 
 ```{r}
-ruta_crudo_vizcaya   <- "../bases_de_datos/censo_municipios_bizkaia.csv"
-ruta_crudo_valencia  <- "../bases_de_datos/censo_municipios_valencia.csv"
-ruta_output_vizcaya  <- "../datasets/municipios_vizcaya_coords.csv"
-ruta_output_valencia <- "../datasets/municipios_valencia_coords.csv"
+ruta_crudo_vizcaya   <- "../../bases_de_datos/censo/censo_municipios_bizkaia.csv"
+ruta_crudo_valencia  <- "../../bases_de_datos/censo/censo_municipios_valencia.csv"
+ruta_output_vizcaya  <- "../../datasets/vizcaya-bilbao/municipios_vizcaya_coords.csv"
+ruta_output_valencia <- "../../datasets/vizcaya-bilbao/municipios_valencia_coords.csv"
 ```
 
 3.  Creamos la función para extraer los municipios y limpiarlos (aparecen como "CP + nombre del municipio)
