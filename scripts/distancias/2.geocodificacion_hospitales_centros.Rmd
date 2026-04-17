@@ -20,18 +20,18 @@ library(readxl) #Leer los archivos .xls
 
 ```{r}
 #Entrada
-ruta_hospitales_bizkaia  <- "../bases_de_datos/hospitales_bizkaia.csv"
-ruta_hospitales_valencia <- "../bases_de_datos/hospitales_valencia.csv"
+ruta_hospitales_bizkaia  <- "../../bases_de_datos/sanidad/hospitales_bizkaia.csv"
+ruta_hospitales_valencia <- "../../bases_de_datos/sanidad/hospitales_valencia.csv"
 
-ruta_centros_bizkaia     <- "../bases_de_datos/listado_centros_bizkaia.xls"
-ruta_centros_valencia    <- "../bases_de_datos/listado_centros_valencia.xls"
+ruta_centros_bizkaia     <- "../../bases_de_datos/educacion/listado_centros_bizkaia.xls"
+ruta_centros_valencia    <- "../../bases_de_datos/educacion/listado_centros_valencia.xls"
 
 #Salida
-ruta_output_hospitales_bizkaia  <- "../datasets/hospitales_vizcaya_coords.csv"
-ruta_output_hospitales_valencia <- "../datasets/hospitales_valencia_coords.csv"
+ruta_output_hospitales_bizkaia  <- "../../datasets/vizcaya-bilbao/hospitales_vizcaya_coords.csv"
+ruta_output_hospitales_valencia <- "../../datasets/valencia/hospitales_valencia_coords.csv"
 
-ruta_output_centros_bizkaia     <- "../datasets/centros_educativos_vizcaya_coords.csv"
-ruta_output_centros_valencia    <- "../datasets/centros_educativos_valencia_coords.csv"
+ruta_output_centros_bizkaia     <- "../../datasets/vizcaya-bilbao/centros_educativos_vizcaya_coords.csv"
+ruta_output_centros_valencia    <- "../../datasets/valencia/centros_educativos_valencia_coords.csv"
 ```
 
 3.  Creamos la función para leer y limpiar la base de hospitales
@@ -237,6 +237,32 @@ hospitales_bizkaia_coords |>
   select(nombre_hospital, municipio, lat, lon) |>
   head(5)
 ```
+Imputamos manualmente los faltantes:
+```{r}
+hospitales_vizcaya_coords <- read_delim(
+  ruta_output_hospitales_bizkaia,
+  delim = ";",
+  show_col_types = FALSE
+)
+
+hospitales_vizcaya_coords[2,  c("lat", "lon")] <- list(43.2969436, -2.9934568)
+hospitales_vizcaya_coords[3,  c("lat", "lon")] <- list(43.4226671, -2.7228639)
+hospitales_vizcaya_coords[6,  c("lat", "lon")] <- list(43.2684271, -2.9278286)
+hospitales_vizcaya_coords[7,  c("lat", "lon")] <- list(43.2631551, -2.9343100)
+hospitales_vizcaya_coords[11, c("lat", "lon")] <- list(43.2589214, -2.9422190)
+hospitales_vizcaya_coords[12, c("lat", "lon")] <- list(43.2623391, -2.9561522)
+hospitales_vizcaya_coords[14, c("lat", "lon")] <- list(43.3296887, -2.9532864)
+hospitales_vizcaya_coords[16, c("lat", "lon")] <- list(43.4179462, -2.9438961)
+hospitales_vizcaya_coords[17, c("lat", "lon")] <- list(43.3246072, -3.0261722)
+hospitales_vizcaya_coords[18, c("lat", "lon")] <- list(43.3246072, -3.0261722)
+hospitales_vizcaya_coords[20, c("lat", "lon")] <- list(43.1683335, -2.5499465)
+hospitales_vizcaya_coords[21, c("lat", "lon")] <- list(43.2905361, -2.8553542)
+
+hospitales_vizcaya_coords |>
+  select(nombre_hospital, municipio, lat, lon) |>
+  head(5)
+```
+
 
 8.  Geocodificamos los hospitales de Valencia
 
@@ -255,6 +281,32 @@ hospitales_valencia_coords |>
   select(nombre_hospital, municipio, lat, lon) |>
   head(5)
 ```
+Imputamos manualmente los faltantes:
+```{r}
+hospitales_valencia_coords <- read_delim(
+  ruta_output_hospitales_valencia,
+  delim = ";",
+  show_col_types = FALSE
+)
+
+hospitales_valencia_coords[2,  c("lat", "lon")] <- list(39.5785165, -0.4452444)
+hospitales_valencia_coords[3,  c("lat", "lon")] <- list(39.5023262, -0.4083376)
+hospitales_valencia_coords[4,  c("lat", "lon")] <- list(39.0882347, -0.3552443)
+hospitales_valencia_coords[6,  c("lat", "lon")] <- list(38.9727511, -0.1754919)
+hospitales_valencia_coords[7,  c("lat", "lon")] <- list(39.5213556, -0.4163800)
+hospitales_valencia_coords[8,  c("lat", "lon")] <- list(39.6417234, -0.6193496)
+hospitales_valencia_coords[11, c("lat", "lon")] <- list(38.8201688, -0.6030140)
+hospitales_valencia_coords[14, c("lat", "lon")] <- list(39.5533971, -0.4810306)
+hospitales_valencia_coords[19, c("lat", "lon")] <- list(39.4698763, -0.3504978)
+hospitales_valencia_coords[25, c("lat", "lon")] <- list(39.4532418, -0.3948748)
+hospitales_valencia_coords[26, c("lat", "lon")] <- list(39.4436988, -0.3760366)
+hospitales_valencia_coords[30, c("lat", "lon")] <- list(39.0067380, -0.5102168)
+
+hospitales_valencia_coords |>
+  select(nombre_hospital, municipio, lat, lon) |>
+  head(35)
+```
+
 
 9.  Geocodificamos los centros educativos de Vizcaya
 
@@ -310,17 +362,17 @@ hospitales_vizcaya_export <- hospitales_bizkaia_coords |>
 hospitales_valencia_export <- hospitales_valencia_coords |>
   select(nombre_hospital, municipio, lat, lon)
 
-centros_vizcaya_export <- centros_bizkaia_coords |>
-  select(nombre_centro, municipio, lat, lon)
+#centros_vizcaya_export <- centros_bizkaia_coords |>
+#  select(nombre_centro, municipio, lat, lon)
 
-centros_valencia_export <- centros_valencia_coords |>
-  select(nombre_centro, municipio, lat, lon)
+#centros_valencia_export <- centros_valencia_coords |>
+#  select(nombre_centro, municipio, lat, lon)
 
 # Guardamos en formato delimitado por ;
 write_delim(hospitales_vizcaya_export, ruta_output_hospitales_bizkaia, delim = ";")
 write_delim(hospitales_valencia_export, ruta_output_hospitales_valencia, delim = ";")
-write_delim(centros_vizcaya_export, ruta_output_centros_bizkaia, delim = ";")
-write_delim(centros_valencia_export, ruta_output_centros_valencia, delim = ";")
+#write_delim(centros_vizcaya_export, ruta_output_centros_bizkaia, delim = ";")
+#write_delim(centros_valencia_export, ruta_output_centros_valencia, delim = ";")
 
 cat("Archivos guardados correctamente.\n")
 ```
