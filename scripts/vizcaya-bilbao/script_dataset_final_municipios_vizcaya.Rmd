@@ -637,9 +637,8 @@ sum(is.na(municipios_bizkaia_base$distancia_hospital))
 
 ### Lectura y exploración inicial de la base de alquiler
 ```{r}
-alquiler <- read_delim("../../bases_de_datos/vivienda/alquiler_municipios_vizcaya.csv",
-                       delim = ";",
-                       show_col_types = FALSE)
+
+alquiler <- read.csv2("../../bases_de_datos/vivienda/alquiler_municipios_vizcaya.csv", fileEncoding = "UTF-8")
 
 head(alquiler)
 dim(alquiler)
