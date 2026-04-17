@@ -24,8 +24,8 @@ library(tidyr)
 ### Lectura de los datasets finales de distritos
 
 ```{r}
-distritos_valencia <- read_csv("../datasets/valencia/distritos_valencia_base.csv")
-distritos_bilbao <- read_csv("../datasets/vizcaya-bilbao/distritos_bilbao_base.csv")
+distritos_valencia <- read_csv("../../datasets/valencia/distritos_valencia_base.csv")
+distritos_bilbao <- read_csv("../../datasets/vizcaya-bilbao/distritos_bilbao_base.csv")
 ```
 
 ### Exploración inicial de ambas bases de datos
@@ -486,8 +486,16 @@ ggplot(distritos_base, aes(x = alquiler_m2, y = esfuerzo_alquiler)) +
 
 ## PROPUESTA INICIAL DE VARIABLES PARA CLUSTERING SEGÚN RESULTADOS GRÁFICOS
 
+El análisis de correlación realizado sobre los distritos de Valencia y Bilbao ha permitido identificar la existencia de varios bloques de variables fuertemente relacionadas, especialmente entre variables demográficas de tamaño (pob_total, pob_menor_16, pob_mayor_65), así como entre recuentos absolutos de equipamientos y sus correspondientes ratios (num_colegios y ratio_colegio, num_zonas_verdes y ratio_zonas_verdes). Estas relaciones elevadas indican la presencia de redundancias que podrían sesgar el análisis de clustering si no se corrigen.
+
+En consecuencia, se ha optado por priorizar variables relativas o sintéticas frente a variables absolutas, con el objetivo de evitar que la dimensión de tamaño del distrito tenga un peso excesivo en la segmentación. Asimismo, en el bloque de vivienda y nivel económico, se ha decidido utilizar esfuerzo_alquiler como indicador sintético, en lugar de incluir simultáneamente alquiler_m2 y renta_media_hogar, ya que esta variable recoge de forma conjunta la relación entre el coste del alquiler y la capacidad económica.
+
+A partir de estos criterios, se propone la siguiente batería de variables para el análisis de clustering de distritos:
+
 indice_envejecimiento
 ratio_colegio
 ratio_hospital
-alquiler_m2 y renta_media_hogar // esfuerzo_alquiler
+esfuerzo_alquiler
 ratio_zonas_verdes
+
+Esta selección permite construir un conjunto de variables más compacto, interpretable y libre de redundancias, asegurando que cada dimensión relevante del territorio esté representada sin duplicar información.
