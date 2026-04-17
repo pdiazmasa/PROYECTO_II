@@ -1268,7 +1268,7 @@ colSums(is.na(municipios_valencia_base[, c(
   "renta_media_hogar",
   "esfuerzo_alquiler",
   "pct_hogares_100mbps",
-  "internet_100mbps_mayor95",
+  "internet_100mbps_mayor90",
   "contratos_total",
   "pct_contratos_agricultura",
   "pct_contratos_industria",
@@ -1332,7 +1332,7 @@ Los histogramas permiten observar que `pct_extranjeros` y `pct_estudios_sup` pre
 
 ```{r}
 table(municipios_valencia_base$consultorio_local)
-table(municipios_valencia_base$internet_100mbps_mayor95)
+table(municipios_valencia_base$internet_100mbps_mayor90)
 ```
 
 En cuanto a las variables binarias, se observa que la mayoría de los municipios dispone de `consultorio_local`, mientras que una proporción algo menor supera el umbral del 95% de cobertura en `internet_100mbps_mayor95`. Esto sugiere que ambas variables pueden aportar información útil para diferenciar perfiles de municipios.
