@@ -1047,6 +1047,7 @@ sum(is.na(municipios_valencia_base$internet_100mbps_mayor90))
 summary(municipios_valencia_base$pct_hogares_100mbps)
 table(municipios_valencia_base$internet_100mbps_mayor90, useNA = "ifany")
 ```
+
 ### Eliminación de los pueblos con mala conectividad a internet
 
 ```{r}
@@ -1058,7 +1059,6 @@ dim(municipios_valencia_base)
 sum(municipios_valencia_base$internet_100mbps_mayor90 == 0, na.rm = TRUE)
 nrow(municipios_valencia_base)
 ```
-
 
 ## BLOQUE DE CONTRATOS
 
@@ -1232,98 +1232,10 @@ head(municipios_valencia_base)
 dim(municipios_valencia_base)
 str(municipios_valencia_base)
 ```
-## IMPUTACIÓN
-
-### Carga del paquete necesario
-
-```{r}
-library(dplyr)
-```
-
-### Cálculo de un valor de respaldo para la renta faltante
-
-```{r}
-renta_mediana <- median(municipios_valencia_base$renta_media_hogar, na.rm = TRUE)
-
-municipios_valencia_base$renta_usada <- ifelse(
-  is.na(municipios_valencia_base$renta_media_hogar),
-  renta_mediana,
-  municipios_valencia_base$renta_media_hogar)
-```
-
-### Ajuste del modelo de imputación del alquiler
-
-```{r}
-modelo_alquiler <- lm(
-  precio_m2_alquiler ~ log(pob_total + 1) +
-    renta_usada +
-    consultorio_local +
-    distancia_hospital +
-    pct_hogares_100mbps,
-  data = municipios_valencia_base,
-  subset = !is.na(precio_m2_alquiler))
-
-summary(modelo_alquiler)
-coef(modelo_alquiler)
-```
-```{r}
-municipios_valencia_base$alquiler_faltaba <- is.na(municipios_valencia_base$precio_m2_alquiler)
-```
-
-
-### Imputación directa de los valores faltantes de alquiler
-
-```{r}
-municipios_valencia_base$precio_m2_alquiler[is.na(municipios_valencia_base$precio_m2_alquiler)] <-
-  round(
-    predict(
-      modelo_alquiler,
-      newdata = municipios_valencia_base[is.na(municipios_valencia_base$precio_m2_alquiler), ]),1)
-```
-
-### Cálculo esfuerzo_alquiler tras la imputación
-
-```{r}
-municipios_valencia_base$esfuerzo_alquiler <- 
-  ((municipios_valencia_base$precio_m2_alquiler * 80) / 
-     (municipios_valencia_base$renta_media_hogar / 12)) * 100
-```
-
-### Revisión de algunos municipios cuyo alquiler ha sido imputado
-
-```{r}
-municipios_imputados <- municipios_valencia_base %>%
-  filter(alquiler_faltaba == TRUE) %>%
-  select(cod_municipio,
-         nombre_municipio,
-         pob_total,
-         renta_media_hogar,
-         precio_m2_alquiler,
-         esfuerzo_alquiler) %>%
-  head(10)
-
-municipios_imputados
-```
-
-### Eliminación de variables auxiliares creadas en la imputación
-
-```{r}
-municipios_valencia_base <- municipios_valencia_base %>%
-  select(-renta_usada, -alquiler_faltaba)
-```
-
 
 ## ANÁLISIS EXPLORATORIO DE LA BASE FINAL
 
-### Descripción general del dataset final
-
-```{r}
-head(municipios_valencia_base)
-dim(municipios_valencia_base)
-str(municipios_valencia_base)
-```
-
-### Análisis de faltantes reales
+### Análisis de faltantes 
 
 ```{r}
 colSums(is.na(municipios_valencia_base[, c(
@@ -1356,13 +1268,119 @@ colSums(is.na(municipios_valencia_base[, c(
   "pct_contratos_servicios"
 )]))
 ```
-
 En general, la base final presenta un buen nivel de completitud. La mayoría de las variables no tienen valores faltantes, lo que indica que el proceso de integración de las distintas fuentes se ha realizado correctamente. Los faltantes se concentran en un número reducido de variables y responden, en general, a limitaciones propias de las fuentes utilizadas y no a errores de lectura o de cruce.
 
-En concreto, `pct_estudios_sup` presenta 46 valores faltantes porque la base de nivel educativo solo ofrece información para municipios de 500 habitantes o más. Por su parte, `precio_m2_alquiler` y `esfuerzo_alquiler` presentan 71 valores faltantes, algo esperable en municipios donde no hay suficientes transacciones de vivienda para estimar el indicador. Además, `renta_media_hogar` presenta 2 valores faltantes y `indice_envejecimiento` presenta 1, en este último caso debido a un municipio con población menor de16 años igual a 0, lo que impide calcular el cociente correspondiente.
+En concreto, *pct_estudios_sup* presenta 25 valores faltantes porque la base de nivel educativo solo ofrece información para municipios de 500 habitantes o más. Por su parte, *precio_m2_alquile*r y *esfuerzo_alquiler* presentan 44 valores faltantes, algo esperable en municipios donde no hay suficientes transacciones de vivienda para estimar el indicador. Además, *renta_media_hogar presenta* e *indice_envejecimiento* presentan un valor faltante.
+
+
+## ANÁLISIS EXPLORATORIO DE LAs VARIABLES PARA CLUSTERING
+
+Con el fin de dar respuesta al objetivo 1 del proyecto, se va a aplicar una técnica de clustering sobre los municipios de la provincia de Valencia, con el propósito de identificar perfiles municipales homogéneos a partir de sus características demográficas, socioeconómicas y de acceso a servicios. Antes de realizar este análisis, resulta necesario estudiar en profundidad las variables que formarán parte del mismo.
+
+La selección de variables se ha realizado a partir de un análisis previo de correlaciones, con el objetivo de evitar redundancias excesivas y conservar únicamente aquellas variables que aportan información relevante y complementaria para la caracterización de los municipios. En este sentido, se han priorizado indicadores expresados en porcentajes, ratios o distancias, ya que permiten comparar municipios de distinto tamaño en condiciones más homogéneas.
+
+Las variables finalmente seleccionadas recogen distintas dimensiones del fenómeno estudiado. Por una parte, *pct_extranjeros*, *indice_envejecimiento* y *pct_estudios_sup* permiten describir la composición demográfica y educativa de los municipios. Por otra, *ratio_colegios*, *distancia_centro_educativo*, *ratio_centros_salud*, *ratio_hospital* y *distancia_hospital* aportan información sobre la disponibilidad y accesibilidad de servicios básicos. A ello se suman variables de carácter socioeconómico y residencial, como *renta_media_hogar* y *esfuerzo_alquiler*, así como *pct_hogares_100mbps*, que recoge el nivel de conectividad digital. Finalmente, *pct_contratos_agricultura*, *pct_contratos_industria* y *pct_contratos_construccion* permiten aproximar la estructura productiva de cada municipio.
+
+A continuación, se realiza un análisis exploratorio en profundidad de estas variables.
+
+### Análisis de faltantes
+
+```{r}
+colSums(is.na(municipios_valencia_base[, c(
+  "pct_extranjeros",
+  "indice_envejecimiento",
+  "pct_estudios_sup",
+  "ratio_colegios",
+  "distancia_centro_educativo",
+  "ratio_centros_salud",
+  "ratio_hospital",
+  "distancia_hospital",
+  "renta_media_hogar",
+  "esfuerzo_alquiler",
+  "pct_hogares_100mbps",
+  "pct_contratos_agricultura",
+  "pct_contratos_industria",
+  "pct_contratos_construccion"
+)]))
+```
+En las variables seleccionadas para clustering se mantiene el patrón de faltantes ya comentado previamente. En particular, esfuerzo_alquiler presenta 44 valores ausentes, lo que resulta especialmente relevante al tratarse de una de las variables seleccionadas para la formación de los clústeres. Por ello, antes de continuar con el análisis exploratorio en profundidad, se plantea un proceso de imputación que permita resolver este problema y trabajar posteriormente con una base más completa.
+
+### Imputación
+
+#### Cálculo de un valor de respaldo para la renta faltante
+
+```{r}
+renta_mediana <- median(municipios_valencia_base$renta_media_hogar, na.rm = TRUE)
+
+municipios_valencia_base$renta_usada <- ifelse(
+  is.na(municipios_valencia_base$renta_media_hogar),
+  renta_mediana,
+  municipios_valencia_base$renta_media_hogar)
+```
+
+#### Ajuste del modelo de imputación del alquiler
+
+```{r}
+modelo_alquiler <- lm(
+  precio_m2_alquiler ~ log(pob_total + 1) +
+    renta_usada +
+    consultorio_local +
+    distancia_hospital +
+    pct_hogares_100mbps,
+  data = municipios_valencia_base,
+  subset = !is.na(precio_m2_alquiler))
+
+summary(modelo_alquiler)
+coef(modelo_alquiler)
+```
+
+```{r}
+municipios_valencia_base$alquiler_faltaba <- is.na(municipios_valencia_base$precio_m2_alquiler)
+```
+
+#### Imputación directa de los valores faltantes de alquiler
+
+```{r}
+municipios_valencia_base$precio_m2_alquiler[is.na(municipios_valencia_base$precio_m2_alquiler)] <-
+  round(
+    predict(
+      modelo_alquiler,
+      newdata = municipios_valencia_base[is.na(municipios_valencia_base$precio_m2_alquiler), ]),1)
+```
+
+#### Cálculo esfuerzo_alquiler tras la imputación
+
+```{r}
+municipios_valencia_base$esfuerzo_alquiler <- 
+  ((municipios_valencia_base$precio_m2_alquiler * 80) / 
+     (municipios_valencia_base$renta_media_hogar / 12)) * 100
+```
+
+#### Revisión de algunos municipios cuyo alquiler ha sido imputado
+
+```{r}
+municipios_imputados <- municipios_valencia_base %>%
+  filter(alquiler_faltaba == TRUE) %>%
+  select(cod_municipio,
+         nombre_municipio,
+         pob_total,
+         renta_media_hogar,
+         precio_m2_alquiler,
+         esfuerzo_alquiler) %>%
+  head(10)
+
+municipios_imputados
+```
+
+#### Eliminación de variables auxiliares creadas en la imputación
+
+```{r}
+municipios_valencia_base <- municipios_valencia_base %>%
+  select(-renta_usada, -alquiler_faltaba)
+```
+
 
 ### Revisión de valores atípicos
-
 ```{r}
 boxplot(municipios_valencia_base$pct_extranjeros,
         main = "Boxplot de pct_extranjeros")
@@ -1373,14 +1391,40 @@ boxplot(municipios_valencia_base$indice_envejecimiento,
 boxplot(municipios_valencia_base$pct_estudios_sup,
         main = "Boxplot de pct_estudios_sup")
 
-boxplot(municipios_valencia_base$precio_m2_alquiler,
-        main = "Boxplot de precio_m2_alquiler")
+boxplot(municipios_valencia_base$ratio_colegios,
+        main = "Boxplot de ratio_colegios")
+
+boxplot(municipios_valencia_base$distancia_centro_educativo,
+        main = "Boxplot de distancia_centro_educativo")
+
+boxplot(municipios_valencia_base$ratio_centros_salud,
+        main = "Boxplot de ratio_centros_salud")
+
+boxplot(municipios_valencia_base$ratio_hospital,
+        main = "Boxplot de ratio_hospital")
+
+boxplot(municipios_valencia_base$distancia_hospital,
+        main = "Boxplot de distancia_hospital")
+
+boxplot(municipios_valencia_base$renta_media_hogar,
+        main = "Boxplot de renta_media_hogar")
 
 boxplot(municipios_valencia_base$esfuerzo_alquiler,
         main = "Boxplot de esfuerzo_alquiler")
-```
 
-En general, los diagramas de caja muestran la presencia de algunos valores atípicos, especialmente en `indice_envejecimiento`, `pct_extranjeros` y `pct_estudios_sup`. En el caso de `indice_envejecimiento`, la existencia de muchos valores extremos parece responder a municipios con estructuras de edad muy envejecidas, más que a errores de construcción de la variable. Por su parte, `precio_m2_alquiler` y `esfuerzo_alquiler` presentan una distribución más concentrada y un número menor de valores atípicos.
+boxplot(municipios_valencia_base$pct_hogares_100mbps,
+        main = "Boxplot de pct_hogares_100mbps")
+
+boxplot(municipios_valencia_base$pct_contratos_agricultura,
+        main = "Boxplot de pct_contratos_agricultura")
+
+boxplot(municipios_valencia_base$pct_contratos_industria,
+        main = "Boxplot de pct_contratos_industria")
+
+boxplot(municipios_valencia_base$pct_contratos_construccion,
+        main = "Boxplot de pct_contratos_construccion")
+```
+En general, los diagramas de caja muestran la presencia de valores atípicos en varias de las variables seleccionadas para clustering. Los casos más destacados aparecen en *indice_envejecimiento*, *pct_estudios_sup*, *ratio_colegios*, *ratio_centros_salud*, *ratio_hospital*, *distancia_hospital* y en las variables de estructura productiva, especialmente *pct_contratos_agricultura*, *pct_contratos_industria* y *pct_contratos_construccion*. En la mayoría de los casos, estos valores extremos parecen responder a municipios con perfiles muy diferenciados, más que a errores en la construcción de las variables. Por su parte, variables como *pct_extranjeros*, *renta_media_hogar* y *esfuerzo_alquiler* presentan una distribución más concentrada y un número menor de valores atípicos, mientras que *pct_hogares_100mbps* muestra una variabilidad reducida.
 
 ### Distribución de variables numéricas
 
@@ -1397,16 +1441,57 @@ hist(municipios_valencia_base$pct_estudios_sup,
      main = "Histograma de pct_estudios_sup",
      xlab = "pct_estudios_sup")
 
-hist(municipios_valencia_base$precio_m2_alquiler,
-     main = "Histograma de precio_m2_alquiler",
-     xlab = "precio_m2_alquiler")
+hist(municipios_valencia_base$ratio_colegios,
+     main = "Histograma de ratio_colegios",
+     xlab = "ratio_colegios")
+
+hist(municipios_valencia_base$distancia_centro_educativo,
+     main = "Histograma de distancia_centro_educativo",
+     xlab = "distancia_centro_educativo")
+
+hist(municipios_valencia_base$ratio_centros_salud,
+     main = "Histograma de ratio_centros_salud",
+     xlab = "ratio_centros_salud")
+
+hist(municipios_valencia_base$ratio_hospital,
+     main = "Histograma de ratio_hospital",
+     xlab = "ratio_hospital")
+
+hist(municipios_valencia_base$distancia_hospital,
+     main = "Histograma de distancia_hospital",
+     xlab = "distancia_hospital")
+
+hist(municipios_valencia_base$renta_media_hogar,
+     main = "Histograma de renta_media_hogar",
+     xlab = "renta_media_hogar")
 
 hist(municipios_valencia_base$esfuerzo_alquiler,
      main = "Histograma de esfuerzo_alquiler",
      xlab = "esfuerzo_alquiler")
+
+hist(municipios_valencia_base$pct_hogares_100mbps,
+     main = "Histograma de pct_hogares_100mbps",
+     xlab = "pct_hogares_100mbps")
+
+hist(municipios_valencia_base$pct_contratos_agricultura,
+     main = "Histograma de pct_contratos_agricultura",
+     xlab = "pct_contratos_agricultura")
+
+hist(municipios_valencia_base$pct_contratos_industria,
+     main = "Histograma de pct_contratos_industria",
+     xlab = "pct_contratos_industria")
+
+hist(municipios_valencia_base$pct_contratos_construccion,
+     main = "Histograma de pct_contratos_construccion",
+     xlab = "pct_contratos_construccion")
 ```
 
-Los histogramas permiten observar que `pct_extranjeros` y `pct_estudios_sup` presentan distribuciones asimétricas a la derecha, aunque con una mayor concentración de municipios en valores intermedios. La variable `indice_envejecimiento` muestra una asimetría mucho más acusada, con una gran acumulación de municipios en valores relativamente bajos y una cola larga hacia la derecha. En cambio, `precio_m2_alquiler` y `esfuerzo_alquiler` presentan distribuciones más compactas y regulares.
+Los histogramas muestran que las variables seleccionadas para clustering presentan distribuciones heterogéneas, algo esperable dado que recogen dimensiones muy distintas del perfil municipal. Variables como *pct_extranjeros*, *pct_estudios_sup*, *renta_media_hogar* y *esfuerzo_alquiler* presentan distribuciones relativamente más concentradas, aunque con cierta asimetría a la derecha. En cambio, *indice_envejecimiento* muestra una asimetría mucho más acusada, con una fuerte concentración de municipios en valores bajos o intermedios y una cola larga hacia valores elevados.
+
+Por su parte, en variables como *ratio_colegios*, *ratio_centros_salud*, *ratio_hospital*, *distancia_centro_educativo* y *distancia_hospital* se observa una acumulación importante en valores bajos o próximos a cero, algo coherente con la propia naturaleza de estas medidas, ya que muchos municipios presentan una dotación reducida o distancias cortas a determinados servicios, mientras que unos pocos se sitúan en valores claramente más altos. De forma similar, *pct_contratos_agricultura*, *pct_contratos_industria* y *pct_contratos_construccion* muestran distribuciones muy asimétricas a la derecha, con muchos municipios concentrados en porcentajes bajos y unos pocos con especialización sectorial más marcada.
+
+Finalmente, *pct_hogares_100mbps* se concentra en valores muy altos, próximos al 100, lo que resulta coherente tanto con la elevada extensión actual de la conectividad digital como con el enfoque del proyecto hacia perfiles residenciales en los que este factor puede ser especialmente relevante, como ocurre en el caso de la población teletrabajadora. En conjunto, estas distribuciones no invalidan el análisis de clustering, pero sí muestran la necesidad de trabajar posteriormente con variables estandarizadas para evitar que las diferencias de escala condicionen en exceso la formación de los grupos.
+
 
 ### Revisión de variables binarias
 
@@ -1414,36 +1499,17 @@ Los histogramas permiten observar que `pct_extranjeros` y `pct_estudios_sup` pre
 table(municipios_valencia_base$consultorio_local)
 table(municipios_valencia_base$internet_100mbps_mayor90)
 ```
-
-En cuanto a las variables binarias, se observa que la mayoría de los municipios dispone de `consultorio_local`, mientras que una proporción algo menor supera el umbral del 95% de cobertura en `internet_100mbps_mayor95`. Esto sugiere que ambas variables pueden aportar información útil para diferenciar perfiles de municipios.
+En cuanto a las variables binarias, *consultorio_local* sí presenta variabilidad, ya que permite distinguir entre municipios que disponen o no de este tipo de recurso sanitario de proximidad. En cambio, *internet_100mbps_mayor90* toma valor 1 en todos los municipios de la base final. Lejos de ser un problema, este resultado es coherente con el planteamiento del proyecto, ya que dicha variable se ha utilizado como criterio previo de selección para centrarnos en municipios con alta conectividad, un aspecto especialmente relevante dado que el perfil de interés es el de la población teletrabajadora.
 
 ### Relaciones entre variables
 
-```{r}
-plot(municipios_valencia_base$pct_extranjeros,
-     municipios_valencia_base$pct_estudios_sup,
-     xlab = "pct_extranjeros",
-     ylab = "pct_estudios_sup",
-     main = "pct_extranjeros vs pct_estudios_sup")
+En esta fase del AED no se profundiza en las relaciones bivariantes entre las variables seleccionadas, ya que dicho análisis se desarrolla de forma específica en el documento de correlaciones. En consecuencia, aquí se ha priorizado la revisión individual de cada variable, atendiendo a su completitud, distribución y posibles valores atípicos. El estudio posterior de las correlaciones permitirá valorar con mayor precisión el grado de asociación entre variables y la posible existencia de redundancias antes de aplicar el clustering.
 
-plot(municipios_valencia_base$precio_m2_alquiler,
-     municipios_valencia_base$esfuerzo_alquiler,
-     xlab = "precio_m2_alquiler",
-     ylab = "esfuerzo_alquiler",
-     main = "precio_m2_alquiler vs esfuerzo_alquiler")
+### Conlusión
+El análisis exploratorio realizado sobre las variables seleccionadas para clustering muestra que los municipios de la provincia de Valencia presentan una notable heterogeneidad en dimensiones como la estructura demográfica, el nivel educativo, el acceso a servicios, la conectividad digital, la especialización productiva y el mercado de la vivienda. En conjunto, las variables analizadas presentan capacidad para diferenciar perfiles municipales, aunque varias de ellas muestran asimetrías y algunos valores extremos, algo coherente con la diversidad territorial existente. Por ello, la base final construida se considera adecuada para abordar posteriormente la caracterización de municipios planteada en el proyecto.
 
-plot(municipios_valencia_base$renta_media_hogar,
-     municipios_valencia_base$esfuerzo_alquiler,
-     xlab = "renta_media_hogar",
-     ylab = "esfuerzo_alquiler",
-     main = "renta_media_hogar vs esfuerzo_alquiler")
-```
-
-En las relaciones bivariantes analizadas no se aprecia una asociación lineal clara entre `pct_extranjeros` y `pct_estudios_sup`, ya que los puntos aparecen bastante dispersos. En cambio, sí se observa una relación positiva muy marcada entre `precio_m2_alquiler` y `esfuerzo_alquiler`, algo esperable dado que esta última variable depende directamente del precio del alquiler. Por su parte, la relación entre `renta_media_hogar` y `esfuerzo_alquiler` no muestra una pauta lineal tan clara.
 
 ## GUARDADO DE LA BASE FINAL
-
-El análisis exploratorio muestra que los municipios de la provincia de Valencia presentan una notable heterogeneidad en dimensiones como la estructura demográfica, el nivel educativo, el acceso a servicios y el mercado de la vivienda. Variables como el índice de envejecimiento, la proporción de población extranjera, el porcentaje de estudios superiores y el esfuerzo de alquiler parecen especialmente útiles para diferenciar perfiles de municipios. En conjunto, la base final construida resulta adecuada para abordarposteriormente la caracterización de municipios planteada en el proyecto.
 
 ### Exportación del dataset final
 
