@@ -192,11 +192,10 @@ alquiler <- readr::read_delim(
 head(alquiler)
 dim(alquiler)
 ```
-
 ## Obtención de la columna del alquiler mensual por m2
 
 ```{r}
-alquiler$PRECIO_ALQUILER <- as.numeric(gsub(",", ".", alquiler$PRECIO_ALQUILER))
+alquiler$PRECIO_ALQUILER <- (as.numeric(gsub(",", ".", alquiler$PRECIO_ALQUILER)))*0.1
 
 distritos_bilbao_base <- distritos_bilbao_base %>%
   left_join(
@@ -340,5 +339,3 @@ write.csv(
   row.names = FALSE
 )
 ```
-
-\`\`\`
