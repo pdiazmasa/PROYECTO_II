@@ -1471,68 +1471,70 @@ En general, los diagramas de caja muestran la presencia de valores atípicos en 
 
 ### Distribución de variables numéricas
 ```{r}
-hist(municipios_valencia_base$pct_extranjeros,
+hist(municipios_bizkaia_base$pct_extranjeros,
      main = "Histograma de pct_extranjeros",
      xlab = "pct_extranjeros")
 
-hist(municipios_valencia_base$indice_envejecimiento,
+hist(municipios_bizkaia_base$indice_envejecimiento,
      main = "Histograma de indice_envejecimiento",
      xlab = "indice_envejecimiento")
 
-hist(municipios_valencia_base$pct_estudios_sup,
+hist(municipios_bizkaia_base$pct_estudios_sup,
      main = "Histograma de pct_estudios_sup",
      xlab = "pct_estudios_sup")
 
-hist(municipios_valencia_base$ratio_colegios,
+hist(municipios_bizkaia_base$ratio_colegios,
      main = "Histograma de ratio_colegios",
      xlab = "ratio_colegios")
 
-hist(municipios_valencia_base$distancia_centro_educativo,
+hist(municipios_bizkaia_base$distancia_centro_educativo,
      main = "Histograma de distancia_centro_educativo",
      xlab = "distancia_centro_educativo")
 
-hist(municipios_valencia_base$ratio_centros_salud,
+hist(municipios_bizkaia_base$ratio_centros_salud,
      main = "Histograma de ratio_centros_salud",
      xlab = "ratio_centros_salud")
 
-hist(municipios_valencia_base$ratio_hospital,
+hist(municipios_bizkaia_base$ratio_hospital,
      main = "Histograma de ratio_hospital",
      xlab = "ratio_hospital")
 
-hist(municipios_valencia_base$distancia_hospital,
+hist(municipios_bizkaia_base$distancia_hospital,
      main = "Histograma de distancia_hospital",
      xlab = "distancia_hospital")
 
-hist(municipios_valencia_base$renta_media_hogar,
+hist(municipios_bizkaia_base$renta_media_hogar,
      main = "Histograma de renta_media_hogar",
      xlab = "renta_media_hogar")
 
-hist(municipios_valencia_base$esfuerzo_alquiler,
+hist(municipios_bizkaia_base$esfuerzo_alquiler,
      main = "Histograma de esfuerzo_alquiler",
      xlab = "esfuerzo_alquiler")
 
-hist(municipios_valencia_base$pct_hogares_100mbps,
+hist(municipios_bizkaia_base$pct_hogares_100mbps,
      main = "Histograma de pct_hogares_100mbps",
      xlab = "pct_hogares_100mbps")
 
-hist(municipios_valencia_base$pct_contratos_agricultura,
+hist(municipios_bizkaia_base$pct_contratos_agricultura,
      main = "Histograma de pct_contratos_agricultura",
      xlab = "pct_contratos_agricultura")
 
-hist(municipios_valencia_base$pct_contratos_industria,
+hist(municipios_bizkaia_base$pct_contratos_industria,
      main = "Histograma de pct_contratos_industria",
      xlab = "pct_contratos_industria")
 
-hist(municipios_valencia_base$pct_contratos_construccion,
+hist(municipios_bizkaia_base$pct_contratos_construccion,
      main = "Histograma de pct_contratos_construccion",
      xlab = "pct_contratos_construccion")
 ```
 
-Los histogramas muestran que las variables seleccionadas para el clustering presentan distribuciones bastante heterogéneas, algo lógico porque recogen dimensiones distintas del perfil municipal. Variables como *pct_extranjeros*, *pct_estudios_sup*, *renta_media_hogar* y, en menor medida, *esfuerzo_alquiler* presentan distribuciones relativamente más concentradas, aunque con cierta asimetría hacia la derecha. En cambio, *indice_envejecimiento* muestra una asimetría mucho más acusada, con la mayor parte de los municipios concentrados en valores intermedios y una cola larga hacia valores elevados.
+### Distribución de variables numéricas
 
-Por su parte, variables como *ratio_colegios*, *ratio_centros_salud*, *ratio_hospital*, *distancia_centro_educativo* y *distancia_hospital* presentan una fuerte concentración en valores bajos o próximos a cero, junto con algunos municipios que se sitúan claramente por encima del resto. Del mismo modo, *pct_contratos_agricultura*, *pct_contratos_industria* y *pct_contratos_construccion* muestran distribuciones muy asimétricas a la derecha, lo que refleja que la mayoría de municipios tienen porcentajes reducidos en estos sectores, mientras que unos pocos presentan una especialización más marcada.
+Los histogramas muestran que las variables seleccionadas para el clustering presentan distribuciones heterogéneas, algo esperable porque recogen dimensiones distintas del perfil municipal. Variables como *pct_extranjeros*, *pct_estudios_sup* y *renta_media_hogar* presentan distribuciones relativamente más concentradas, mientras que *esfuerzo_alquiler* también se concentra en un rango intermedio, aunque con algo más de dispersión. En cambio, *indice_envejecimiento* muestra una asimetría más acusada hacia la derecha, con la mayor parte de los municipios agrupados en valores intermedios y algún caso claramente más envejecido que se aleja del resto.
 
-Finalmente, *pct_hogares_100mbps* se concentra en valores muy altos, próximos al 100, lo que resulta coherente con el elevado nivel de conectividad digital existente y con el interés del proyecto por variables relevantes para perfiles residenciales vinculados al teletrabajo. En conjunto, estas distribuciones no impiden aplicar técnicas de clustering, aunque sí refuerzan la conveniencia de estandarizar las variables antes de formar los grupos.
+Por su parte, variables como *ratio_colegios*, *ratio_centros_salud*, *ratio_hospital* y *distancia_centro_educativo* presentan una fuerte concentración en valores bajos o próximos a cero, junto con unos pocos municipios con valores bastante más elevados. En *distancia_hospital* también se observa una mayor acumulación en distancias reducidas, aunque con una cola a la derecha que refleja la existencia de municipios más alejados de este servicio. De forma similar, *pct_contratos_agricultura*, *pct_contratos_industria* y *pct_contratos_construccion* muestran distribuciones asimétricas hacia la derecha, especialmente en agricultura y construcción, lo que indica que la mayoría de municipios presentan porcentajes bajos y solo algunos destacan por una mayor especialización sectorial.
+
+Finalmente, *pct_hogares_100mbps* se concentra en valores muy altos, cercanos al 100, lo que resulta coherente tanto con la elevada extensión actual de la conectividad digital como con el enfoque del proyecto hacia perfiles residenciales en los que este factor puede ser especialmente relevante, como ocurre en el caso de la población teletrabajadora. En conjunto, estas distribuciones no impiden aplicar técnicas de clustering, aunque sí refuerzan la conveniencia de estandarizar las variables antes de formar los grupos.
 
 ### Revisión de variables binarias
 
