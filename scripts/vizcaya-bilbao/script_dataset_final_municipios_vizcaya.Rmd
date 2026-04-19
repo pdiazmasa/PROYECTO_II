@@ -11,6 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ## PREPARACIONES INICIALES
 
 ### Carga de paquetes
+
 ```{r}
 library(dplyr)
 library(readr)
@@ -20,6 +21,7 @@ library(stringi)
 ```
 
 ### Función de normalización de municipios
+
 ```{r}
 normalizar_municipio <- function(x) {
   x <- tolower(x)
@@ -43,6 +45,7 @@ normalizar_municipio <- function(x) {
 ## CONSTRUCCIÓN DE LA BASE PRINCIPAL DE MUNICIPIOS
 
 ### Lectura de la base de datos del censo
+
 ```{r}
 censo <- read_delim("../../bases_de_datos/censo/censo_municipios_bizkaia.csv",
                     delim = ";",
@@ -50,25 +53,28 @@ censo <- read_delim("../../bases_de_datos/censo/censo_municipios_bizkaia.csv",
 ```
 
 ### Exploración inicial del censo
+
 ```{r}
 head(censo)
 dim(censo)
 colnames(censo)
 ```
 
-
 ### Transformación de variables numéricas
+
 ```{r}
 censo$Total <- gsub("\\.", "", censo$Total)
 censo$Total <- as.numeric(censo$Total)
 ```
 
 ### Eliminación de filas no municipales
+
 ```{r}
 censo_muni <- filter(censo, !is.na(Municipios) & Municipios != "")
 ```
 
 ### Separación del código y nombre de municipio
+
 ```{r}
 censo_muni$cod_municipio <- str_sub(censo_muni$Municipios, 1, 5)
 censo_muni$nombre_municipio_original <- str_sub(censo_muni$Municipios, 7)
@@ -77,14 +83,15 @@ head(censo_muni[, c("Municipios", "cod_municipio", "nombre_municipio_original")]
 ```
 
 ### Estandarización del nombre de municipio
+
 ```{r}
 censo_muni$nombre_municipio_norm <- normalizar_municipio(censo_muni$nombre_municipio_original)
 
 head(censo_muni[, c("nombre_municipio_original", "nombre_municipio_norm")])
 ```
 
-
 ### Construcción de la tabla base de municipios
+
 ```{r}
 municipios_bizkaia_base <- filter(censo_muni,
                                   Nacionalidad == "Total" &
@@ -105,6 +112,7 @@ dim(municipios_bizkaia_base)
 ```
 
 ### Comprobación de duplicados y cobertura
+
 ```{r}
 sum(duplicated(municipios_bizkaia_base$cod_municipio))
 sum(duplicated(municipios_bizkaia_base$nombre_municipio))
@@ -116,6 +124,7 @@ dim(municipios_bizkaia_base)
 ## BLOQUE DEMOGRÁFICO
 
 ### Obtención de la población extranjera
+
 ```{r}
 extranjeros_muni <- filter(censo_muni,
                            Nacionalidad == "Extranjera" &
@@ -130,6 +139,7 @@ dim(extranjeros_muni)
 ```
 
 ### Obtención de la población menor de 16 años
+
 ```{r}
 menores16_muni <- filter(censo_muni,
                          Nacionalidad == "Total" &
@@ -144,6 +154,7 @@ dim(menores16_muni)
 ```
 
 ### Obtención de la población de 65 y más años
+
 ```{r}
 mayores65_muni <- filter(censo_muni,
                          Nacionalidad == "Total" &
@@ -158,6 +169,7 @@ dim(mayores65_muni)
 ```
 
 ### Incorporación de variables demográficas auxiliares
+
 ```{r}
 municipios_bizkaia_base <- left_join(municipios_bizkaia_base,
                                      extranjeros_muni,
@@ -175,6 +187,7 @@ head(municipios_bizkaia_base)
 ```
 
 ### Creación de indicadores demográficos
+
 ```{r}
 municipios_bizkaia_base$pct_extranjeros <- 
   (municipios_bizkaia_base$pob_extranjera / municipios_bizkaia_base$pob_total) * 100
@@ -189,6 +202,7 @@ head(municipios_bizkaia_base)
 ```
 
 ### Comprobación de resultados del bloque demográfico
+
 ```{r}
 head(municipios_bizkaia_base)
 
@@ -205,6 +219,7 @@ summary(municipios_bizkaia_base[, c("pob_total",
 ### Nivel educativo por municipio
 
 ### Lectura y exploración inicial de la base de nivel educativo
+
 ```{r}
 estudios <- read_delim("../../bases_de_datos/educacion/Nivel_educativo_municipios_bizkaia.csv",
                        delim = ";",
@@ -217,7 +232,9 @@ colnames(estudios)
 ```
 
 ### Limpieza de la base de datos de nivel educativo
+
 En este apartado se transforma la variable Total a formato numérico y se construyen las variables identificativas del municipio a partir de la columna Municipios de 500 habitantes o más. Esto permite dejar la base preparada para su posterior integración con el dataset principal.
+
 ```{r}
 estudios$Total <- gsub("\\.", "", estudios$Total)
 estudios$Total <- as.numeric(estudios$Total)
@@ -235,7 +252,9 @@ head(estudios[, c("Municipios de 500 habitantes o más",
 ```
 
 ### Selección de la población total
+
 A continuación, se selecciona la población total de 15 y más años para cada municipio. Esta variable se utilizará como denominador para calcular el porcentaje de población con estudios superiores.
+
 ```{r}
 total_estudios <- estudios %>%
   filter(Sexo == "Total",
@@ -250,7 +269,9 @@ dim(total_estudios)
 ```
 
 ### Selección de la población con estudios superiores
+
 Seguidamente, se selecciona la población con estudios superiores para cada municipio. En este caso, se suman las categorías de grados universitarios, máster y doctorado.
+
 ```{r}
 estudios_sup_muni <- estudios %>%
   filter(Sexo == "Total",
@@ -270,7 +291,9 @@ dim(estudios_sup_muni)
 ```
 
 ### Cálculo de la variable `pct_estudios_sup`
+
 Una vez obtenidos el total de población y la población con estudios superiores, se calcula el porcentaje correspondiente para cada municipio.
+
 ```{r}
 pct_estudios_sup <- left_join(total_estudios,
                               estudios_sup_muni,
@@ -284,6 +307,7 @@ dim(pct_estudios_sup)
 ```
 
 ### Incorporación de la variable a la base principal
+
 ```{r}
 municipios_bizkaia_base <- left_join(
   municipios_bizkaia_base,
@@ -295,6 +319,7 @@ head(municipios_bizkaia_base)
 ```
 
 ### Comprobación de resultados del nivel educativo
+
 ```{r}
 summary(municipios_bizkaia_base$pct_estudios_sup)
 sum(is.na(municipios_bizkaia_base$pct_estudios_sup))
@@ -306,6 +331,7 @@ head(municipios_bizkaia_base[, c("cod_municipio",
 ### Centros educativos
 
 ### Lectura y exploración inicial de la base de centros educativos
+
 ```{r}
 centros_edu <- read_excel("../../bases_de_datos/censo/listado_centros_bizkaia.xls",
                           sheet = "Listado de centros")
@@ -316,6 +342,7 @@ colnames(centros_edu)
 ```
 
 ### Selección de tipos de centro
+
 ```{r}
 centros_edu <- centros_edu %>%
   filter(`DENOMINACIÓN GENÉRICA` %in% c(
@@ -333,6 +360,7 @@ dim(centros_edu)
 ```
 
 ### Construcción y normalización de la variable municipio
+
 ```{r}
 centros_edu$nombre_municipio <- str_squish(centros_edu$LOCALIDAD)
 centros_edu$nombre_municipio_norm <- normalizar_municipio(centros_edu$nombre_municipio)
@@ -343,6 +371,7 @@ head(centros_edu[, c("LOCALIDAD",
 ```
 
 ### Corrección manual de nombres
+
 ```{r}
 centros_edu$nombre_municipio_join <- centros_edu$nombre_municipio_norm
 
@@ -350,6 +379,7 @@ head(centros_edu[, c("nombre_municipio_norm", "nombre_municipio_join")])
 ```
 
 ### Conteo de centros educativos por municipio
+
 ```{r}
 colegios_muni <- centros_edu %>%
   group_by(nombre_municipio_join) %>%
@@ -361,6 +391,7 @@ dim(colegios_muni)
 ```
 
 ### Incorporación de la variable `num_colegios`
+
 ```{r}
 municipios_bizkaia_base <- left_join(
   municipios_bizkaia_base,
@@ -376,6 +407,7 @@ head(municipios_bizkaia_base[, c("nombre_municipio",
 ```
 
 ### Cálculo de la variable `ratio_colegios`
+
 ```{r}
 municipios_bizkaia_base$ratio_colegios <- 
   (municipios_bizkaia_base$num_colegios / municipios_bizkaia_base$pob_total) * 1000
@@ -387,6 +419,7 @@ head(municipios_bizkaia_base[, c("nombre_municipio",
 ```
 
 ### Comprobación de resultados de los centros educativos
+
 ```{r}
 summary(municipios_bizkaia_base$ratio_colegios)
 sum(is.na(municipios_bizkaia_base$num_colegios))
@@ -398,7 +431,9 @@ head(municipios_bizkaia_base[, c("nombre_municipio",
 ```
 
 ### Columna reservada de distancia al centro educativo
+
 Aunque en esta parte del trabajo no se calcula todavía la distancia al centro educativo más cercano, se crea ya la columna (vacía con valores faltantes que serán numéricos) correspondiente en la tabla principal para dejar preparada la estructura del dataset final. Esta variable será completada posteriormente con los valores calculados para cada municipio.
+
 ```{r}
 distancias <- read_csv("../../datasets/vizcaya-bilbao/dataset_distancias_vizcaya.csv",
                        show_col_types = FALSE)
@@ -413,6 +448,7 @@ municipios_bizkaia_base <- left_join(
 ```
 
 Validación:
+
 ```{r}
 # Validación
 head(municipios_bizkaia_base[, c("nombre_municipio",
@@ -422,6 +458,7 @@ summary(municipios_bizkaia_base$distancia_centro_educativo)
 ```
 
 Comprobación de faltantes:
+
 ```{r}
 sum(is.na(municipios_bizkaia_base$distancia_centro_educativo))
 ```
@@ -431,6 +468,7 @@ sum(is.na(municipios_bizkaia_base$distancia_centro_educativo))
 ### Atención primaria y centros de salud
 
 ### Lectura y exploración inicial de la base de atención primaria
+
 ```{r}
 ap <- read_delim("../../bases_de_datos/sanidad/centros_AP_municipios_vizcaya.csv",
                  delim = ";",
@@ -440,7 +478,9 @@ head(ap)
 dim(ap)
 colnames(ap)
 ```
+
 ### Construcción y normalización de la variable municipio
+
 ```{r}
 ap$LOCALIDAD <- str_replace_all(ap$LOCALIDAD, "[´`’]", "'")
 ap$LOCALIDAD <- str_replace_all(ap$LOCALIDAD, "'\\s+", "'")
@@ -454,6 +494,7 @@ head(ap[, c("LOCALIDAD",
 ```
 
 ### Corrección manual de nombres
+
 ```{r}
 ap$nombre_municipio_join <- ap$nombre_municipio_norm
 
@@ -461,8 +502,9 @@ head(ap[, c("nombre_municipio_norm", "nombre_municipio_join")])
 ```
 
 ### Construcción de la variable `num_centros_salud`
-Contaremos sol con aquellas filas que hacen referencia a Centros de Salud (descartando únicamente los
-Consultorios Locales, ya que no hay ningún otro tipo de centro)
+
+Contaremos sol con aquellas filas que hacen referencia a Centros de Salud (descartando únicamente los Consultorios Locales, ya que no hay ningún otro tipo de centro)
+
 ```{r}
 centros_salud_muni <- ap %>%
   filter(`TIPO CENTRO` == "CENTRO SALUD") %>%
@@ -483,6 +525,7 @@ head(municipios_bizkaia_base[, c("nombre_municipio",
 ```
 
 ### Cálculo de la variable `ratio_centros_salud`
+
 ```{r}
 municipios_bizkaia_base$ratio_centros_salud <- 
   (municipios_bizkaia_base$num_centros_salud / municipios_bizkaia_base$pob_total) * 1000
@@ -494,14 +537,17 @@ head(municipios_bizkaia_base[, c("nombre_municipio",
 ```
 
 ### Comprobación de resultados de centros de salud
+
 ```{r}
 summary(municipios_bizkaia_base$ratio_centros_salud)
 sum(is.na(municipios_bizkaia_base$num_centros_salud))
 sum(is.na(municipios_bizkaia_base$ratio_centros_salud))
 ```
+
 ### Consultorio local
 
 ### Construcción de la variable `consultorio_local`
+
 ```{r}
 consultorio_muni <- ap %>%
   filter(`TIPO CENTRO` == "CONSULTORIO LOCAL") %>%
@@ -514,6 +560,7 @@ dim(consultorio_muni)
 ```
 
 ### Incorporación a la base principal
+
 ```{r}
 municipios_bizkaia_base <- left_join(
   municipios_bizkaia_base,
@@ -529,6 +576,7 @@ head(municipios_bizkaia_base[, c("nombre_municipio",
 ```
 
 ### Comprobación de resultados del consultorio local
+
 ```{r}
 table(municipios_bizkaia_base$consultorio_local)
 sum(is.na(municipios_bizkaia_base$consultorio_local))
@@ -537,6 +585,7 @@ sum(is.na(municipios_bizkaia_base$consultorio_local))
 ### Hospitales
 
 ### Lectura y exploración inicial de la base de hospitales
+
 ```{r}
 hospitales <- read.csv("../../bases_de_datos/sanidad/hospitales_bizkaia.csv", fileEncoding = "latin1")
 
@@ -547,6 +596,7 @@ colnames(hospitales)
 ```
 
 ### Construcción y normalización de la variable municipio
+
 ```{r}
 hospitales$nombre_municipio <- str_squish(hospitales$Municipio)
 hospitales$nombre_municipio_norm <- normalizar_municipio(hospitales$nombre_municipio)
@@ -557,6 +607,7 @@ head(hospitales[, c("Municipio",
 ```
 
 ### Corrección manual de nombres
+
 ```{r}
 hospitales$nombre_municipio_join <- hospitales$nombre_municipio_norm
 
@@ -564,6 +615,7 @@ head(hospitales[, c("nombre_municipio_norm", "nombre_municipio_join")])
 ```
 
 ### Construcción de la variable `num_hospitales`
+
 ```{r}
 hospitales_muni <- hospitales %>%
   group_by(nombre_municipio_join) %>%
@@ -584,6 +636,7 @@ head(municipios_bizkaia_base[, c("nombre_municipio",
 ```
 
 ### Cálculo de la variable `ratio_hospital`
+
 ```{r}
 municipios_bizkaia_base$ratio_hospital <- 
   (municipios_bizkaia_base$num_hospitales / municipios_bizkaia_base$pob_total) * 1000
@@ -595,6 +648,7 @@ head(municipios_bizkaia_base[, c("nombre_municipio",
 ```
 
 ### Incorporación a la base principal
+
 ```{r}
 head(municipios_bizkaia_base[, c("nombre_municipio",
                                  "num_hospitales",
@@ -602,6 +656,7 @@ head(municipios_bizkaia_base[, c("nombre_municipio",
 ```
 
 ### Comprobación de resultados de hospitales
+
 ```{r}
 summary(municipios_bizkaia_base$ratio_hospital)
 sum(is.na(municipios_bizkaia_base$num_hospitales))
@@ -609,7 +664,9 @@ sum(is.na(municipios_bizkaia_base$ratio_hospital))
 ```
 
 ### Columna reservada de distancia al hospital
+
 Aunque en esta parte del trabajo no se calcula todavía la distancia al hospital más cercano, se crea ya la columna correspondiente en la tablaprincipal para dejar preparada la estructura del dataset final.
+
 ```{r}
 municipios_bizkaia_base <- left_join(
   municipios_bizkaia_base,
@@ -619,6 +676,7 @@ municipios_bizkaia_base <- left_join(
 ```
 
 Validación:
+
 ```{r}
 head(municipios_bizkaia_base[, c("nombre_municipio",
                                  "nombre_municipio_norm",
@@ -627,6 +685,7 @@ summary(municipios_bizkaia_base$distancia_hospital)
 ```
 
 Comprobación de faltantes:
+
 ```{r}
 sum(is.na(municipios_bizkaia_base$distancia_hospital))
 ```
@@ -636,6 +695,7 @@ sum(is.na(municipios_bizkaia_base$distancia_hospital))
 ### Alquiler
 
 ### Lectura y exploración inicial de la base de alquiler
+
 ```{r}
 
 alquiler <- read.csv2("../../bases_de_datos/vivienda/alquiler_municipios_vizcaya.csv", fileEncoding = "UTF-8")
@@ -645,8 +705,8 @@ dim(alquiler)
 colnames(alquiler)
 ```
 
-
 ### Construcción y normalización de la variable municipio
+
 ```{r}
 colnames(alquiler) <- c("cod_municipio", "nombre_municipio", "precio_m2_alquiler")
 
@@ -661,7 +721,9 @@ head(alquiler[, c("cod_municipio",
 ```
 
 ### Corrección manual de nombres
+
 En este caso no hace falta realizar correcciones manuales, ya que la incorporación a la base principal se hará mediante el código de municipio.
+
 ```{r}
 alquiler$nombre_municipio_join <- alquiler$nombre_municipio_norm
 
@@ -671,8 +733,9 @@ head(alquiler[, c("nombre_municipio",
 ```
 
 ### Cálculo de la variable `precio_m2_alquiler`
-En este caso, la base de Viscaya ya proporciona directamente la variable de
-alquiler por metro cuadrado.
+
+En este caso, la base de Viscaya ya proporciona directamente la variable de alquiler por metro cuadrado.
+
 ```{r}
 alquiler$precio_m2_alquiler <- as.numeric(alquiler$precio_m2_alquiler)
 
@@ -682,6 +745,7 @@ sum(is.na(alquiler$precio_m2_alquiler))
 ```
 
 ### Incorporación a la base principal
+
 ```{r}
 municipios_bizkaia_base$cod_municipio <- as.character(municipios_bizkaia_base$cod_municipio)
 
@@ -693,6 +757,7 @@ municipios_bizkaia_base <- left_join(municipios_bizkaia_base,
 ```
 
 ### Comprobación de resultados del alquiler
+
 ```{r}
 sum(is.na(municipios_bizkaia_base$precio_m2_alquiler))
 summary(municipios_bizkaia_base$precio_m2_alquiler)
@@ -701,11 +766,12 @@ summary(municipios_bizkaia_base$precio_m2_alquiler)
 ### Renta media por hogar
 
 ### Lectura y exploración inicial de la base de renta
+
 ```{r}
-renta <- read_delim("../../bases_de_datos/renta/renta_municipios_vizcaya.csv",
-                    delim = ";",
-                    locale = locale(encoding = "Latin1"),
-                    show_col_types = FALSE)
+renta <- read.csv2("../../bases_de_datos/renta/renta_municipios_vizcaya.csv",
+                   sep = ";",
+                   stringsAsFactors = FALSE,
+                   fileEncoding = "latin1")
 
 dim(renta)
 head(renta)
@@ -713,6 +779,7 @@ colnames(renta)
 ```
 
 ### Limpieza de la base de datos de renta
+
 ```{r}
 # Identificamos automáticamente las columnas clave
 col_codigo <- names(renta)[grepl("cod.*municip|municip.*cod", names(renta), ignore.case = TRUE)][1]
@@ -768,6 +835,7 @@ head(renta[, c("cod_municipio",
 ```
 
 ### Selección del indicador de renta
+
 ```{r}
 renta <- renta[, c("cod_municipio",
                    "nombre_municipio",
@@ -778,6 +846,7 @@ head(renta)
 ```
 
 ### Comprobación de duplicados y cobertura
+
 ```{r}
 sum(duplicated(renta$cod_municipio))
 sum(is.na(renta$cod_municipio))
@@ -788,6 +857,7 @@ head(renta[renta$renta_media_hogar < 10000,
 ```
 
 ### Incorporación de la variable `renta_media_hogar`
+
 ```{r}
 renta$renta_media_hogar[renta$renta_media_hogar < 10000] <- NA
 
@@ -799,6 +869,7 @@ municipios_bizkaia_base <- left_join(municipios_bizkaia_base,
 ```
 
 ### Comprobación de resultados de la renta
+
 ```{r}
 sum(is.na(municipios_bizkaia_base$renta_media_hogar))
 summary(municipios_bizkaia_base$renta_media_hogar)
@@ -807,7 +878,9 @@ summary(municipios_bizkaia_base$renta_media_hogar)
 ### Esfuerzo de alquiler
 
 ### Construcción de la variable `esfuerzo_alquiler`
+
 A continuación, se calcula la variable esfuerzo_alquiler, que aproxima el porcentaje de renta media del hogar destinado al pago del alquiler.
+
 ```{r}
 municipios_bizkaia_base$esfuerzo_alquiler <- 
   ((municipios_bizkaia_base$precio_m2_alquiler * 80) /
@@ -822,10 +895,12 @@ head(municipios_bizkaia_base[, c("nombre_municipio",
 ### Comprobación de resultados del esfuerzo de alquiler
 
 Como esta variable depende del precio del alquiler, los municipios sin dato de alquiler también quedarán sin valor en esfuerzo_alquiler.
+
 ```{r}
 sum(is.na(municipios_bizkaia_base$esfuerzo_alquiler))
 summary(municipios_bizkaia_base$esfuerzo_alquiler)
 ```
+
 ```{r}
 municipios_bizkaia_base[municipios_bizkaia_base$renta_media_hogar < 10000,
                         c("cod_municipio",
@@ -959,6 +1034,7 @@ nrow(municipios_bizkaia_base)
 ## BLOQUE DE CONTRATOS
 
 ### Lectura y exploración inicial de la base de contratos
+
 ```{r}
 contratos <- read_delim("../../bases_de_datos/trabajo/contratos_sectores_municipios.csv",
                         delim = ";",
@@ -972,6 +1048,7 @@ colnames(contratos)
 ```
 
 ### Selección de municipios de Vizcaya
+
 ```{r}
 contratos <- contratos %>%
   filter(str_detect(Provincia, "^(Bizkaia|Vizcaya)$")) %>%
@@ -988,6 +1065,7 @@ head(contratos)
 ```
 
 ### Limpieza de variables de contratos
+
 ```{r}
 col_agricultura <- grep("agr", colnames(contratos), ignore.case = TRUE, value = TRUE)[1]
 col_industria <- grep("ind", colnames(contratos), ignore.case = TRUE, value = TRUE)[1]
@@ -997,6 +1075,7 @@ col_total <- grep("total", colnames(contratos), ignore.case = TRUE, value = TRUE
 
 c(col_agricultura, col_industria, col_construccion, col_servicios, col_total)
 ```
+
 ```{r}
 if (!is.na(col_total)) {
   contratos_muni <- contratos %>%
@@ -1046,8 +1125,8 @@ head(contratos_muni)
 str(contratos_muni)
 ```
 
-
 ### Construcción de variables anuales por municipio
+
 ```{r}
 contratos_muni <- contratos_muni %>%
   group_by(cod_municipio, nombre_municipio, nombre_municipio_norm) %>%
@@ -1065,6 +1144,7 @@ dim(contratos_muni)
 ```
 
 ### Cálculo de la variable `contratos_total`
+
 ```{r}
 contratos_muni <- contratos_muni %>%
   mutate(
@@ -1086,6 +1166,7 @@ head(contratos_muni[, c("cod_municipio",
 ```
 
 ### Cálculo de los porcentajes sectoriales
+
 ```{r}
 contratos_muni <- contratos_muni %>%
   mutate(
@@ -1120,6 +1201,7 @@ head(contratos_muni[, c("cod_municipio",
 ```
 
 ### Incorporación a la base principal
+
 ```{r}
 municipios_bizkaia_base <- left_join(
   municipios_bizkaia_base,
@@ -1143,6 +1225,7 @@ head(municipios_bizkaia_base[, c("cod_municipio",
 ```
 
 ### Comprobación de resultados del bloque de contratos
+
 ```{r}
 municipios_bizkaia_base$suma_pct_contratos <-
   municipios_bizkaia_base$pct_contratos_agricultura +
@@ -1158,19 +1241,21 @@ sum(is.na(municipios_bizkaia_base$pct_contratos_industria))
 sum(is.na(municipios_bizkaia_base$pct_contratos_construccion))
 sum(is.na(municipios_bizkaia_base$pct_contratos_servicios))
 ```
+
 ```{r}
 municipios_bizkaia_base$suma_pct_contratos <- NULL
 ```
 
-
 ## COMPROBACIÓN DE LA BASE FINAL
 
 ### Comprobación final de nombres de variables
+
 ```{r}
 colnames(municipios_bizkaia_base)
 ```
 
 ### Vista general de la base final
+
 ```{r}
 head(municipios_bizkaia_base)
 dim(municipios_bizkaia_base)
@@ -1179,101 +1264,300 @@ str(municipios_bizkaia_base)
 
 ## ANÁLISIS EXPLORATORIO DE LA BASE FINAL
 
-### Descripción general del dataset final
+### Análisis de faltantes
+
 ```{r}
-summary(municipios_bizkaia_base)
+colSums(is.na(municipios_bizkaia_base[, c(
+  "cod_municipio",
+  "nombre_municipio",
+  "nombre_municipio_norm",
+  "pob_total",
+  "pob_extranjera",
+  "pob_menor_16",
+  "pob_mayor_65",
+  "pct_extranjeros",
+  "indice_envejecimiento",
+  "pct_estudios_sup",
+  "num_colegios",
+  "ratio_colegios",
+  "num_centros_salud",
+  "ratio_centros_salud",
+  "consultorio_local",
+  "num_hospitales",
+  "ratio_hospital",
+  "precio_m2_alquiler",
+  "renta_media_hogar",
+  "esfuerzo_alquiler",
+  "pct_hogares_100mbps",
+  "internet_100mbps_mayor90",
+  "contratos_total",
+  "pct_contratos_agricultura",
+  "pct_contratos_industria",
+  "pct_contratos_construccion",
+  "pct_contratos_servicios"
+)]))
+```
+En general, la base final presenta un buen nivel de completitud. La mayoría de las variables no tienen valores faltantes, lo que indica que el proceso de integración de las distintas fuentes se ha realizado correctamente. Los faltantes se concentran en un número reducido de variables y responden, en general, a limitaciones propias de las fuentes utilizadas y no a errores de lectura o de cruce.
+
+En concreto, *pct_estudios_sup* presenta 4 valores faltantes, mientras que *precio_m2_alquiler* y *esfuerzo_alquiler* presentan 14 valores faltantes. Estos últimos son esperables en municipios donde no hay suficientes transacciones de vivienda para estimar el indicador. Por su parte, el resto de variables presenta completitud total, lo que refuerza la consistencia de la base construida.
+
+
+## ANÁLISIS EXPLORATORIO DE LAS VARIABLES PARA CLUSTERING
+
+Con el fin de dar respuesta al objetivo 1 del proyecto, se va a aplicar una técnica de clustering sobre los municipios de la provincia de Vizcaya, con el propósito de identificar perfiles municipales homogéneos a partir de sus características demográficas, socioeconómicas y de acceso a servicios. Antes de realizar este análisis, resulta necesario estudiar en profundidad las variables que formarán parte del mismo.
+
+La selección de variables se ha realizado a partir de un análisis previo de correlaciones, con el objetivo de evitar redundancias excesivas y conservar únicamente aquellas variables que aportan información relevante y complementaria para la caracterización de los municipios. En este sentido, se han priorizado indicadores expresados en porcentajes, ratios o distancias, ya que permiten comparar municipios de distinto tamaño en condiciones más homogéneas.
+
+Las variables finalmente seleccionadas recogen distintas dimensiones del fenómeno estudiado. Por una parte, *pct_extranjeros*, *indice_envejecimiento* y *pct_estudios_sup* permiten describir la composición demográfica y educativa de los municipios. Por otra, *ratio_colegios*, *distancia_centro_educativo*, *ratio_centros_salud*, *ratio_hospital* y *distancia_hospital* aportan información sobre la disponibilidad y accesibilidad de servicios básicos. A ello se suman variables de carácter socioeconómico y residencial, como *renta_media_hogar* y *esfuerzo_alquiler*, así como *pct_hogares_100mbps*, que recoge el nivel de conectividad digital. Finalmente, *pct_contratos_agricultura*, *pct_contratos_industria* y *pct_contratos_construccion* permiten aproximar la estructura productiva de cada municipio.
+
+A continuación, se realiza un análisis exploratorio en profundidad de estas variables.
+
+### Análisis de faltantes
+
+```{r}
+colSums(is.na(municipios_bizkaia_base[, c(
+  "pct_extranjeros",
+  "indice_envejecimiento",
+  "pct_estudios_sup",
+  "ratio_colegios",
+  "distancia_centro_educativo",
+  "ratio_centros_salud",
+  "ratio_hospital",
+  "distancia_hospital",
+  "renta_media_hogar",
+  "esfuerzo_alquiler",
+  "pct_hogares_100mbps",
+  "pct_contratos_agricultura",
+  "pct_contratos_industria",
+  "pct_contratos_construccion"
+)]))
+```
+En las variables seleccionadas para clustering se mantiene el patrón de faltantes ya comentado previamente. En particular, *esfuerzo_alquiler* presenta 14 valores ausentes, lo que resulta especialmente relevante al tratarse de una de las variables seleccionadas para la formación de los clústeres. Además, *pct_estudios_sup* presenta 4 valores faltantes, aunque su impacto es más reducido. Por ello, antes de continuar con el análisis exploratorio en profundidad, se plantea un proceso de imputación que permita resolver este problema y trabajar posteriormente con una base más completa.
+
+### Imputación
+
+#### Carga del paquete necesario
+
+```{r}
+library(dplyr)
 ```
 
-### Análisis de faltantes reales
+#### Cálculo de un valor de respaldo para la renta faltante
+
 ```{r}
-faltantes_bizkaia <- data.frame(
-  variable = colnames(municipios_bizkaia_base),
-  n_faltantes = colSums(is.na(municipios_bizkaia_base)),
-  pct_faltantes = round(colSums(is.na(municipios_bizkaia_base)) / nrow(municipios_bizkaia_base) * 100, 2)
+renta_mediana <- median(municipios_bizkaia_base$renta_media_hogar, na.rm = TRUE)
+
+municipios_bizkaia_base$renta_usada <- ifelse(
+  is.na(municipios_bizkaia_base$renta_media_hogar),
+  renta_mediana,
+  municipios_bizkaia_base$renta_media_hogar
+)
+```
+
+#### Ajuste del modelo de imputación del alquiler
+
+```{r}
+modelo_alquiler <- lm(
+  precio_m2_alquiler ~ log(pob_total + 1) +
+    renta_usada +
+    consultorio_local +
+    distancia_hospital +
+    pct_hogares_100mbps,
+  data = municipios_bizkaia_base,
+  subset = !is.na(precio_m2_alquiler)
 )
 
-faltantes_bizkaia
+summary(modelo_alquiler)
+coef(modelo_alquiler)
 ```
-En general, la base final presenta un nivel de completitud bastante bueno en la mayoría de variables estructurales, demográficas y de equipamientos. Los valores perdidos se concentran sobre todo en las variables de educación, alquiler y esfuerzo de alquiler. En el caso de pct_estudios_sup, la existencia de faltantes parece estar asociada a la propia disponibilidad de información en la fuente original y no a errores de integración. En vivienda, los faltantes de precio_m2_alquiler se trasladan automáticamente a esfuerzo_alquiler, ya que esta última depende directamente del precio del alquiler.
 
+#### Identificación de los municipios con alquiler faltante antes de imputar
 
-### Revisión de valores atípicos o sospechosos
-A continuación, se representan boxplots de varias variables numéricas principales para detectar posibles valores atípicos o distribuciones especialmente asimétricas.
+```{r}
+municipios_bizkaia_base$alquiler_faltaba <- is.na(municipios_bizkaia_base$precio_m2_alquiler)
+```
+
+#### Imputación directa de los valores faltantes de alquiler
+
+```{r}
+municipios_bizkaia_base$precio_m2_alquiler[is.na(municipios_bizkaia_base$precio_m2_alquiler)] <-
+  round(
+    predict(
+      modelo_alquiler,
+      newdata = municipios_bizkaia_base[is.na(municipios_bizkaia_base$precio_m2_alquiler), ]
+    ),
+    1
+  )
+```
+
+#### Cálculo de esfuerzo_alquiler tras la imputación
+
+```{r}
+municipios_bizkaia_base$esfuerzo_alquiler <- 
+  ((municipios_bizkaia_base$precio_m2_alquiler * 80) / 
+     (municipios_bizkaia_base$renta_media_hogar / 12)) * 100
+```
+
+#### Revisión de algunos municipios cuyo alquiler ha sido imputado
+
+```{r}
+municipios_imputados <- municipios_bizkaia_base %>%
+  filter(alquiler_faltaba == TRUE) %>%
+  select(
+    cod_municipio,
+    nombre_municipio,
+    pob_total,
+    renta_media_hogar,
+    precio_m2_alquiler,
+    esfuerzo_alquiler
+  ) %>%
+  head(10)
+
+municipios_imputados
+```
+
+#### Eliminación de variables auxiliares creadas en la imputación
+
+```{r}
+municipios_bizkaia_base <- municipios_bizkaia_base %>%
+  select(-renta_usada, -alquiler_faltaba)
+```
+
+### Revisión de valores atípicos 
 ```{r}
 boxplot(municipios_bizkaia_base$pct_extranjeros,
         main = "Boxplot de pct_extranjeros")
+
 boxplot(municipios_bizkaia_base$indice_envejecimiento,
         main = "Boxplot de indice_envejecimiento")
+
 boxplot(municipios_bizkaia_base$pct_estudios_sup,
         main = "Boxplot de pct_estudios_sup")
-boxplot(municipios_bizkaia_base$precio_m2_alquiler,
-        main = "Boxplot de precio_m2_alquiler")
+
+boxplot(municipios_bizkaia_base$ratio_colegios,
+        main = "Boxplot de ratio_colegios")
+
+boxplot(municipios_bizkaia_base$distancia_centro_educativo,
+        main = "Boxplot de distancia_centro_educativo")
+
+boxplot(municipios_bizkaia_base$ratio_centros_salud,
+        main = "Boxplot de ratio_centros_salud")
+
+boxplot(municipios_bizkaia_base$ratio_hospital,
+        main = "Boxplot de ratio_hospital")
+
+boxplot(municipios_bizkaia_base$distancia_hospital,
+        main = "Boxplot de distancia_hospital")
+
+boxplot(municipios_bizkaia_base$renta_media_hogar,
+        main = "Boxplot de renta_media_hogar")
+
 boxplot(municipios_bizkaia_base$esfuerzo_alquiler,
         main = "Boxplot de esfuerzo_alquiler")
+
+boxplot(municipios_bizkaia_base$pct_hogares_100mbps,
+        main = "Boxplot de pct_hogares_100mbps")
+
+boxplot(municipios_bizkaia_base$pct_contratos_agricultura,
+        main = "Boxplot de pct_contratos_agricultura")
+
+boxplot(municipios_bizkaia_base$pct_contratos_industria,
+        main = "Boxplot de pct_contratos_industria")
+
+boxplot(municipios_bizkaia_base$pct_contratos_construccion,
+        main = "Boxplot de pct_contratos_construccion")
 ```
-La revisión de boxplots muestra que indice_envejecimiento es la variable con mayor presencia de valores extremos, lo que resulta coherente con la posible existencia de municipios muy envejecidos dentro del territorio analizado. Estos valores no deben considerarse necesariamente errores, sino observaciones plausibles que reflejan heterogeneidad demográfica real. En pct_estudios_sup no se aprecian valores anómalos graves, ya que la distribución se mantiene dentro de un rango razonable. Sin embargo, en precio_m2_alquiler y esfuerzo_alquiler aparecen observaciones muy bajas respecto al resto, lo que sugiere una posible heterogeneidad de escala o de unidad de medida en algunos registros. Por ello, estas dos variables deben interpretarse con cautela y sería recomendable revisar la consistencia de sus valores antes de utilizarlas en análisis posteriores.
+En general, los diagramas de caja muestran la presencia de valores atípicos en varias de las variables seleccionadas para clustering. Los casos más claros aparecen en *indice_envejecimiento*, *distancia_centro_educativo*, *ratio_centros_salud*, *ratio_hospital*, *distancia_hospital* y *esfuerzo_alquiler*. También se observan valores extremos en las variables de estructura productiva, especialmente en *pct_contratos_agricultura* y *pct_contratos_industria*, y de forma más moderada en *pct_contratos_construccion*. Por el contrario, variables como *pct_extranjeros*, *pct_estudios_sup*, *ratio_colegios*, *renta_media_hogar* y *pct_hogares_100mbps* presentan distribuciones más concentradas y apenas muestran valores atípicos. En conjunto, estos casos extremos parecen reflejar municipios con perfiles muy diferenciados, más que errores en la construcción de la base.
 
 ### Distribución de variables numéricas
-Seguidamente, se estudia la distribución de algunas variables cuantitativas mediante histogramas.
 ```{r}
-hist(municipios_bizkaia_base$pct_extranjeros,
+hist(municipios_valencia_base$pct_extranjeros,
      main = "Histograma de pct_extranjeros",
      xlab = "pct_extranjeros")
-hist(municipios_bizkaia_base$indice_envejecimiento,
+
+hist(municipios_valencia_base$indice_envejecimiento,
      main = "Histograma de indice_envejecimiento",
      xlab = "indice_envejecimiento")
-hist(municipios_bizkaia_base$pct_estudios_sup,
+
+hist(municipios_valencia_base$pct_estudios_sup,
      main = "Histograma de pct_estudios_sup",
      xlab = "pct_estudios_sup")
-hist(municipios_bizkaia_base$precio_m2_alquiler,
-     main = "Histograma de precio_m2_alquiler",
-     xlab = "precio_m2_alquiler")
-hist(municipios_bizkaia_base$esfuerzo_alquiler,
+
+hist(municipios_valencia_base$ratio_colegios,
+     main = "Histograma de ratio_colegios",
+     xlab = "ratio_colegios")
+
+hist(municipios_valencia_base$distancia_centro_educativo,
+     main = "Histograma de distancia_centro_educativo",
+     xlab = "distancia_centro_educativo")
+
+hist(municipios_valencia_base$ratio_centros_salud,
+     main = "Histograma de ratio_centros_salud",
+     xlab = "ratio_centros_salud")
+
+hist(municipios_valencia_base$ratio_hospital,
+     main = "Histograma de ratio_hospital",
+     xlab = "ratio_hospital")
+
+hist(municipios_valencia_base$distancia_hospital,
+     main = "Histograma de distancia_hospital",
+     xlab = "distancia_hospital")
+
+hist(municipios_valencia_base$renta_media_hogar,
+     main = "Histograma de renta_media_hogar",
+     xlab = "renta_media_hogar")
+
+hist(municipios_valencia_base$esfuerzo_alquiler,
      main = "Histograma de esfuerzo_alquiler",
      xlab = "esfuerzo_alquiler")
-```
-Las distribuciones de las variables numéricas reflejan perfiles municipales bastante diferenciados. La variable pct_extranjeros presenta una distribución asimétrica a la derecha, con concentración de municipios en valores bajos o moderados y pocos casos con porcentajes más elevados. indice_envejecimiento también muestra una clara asimetría positiva, lo que indica que la mayoría de municipios se sitúan en niveles intermedios de envejecimiento, mientras que unos pocos concentran valores mucho más altos. Por su parte, pct_estudios_sup presenta una distribución más extendida y relativamente estable, lo que sugiere una mayor variabilidad territorial en el nivel educativo. En las variables de vivienda, la distribución observada no es tan homogénea y parece existir una separación entre grupos de municipios, por lo que conviene interpretar esta parte con especial prudencia.
 
+hist(municipios_valencia_base$pct_hogares_100mbps,
+     main = "Histograma de pct_hogares_100mbps",
+     xlab = "pct_hogares_100mbps")
+
+hist(municipios_valencia_base$pct_contratos_agricultura,
+     main = "Histograma de pct_contratos_agricultura",
+     xlab = "pct_contratos_agricultura")
+
+hist(municipios_valencia_base$pct_contratos_industria,
+     main = "Histograma de pct_contratos_industria",
+     xlab = "pct_contratos_industria")
+
+hist(municipios_valencia_base$pct_contratos_construccion,
+     main = "Histograma de pct_contratos_construccion",
+     xlab = "pct_contratos_construccion")
+```
+
+Los histogramas muestran que las variables seleccionadas para el clustering presentan distribuciones bastante heterogéneas, algo lógico porque recogen dimensiones distintas del perfil municipal. Variables como *pct_extranjeros*, *pct_estudios_sup*, *renta_media_hogar* y, en menor medida, *esfuerzo_alquiler* presentan distribuciones relativamente más concentradas, aunque con cierta asimetría hacia la derecha. En cambio, *indice_envejecimiento* muestra una asimetría mucho más acusada, con la mayor parte de los municipios concentrados en valores intermedios y una cola larga hacia valores elevados.
+
+Por su parte, variables como *ratio_colegios*, *ratio_centros_salud*, *ratio_hospital*, *distancia_centro_educativo* y *distancia_hospital* presentan una fuerte concentración en valores bajos o próximos a cero, junto con algunos municipios que se sitúan claramente por encima del resto. Del mismo modo, *pct_contratos_agricultura*, *pct_contratos_industria* y *pct_contratos_construccion* muestran distribuciones muy asimétricas a la derecha, lo que refleja que la mayoría de municipios tienen porcentajes reducidos en estos sectores, mientras que unos pocos presentan una especialización más marcada.
+
+Finalmente, *pct_hogares_100mbps* se concentra en valores muy altos, próximos al 100, lo que resulta coherente con el elevado nivel de conectividad digital existente y con el interés del proyecto por variables relevantes para perfiles residenciales vinculados al teletrabajo. En conjunto, estas distribuciones no impiden aplicar técnicas de clustering, aunque sí refuerzan la conveniencia de estandarizar las variables antes de formar los grupos.
 
 ### Revisión de variables binarias
-```{r}
-table(municipios_bizkaia_base$consultorio_local, useNA = "ifany")
 
-table(municipios_bizkaia_base$internet_100mbps_mayor90, useNA = "ifany")
+```{r}
+table(municipios_bizkaia_base$consultorio_local)
+
+table(municipios_bizkaia_base$internet_100mbps_mayor90)
 ```
-Las variables binarias muestran comportamientos distintos. En consultorio_local sí existe variabilidad suficiente, ya que aparecen municipios tanto con presencia como sin presencia de este recurso, por lo que puede resultar útil en análisis comparativos posteriores. En cambio, internet_100mbps_mayor95 no discrimina entre municipios, puesto que todos los casos aparecen con valor 0. Esto indica que, en su estado actual, la variable no aporta capacidad explicativa y convendría revisar su construcción o, alternativamente, priorizar el uso de la variable continua pct_hogares_100mbps, que sí conserva información territorial relevante.
+
+En cuanto a las variables binarias, *consultorio_local* sí presenta variabilidad, ya que permite diferenciar entre municipios de Bizkaia que disponen de consultorio local y aquellos que no. En concreto, en la base final hay municipios con valor 0 y municipios con valor 1, por lo que esta variable puede aportar información útil en la caracterización de perfiles municipales. Por su parte, *internet_100mbps_mayor90* toma valor 1 en todos los municipios analizados. Este resultado no supone un inconveniente, sino que es coherente con el planteamiento del proyecto, dado que esta variable se ha utilizado previamente como criterio de selección para centrarse en municipios con alta conectividad digital, un aspecto especialmente relevante para el perfil de población teletrabajadora.
 
 ### Relaciones entre variables
-Por último, se exploran algunas relaciones entre variables mediante diagramas de dispersión. Esto ayuda a detectar asociaciones lineales, agrupaciones o patrones generales entre indicadores.
-```{r}
-plot(municipios_bizkaia_base$pct_extranjeros,
-     municipios_bizkaia_base$pct_estudios_sup,
-     xlab = "pct_extranjeros",
-     ylab = "pct_estudios_sup",
-     main = "pct_extranjeros vs pct_estudios_sup")
 
-plot(municipios_bizkaia_base$precio_m2_alquiler,
-     municipios_bizkaia_base$esfuerzo_alquiler,
-     xlab = "precio_m2_alquiler",
-     ylab = "esfuerzo_alquiler",
-     main = "precio_m2_alquiler vs esfuerzo_alquiler")
+En esta fase del AED no se profundiza en las relaciones bivariantes entre las variables seleccionadas, ya que dicho análisis se desarrolla de forma específica en el documento de correlaciones. En consecuencia, aquí se ha priorizado la revisión individual de cada variable, atendiendo a su completitud, distribución y posibles valores atípicos. El estudio posterior de las correlaciones permitirá valorar con mayor precisión el grado de asociación entre variables y la posible existencia de redundancias antes de aplicar el clustering.
 
-plot(municipios_bizkaia_base$renta_media_hogar,
-     municipios_bizkaia_base$esfuerzo_alquiler,
-     xlab = "renta_media_hogar",
-     ylab = "esfuerzo_alquiler",
-     main = "renta_media_hogar vs esfuerzo_alquiler")
-```
-El gráfico de dispersión entre pct_extranjeros y pct_estudios_sup no muestra una relación lineal fuerte, aunque puede apreciarse una tendencia débil y con bastante dispersión, lo que sugiere que ambas dimensiones responden a dinámicas territoriales distintas. En cambio, la relación entre precio_m2_alquiler y esfuerzo_alquiler es claramente positiva, algo esperable porque el esfuerzo de alquiler depende directamente del nivel del precio. Por ello, esta asociación debe interpretarse más como una relación estructural derivada de la propia definición de la variable que como un hallazgo sustantivo independiente. Finalmente, la relación entre renta_media_hogar y esfuerzo_alquiler no muestra un patrón lineal simple, y además está condicionada por la heterogeneidad observada en las variables de vivienda, por lo que cualquier conclusión en este punto debe formularse con cautela.
+### Conclusión
+
+El análisis exploratorio realizado sobre las variables seleccionadas para clustering muestra que los municipios de Viszcaya presentan una notable heterogeneidad en dimensiones como la estructura demográfica, el nivel educativo, el acceso a servicios, la conectividad digital, la especialización productiva y el mercado de la vivienda. En conjunto, las variables analizadas presentan capacidad para diferenciar perfiles municipales, aunque varias de ellas muestran asimetrías y algunos valores extremos, algo coherente con la diversidad territorial existente. Por ello, la base final construida se considera adecuada para abordar posteriormente la caracterización de municipios planteada en el proyecto.
 
 
 ## GUARDADO DE LA BASE FINAL
-En conjunto, el análisis exploratorio indica que la base final de municipios de Vizcaya recoge adecuadamente varias dimensiones relevantes del territorio, especialmente en los ámbitos demográfico, educativo y sanitario. Las distribuciones observadas muestran heterogeneidad real entre municipios y permiten identificar perfiles distintos dentro de la provincia. No obstante, también se han detectado dos cuestiones que conviene tener en cuenta antes de fases posteriores del análisis: por un lado, la variable binaria de cobertura de internet no está discriminando entre municipios en su formato actual; por otro, las variables de vivienda presentan indicios de posibles inconsistencias de escala o unidad en algunos registros. Salvo por estos aspectos, la base puede considerarse suficientemente estructurada y válida como punto de partida para análisis descriptivos posteriores.
 
 ### Exportación del dataset final
+
 ```{r}
 write.csv(municipios_bizkaia_base, "../../datasets/vizcaya-bilbao/municipios_vizcaya_base_final.csv", row.names = FALSE)
 
 ```
-
-
