@@ -1528,8 +1528,6 @@ hist(municipios_bizkaia_base$pct_contratos_construccion,
      xlab = "pct_contratos_construccion")
 ```
 
-### Distribución de variables numéricas
-
 Los histogramas muestran que las variables seleccionadas para el clustering presentan distribuciones heterogéneas, algo esperable porque recogen dimensiones distintas del perfil municipal. Variables como *pct_extranjeros*, *pct_estudios_sup* y *renta_media_hogar* presentan distribuciones relativamente más concentradas, mientras que *esfuerzo_alquiler* también se concentra en un rango intermedio, aunque con algo más de dispersión. En cambio, *indice_envejecimiento* muestra una asimetría más acusada hacia la derecha, con la mayor parte de los municipios agrupados en valores intermedios y algún caso claramente más envejecido que se aleja del resto.
 
 Por su parte, variables como *ratio_colegios*, *ratio_centros_salud*, *ratio_hospital* y *distancia_centro_educativo* presentan una fuerte concentración en valores bajos o próximos a cero, junto con unos pocos municipios con valores bastante más elevados. En *distancia_hospital* también se observa una mayor acumulación en distancias reducidas, aunque con una cola a la derecha que refleja la existencia de municipios más alejados de este servicio. De forma similar, *pct_contratos_agricultura*, *pct_contratos_industria* y *pct_contratos_construccion* muestran distribuciones asimétricas hacia la derecha, especialmente en agricultura y construcción, lo que indica que la mayoría de municipios presentan porcentajes bajos y solo algunos destacan por una mayor especialización sectorial.
@@ -1552,7 +1550,7 @@ En esta fase del AED no se profundiza en las relaciones bivariantes entre las va
 
 ### Conclusión
 
-El análisis exploratorio realizado sobre las variables seleccionadas para clustering muestra que los municipios de Viszcaya presentan una notable heterogeneidad en dimensiones como la estructura demográfica, el nivel educativo, el acceso a servicios, la conectividad digital, la especialización productiva y el mercado de la vivienda. En conjunto, las variables analizadas presentan capacidad para diferenciar perfiles municipales, aunque varias de ellas muestran asimetrías y algunos valores extremos, algo coherente con la diversidad territorial existente. Por ello, la base final construida se considera adecuada para abordar posteriormente la caracterización de municipios planteada en el proyecto.
+El análisis exploratorio realizado sobre las variables seleccionadas para clustering muestra que los municipios de Vizcaya presentan una notable heterogeneidad en dimensiones como la estructura demográfica, el nivel educativo, el acceso a servicios, la conectividad digital, la especialización productiva y el mercado de la vivienda. En conjunto, las variables analizadas presentan capacidad para diferenciar perfiles municipales, aunque varias de ellas muestran asimetrías y algunos valores extremos, algo coherente con la diversidad territorial existente. Por ello, la base final construida se considera adecuada para abordar posteriormente la caracterización de municipios planteada en el proyecto.
 
 
 ## GUARDADO DE LA BASE FINAL
