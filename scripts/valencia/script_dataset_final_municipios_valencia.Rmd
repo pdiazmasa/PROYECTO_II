@@ -1007,7 +1007,7 @@ head(internet_valencia[, c("cod_municipio", "pct_hogares_100mbps")])
 summary(internet_valencia$pct_hogares_100mbps)
 ```
 
-### Creación de la variable `internet_100mbps_mayor95`
+### Creación de la variable `internet_100mbps_mayor90`
 
 ```{r}
 internet_valencia$internet_100mbps_mayor90 <- ifelse(
