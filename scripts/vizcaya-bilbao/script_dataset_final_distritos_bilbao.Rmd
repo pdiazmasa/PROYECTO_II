@@ -1,0 +1,458 @@
+---
+title: "dataset_final_distritos_bilbao"
+output: html_document
+date: "2026-04-12"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## PREPARACIONES INICIALES
+
+### Carga de paquetes
+
+```{r}
+library(dplyr)
+library(readr)
+library(readxl)
+library(stringr)
+library(stringi)
+```
+
+### Función de normalización de distritos
+
+```{r}
+normalizar_distrito <- function(x) {
+  x <- tolower(x)
+  x <- stringi::stri_trans_general(x, "Latin-ASCII")
+  x <- str_squish(x)
+
+  # Quitamos números iniciales tipo "1. " o prefijos innecesarios
+  x <- str_remove(x, "^\\d+\\.\\s*")
+
+  # Usamos replace para limpiar lo que haya después de / o -
+  x <- str_replace(x, "[/-].*", "")
+
+  x <- str_squish(x)
+  return(x)
+}
+```
+
+## CONSTRUCCIÓN DE LA BASE PRINCIPAL DE DISTRITOS
+
+### Lectura de la base de datos del censo
+
+```{r}
+censo <- read_csv("../../bases_de_datos/censo/censo_distritos_bilbao_agrupado.csv",
+                  show_col_types = FALSE)
+```
+
+### Exploración inicial del censo
+
+```{r}
+head(censo)
+dim(censo)
+colnames(censo)
+str(censo)
+```
+
+### Creación del dataset base y columnas de identificación
+
+```{r}
+# Creamos la base inicial de distritos de Bilbao
+distritos_bilbao_base <- censo %>%
+  mutate(
+    cod_distrito         = as.numeric(cod_distrito),
+    nombre_distrito      = nombre_distrito,
+    nombre_distrito_norm = normalizar_distrito(nombre_distrito)
+  ) %>%
+  select(cod_distrito, nombre_distrito, nombre_distrito_norm)
+
+head(distritos_bilbao_base)
+cat("Filas detectadas:", nrow(distritos_bilbao_base), "(deberían ser 8)\n")
+cat("Nulos en cod_distrito:", sum(is.na(distritos_bilbao_base$cod_distrito)), "\n")
+```
+
+### Incorporación de las variables poblacionales
+
+```{r}
+distritos_bilbao_base <- distritos_bilbao_base %>%
+  mutate(
+    pob_total    = censo$pob_total[1:nrow(distritos_bilbao_base)],
+    pob_menor_16 = censo$pob_0_15[1:nrow(distritos_bilbao_base)],
+    pob_mayor_65 = censo$pob_65_mas[1:nrow(distritos_bilbao_base)]
+  )
+
+head(distritos_bilbao_base)
+summary(distritos_bilbao_base)
+```
+
+### Comprobación de duplicados y cobertura
+
+```{r}
+sum(duplicated(distritos_bilbao_base$cod_distrito))
+sum(duplicated(distritos_bilbao_base$nombre_distrito_norm))
+
+dim(distritos_bilbao_base)
+```
+
+## BLOQUE DEMOGRÁFICO
+
+### Cálculo del índice de envejecimiento
+
+El índice de envejecimiento se calcula como el cociente entre la población mayor de 65 años y la población menor de 16 años, expresado en tanto por ciento. Recoge la proporción relativa de personas mayores frente a jóvenes en cada distrito.
+
+```{r}
+distritos_bilbao_base$indice_envejecimiento <-
+  (distritos_bilbao_base$pob_mayor_65 / distritos_bilbao_base$pob_menor_16) * 100
+
+head(distritos_bilbao_base)
+```
+
+### Comprobación de resultados del bloque demográfico
+
+```{r}
+head(distritos_bilbao_base)
+
+summary(distritos_bilbao_base[, c("pob_total",
+                                   "pob_menor_16",
+                                   "pob_mayor_65",
+                                   "indice_envejecimiento")])
+
+sum(is.na(distritos_bilbao_base$pob_total))
+sum(is.na(distritos_bilbao_base$pob_menor_16))
+sum(is.na(distritos_bilbao_base$pob_mayor_65))
+sum(is.na(distritos_bilbao_base$indice_envejecimiento))
+```
+
+## BLOQUE EDUCATIVO
+
+### Lectura del resumen de Bilbao
+
+```{r}
+bilbao_resumen <- read_delim("../../datasets/vizcaya-bilbao/bilbao_resumen.csv",
+                             delim = ";",
+                             show_col_types = FALSE)
+
+# Normalizamos el nombre del distrito en el resumen
+bilbao_resumen <- bilbao_resumen %>%
+  mutate(nombre_distrito_norm = normalizar_distrito(distrito))
+
+head(bilbao_resumen)
+dim(bilbao_resumen)
+colnames(bilbao_resumen)
+```
+
+### Incorporación de la variable `num_colegios`
+
+```{r}
+distritos_bilbao_base <- distritos_bilbao_base %>%
+  select(-any_of("num_colegios")) %>%
+  left_join(
+    bilbao_resumen %>% select(nombre_distrito_norm, num_colegios),
+    by = "nombre_distrito_norm"
+  ) %>%
+  mutate(num_colegios = coalesce(num_colegios, 0L))
+
+head(distritos_bilbao_base[, c("nombre_distrito", "num_colegios")])
+```
+
+### Cálculo de la variable `ratio_colegio`
+
+```{r}
+distritos_bilbao_base <- distritos_bilbao_base %>%
+  select(-any_of("ratio_colegio")) %>%
+  mutate(ratio_colegio = round((num_colegios / pob_total) * 1000, 4))
+
+head(distritos_bilbao_base[, c("nombre_distrito", "num_colegios", "ratio_colegio")])
+```
+
+### Comprobación de resultados del bloque educativo
+
+```{r}
+summary(distritos_bilbao_base[, c("num_colegios", "ratio_colegio")])
+sum(is.na(distritos_bilbao_base$num_colegios))
+sum(is.na(distritos_bilbao_base$ratio_colegio))
+```
+
+## BLOQUE SANITARIO
+
+### Incorporación de la variable `num_hospitales`
+
+```{r}
+distritos_bilbao_base <- distritos_bilbao_base %>%
+  select(-any_of("num_hospitales")) %>%
+  left_join(
+    bilbao_resumen %>% select(nombre_distrito_norm, num_hospitales),
+    by = "nombre_distrito_norm"
+  ) %>%
+  mutate(num_hospitales = coalesce(num_hospitales, 0L))
+
+head(distritos_bilbao_base[, c("nombre_distrito", "num_hospitales")])
+```
+
+### Cálculo de la variable `ratio_hospital`
+
+```{r}
+distritos_bilbao_base <- distritos_bilbao_base %>%
+  select(-any_of("ratio_hospital")) %>%
+  mutate(ratio_hospital = round((num_hospitales / pob_total) * 1000, 4))
+
+head(distritos_bilbao_base[, c("nombre_distrito", "num_hospitales", "ratio_hospital")])
+```
+
+### Comprobación de resultados del bloque sanitario
+
+```{r}
+summary(distritos_bilbao_base[, c("num_hospitales", "ratio_hospital")])
+sum(is.na(distritos_bilbao_base$num_hospitales))
+sum(is.na(distritos_bilbao_base$ratio_hospital))
+```
+
+## BLOQUE DE VIVIENDA
+
+### Lectura y exploración de la base de datos de alquiler
+
+```{r}
+alquiler <- readr::read_delim("../../bases_de_datos/vivienda/alquiler_distritos_bilbao.csv",
+                              delim = ";",
+                              show_col_types = FALSE)
+
+head(alquiler)
+dim(alquiler)
+colnames(alquiler)
+```
+
+### Transformación y limpieza del precio de alquiler
+
+El precio de alquiler en la fuente de Bilbao está expresado en precio total mensual y ha de convertirse a precio por m². Se aplica la corrección de formato decimal (coma por punto) y la conversión de unidades.
+
+```{r}
+alquiler$PRECIO_ALQUILER <- as.numeric(gsub(",", ".", alquiler$PRECIO_ALQUILER)) * 0.1
+
+head(alquiler)
+```
+
+### Incorporación de la variable `alquiler_m2`
+
+```{r}
+distritos_bilbao_base <- distritos_bilbao_base %>%
+  select(-any_of("alquiler_m2")) %>%
+  left_join(
+    alquiler %>% select(COD_DIS, alquiler_m2 = PRECIO_ALQUILER),
+    by = c("cod_distrito" = "COD_DIS")
+  )
+
+head(distritos_bilbao_base[, c("nombre_distrito", "alquiler_m2")])
+```
+
+### Lectura y exploración de la base de datos de renta
+
+```{r}
+renta <- readr::read_delim("../../bases_de_datos/renta/renta_distritos_bilbao.csv",
+                           delim = ";",
+                           show_col_types = FALSE,
+                           col_types = cols(Total = col_character()))
+
+# Limpieza de puntos y conversión a numérico del valor de la renta
+renta$Total <- as.numeric(gsub("\\.", "", renta$Total))
+
+# Extraemos el número de distrito del texto
+renta <- renta %>%
+  mutate(cod_distrito = as.numeric(stringr::str_extract(Distritos, "\\d+$")))
+
+head(renta)
+dim(renta)
+```
+
+### Incorporación de la variable `renta_media_hogar`
+
+```{r}
+distritos_bilbao_base <- distritos_bilbao_base %>%
+  select(-any_of("renta_media_hogar")) %>%
+  left_join(
+    renta %>% select(cod_distrito, renta_media_hogar = Total),
+    by = "cod_distrito"
+  )
+
+head(distritos_bilbao_base[, c("nombre_distrito", "renta_media_hogar")])
+```
+
+### Cálculo del esfuerzo de alquiler
+
+El esfuerzo de alquiler se calcula como el porcentaje de la renta mensual del hogar que se destina al pago de una vivienda de 80 m².
+
+```{r}
+distritos_bilbao_base <- distritos_bilbao_base %>%
+  select(-any_of("esfuerzo_alquiler")) %>%
+  mutate(
+    esfuerzo_alquiler = ((alquiler_m2 * 80) / (renta_media_hogar / 12)) * 100
+  )
+
+head(distritos_bilbao_base[, c("nombre_distrito", "alquiler_m2", "renta_media_hogar", "esfuerzo_alquiler")])
+```
+
+### Comprobación de resultados del bloque de vivienda
+
+```{r}
+summary(distritos_bilbao_base[, c("alquiler_m2", "renta_media_hogar", "esfuerzo_alquiler")])
+sum(is.na(distritos_bilbao_base$alquiler_m2))
+sum(is.na(distritos_bilbao_base$renta_media_hogar))
+sum(is.na(distritos_bilbao_base$esfuerzo_alquiler))
+```
+
+### Revisión de distritos con mayor esfuerzo de alquiler
+
+Este listado permite identificar los distritos donde el alquiler de una vivienda de 80 m² supone un mayor esfuerzo económico para el hogar medio.
+
+```{r}
+distritos_bilbao_base %>%
+  filter(!is.na(esfuerzo_alquiler)) %>%
+  select(nombre_distrito, pob_total, alquiler_m2, renta_media_hogar, esfuerzo_alquiler) %>%
+  arrange(desc(esfuerzo_alquiler)) %>%
+  head(8)
+```
+
+### Revisión de distritos con menor esfuerzo de alquiler
+
+```{r}
+distritos_bilbao_base %>%
+  filter(!is.na(esfuerzo_alquiler)) %>%
+  select(nombre_distrito, pob_total, alquiler_m2, renta_media_hogar, esfuerzo_alquiler) %>%
+  arrange(esfuerzo_alquiler) %>%
+  head(8)
+```
+
+## BLOQUE DE ZONAS VERDES
+
+### Incorporación de la variable `num_zonas_verdes`
+
+```{r}
+distritos_bilbao_base <- distritos_bilbao_base %>%
+  select(-any_of("num_zonas_verdes")) %>%
+  left_join(
+    bilbao_resumen %>% select(nombre_distrito_norm, num_zonas_verdes),
+    by = "nombre_distrito_norm"
+  ) %>%
+  mutate(num_zonas_verdes = coalesce(num_zonas_verdes, 0L))
+
+head(distritos_bilbao_base[, c("nombre_distrito", "num_zonas_verdes")])
+```
+
+### Cálculo de la variable `ratio_zonas_verdes`
+
+```{r}
+distritos_bilbao_base <- distritos_bilbao_base %>%
+  select(-any_of("ratio_zonas_verdes")) %>%
+  mutate(ratio_zonas_verdes = round(num_zonas_verdes / pob_total, 4))
+
+head(distritos_bilbao_base[, c("nombre_distrito", "num_zonas_verdes", "ratio_zonas_verdes")])
+```
+
+### Comprobación de resultados del bloque de zonas verdes
+
+```{r}
+summary(distritos_bilbao_base[, c("num_zonas_verdes", "ratio_zonas_verdes")])
+sum(is.na(distritos_bilbao_base$num_zonas_verdes))
+sum(is.na(distritos_bilbao_base$ratio_zonas_verdes))
+```
+
+## TRANSFORMACIONES FINALES
+
+### Redondeo de variables calculadas a dos decimales
+
+Para dejar las variables más limpias de cara a la presentación final, redondeamos las variables calculadas a dos decimales.
+
+```{r}
+distritos_bilbao_base$indice_envejecimiento <- round(distritos_bilbao_base$indice_envejecimiento, 2)
+distritos_bilbao_base$esfuerzo_alquiler     <- round(distritos_bilbao_base$esfuerzo_alquiler, 2)
+distritos_bilbao_base$ratio_colegio         <- round(distritos_bilbao_base$ratio_colegio, 4)
+distritos_bilbao_base$ratio_hospital        <- round(distritos_bilbao_base$ratio_hospital, 4)
+distritos_bilbao_base$ratio_zonas_verdes    <- round(distritos_bilbao_base$ratio_zonas_verdes, 4)
+
+head(distritos_bilbao_base[, c("nombre_distrito_norm",
+                                "indice_envejecimiento",
+                                "esfuerzo_alquiler",
+                                "ratio_colegio",
+                                "ratio_hospital",
+                                "ratio_zonas_verdes")])
+```
+
+### Verificación de la estructura final
+
+```{r}
+head(distritos_bilbao_base)
+str(distritos_bilbao_base)
+dim(distritos_bilbao_base)
+colnames(distritos_bilbao_base)
+```
+
+## ANÁLISIS EXPLORATORIO DE DATOS (AED)
+
+Las variables seleccionadas para el clustering son: `indice_envejecimiento`, `ratio_colegio`, `ratio_hospital`, `esfuerzo_alquiler` y `ratio_zonas_verdes`.
+
+### Revisión de valores atípicos
+
+```{r}
+boxplot(distritos_bilbao_base$indice_envejecimiento,
+        main = "Boxplot de indice_envejecimiento")
+
+boxplot(distritos_bilbao_base$ratio_colegio,
+        main = "Boxplot de ratio_colegio")
+
+boxplot(distritos_bilbao_base$ratio_hospital,
+        main = "Boxplot de ratio_hospital")
+
+boxplot(distritos_bilbao_base$esfuerzo_alquiler,
+        main = "Boxplot de esfuerzo_alquiler")
+
+boxplot(distritos_bilbao_base$ratio_zonas_verdes,
+        main = "Boxplot de ratio_zonas_verdes")
+```
+
+Dado el reducido número de distritos (8), los valores que puedan destacar como atípicos en los diagramas de caja no se eliminan, ya que probablemente reflejan perfiles reales y diferenciados de los distritos, más que errores en la construcción de las variables. La variabilidad entre distritos es esperable y constituye precisamente la base sobre la que se apoya el análisis de clustering.
+
+### Distribución de variables numéricas
+
+```{r}
+hist(distritos_bilbao_base$indice_envejecimiento,
+     main = "Histograma de indice_envejecimiento",
+     xlab = "indice_envejecimiento")
+
+hist(distritos_bilbao_base$ratio_colegio,
+     main = "Histograma de ratio_colegio",
+     xlab = "ratio_colegio")
+
+hist(distritos_bilbao_base$ratio_hospital,
+     main = "Histograma de ratio_hospital",
+     xlab = "ratio_hospital")
+
+hist(distritos_bilbao_base$esfuerzo_alquiler,
+     main = "Histograma de esfuerzo_alquiler",
+     xlab = "esfuerzo_alquiler")
+
+hist(distritos_bilbao_base$ratio_zonas_verdes,
+     main = "Histograma de ratio_zonas_verdes",
+     xlab = "ratio_zonas_verdes")
+```
+
+Los histogramas muestran las distribuciones de las cinco variables de clustering en los 8 distritos de Bilbao. Dada la pequeña muestra, las distribuciones no permiten extraer conclusiones estadísticas robustas, pero sí son útiles para identificar posibles concentraciones o dispersiones. El `indice_envejecimiento` permite distinguir entre distritos con estructuras demográficas más jóvenes y más envejecidas, coherente con las diferencias socioeconómicas entre zonas de Bilbao. Las variables de servicios (`ratio_colegio`, `ratio_hospital`) reflejan la concentración de recursos en determinados distritos, especialmente en aquellos con mayor peso poblacional o funcional. El `esfuerzo_alquiler` muestra cierta variabilidad, ligada tanto a los precios del alquiler como a los niveles de renta de cada distrito. Finalmente, `ratio_zonas_verdes` es esperable que muestre diferencias notables entre el centro y la periferia de la ciudad. En conjunto, la variabilidad observada refuerza la idoneidad de estas variables para la caracterización de perfiles distritales, aunque será necesario estandarizarlas antes de aplicar el clustering para evitar que las diferencias de escala condicionen la formación de los grupos.
+
+### Relaciones entre variables
+
+En esta fase del AED no se profundiza en las relaciones bivariantes entre las variables seleccionadas, ya que dicho análisis se desarrolla de forma específica en el documento de correlaciones. En consecuencia, aquí se ha priorizado la revisión individual de cada variable, atendiendo a su completitud, distribución y posibles valores atípicos. El estudio posterior de las correlaciones permitirá valorar con mayor precisión el grado de asociación entre variables y la posible existencia de redundancias antes de aplicar el clustering.
+
+### Conclusión
+
+El análisis exploratorio realizado sobre las variables seleccionadas para clustering muestra que los distritos de la ciudad de Bilbao presentan heterogeneidad en dimensiones como la estructura demográfica, la dotación de centros educativos y sanitarios, el esfuerzo económico asociado a la vivienda en alquiler y la presencia de zonas verdes. Aunque el número de distritos es reducido (8), la variabilidad observada en las variables analizadas es suficiente para sustentar un análisis de tipología distrital. Por ello, la base final construida se considera adecuada para abordar la caracterización de distritos planteada en el proyecto.
+
+## GUARDADO DE LA BASE FINAL
+
+### Exportación del dataset final
+
+```{r}
+write.csv(distritos_bilbao_base,
+          "../../datasets/vizcaya-bilbao/distritos_bilbao_base_final.csv",
+          row.names = FALSE)
+```
