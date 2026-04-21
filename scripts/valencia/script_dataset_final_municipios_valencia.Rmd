@@ -1232,6 +1232,14 @@ head(municipios_valencia_base)
 dim(municipios_valencia_base)
 str(municipios_valencia_base)
 ```
+```{r}
+# Ajuste manual 
+municipios_valencia_base$indice_envejecimiento[is.na(municipios_valencia_base$indice_envejecimiento)] <- median(municipios_valencia_base$indice_envejecimiento, na.rm = TRUE)
+
+municipios_valencia_base$renta_media_hogar[is.na(municipios_valencia_base$renta_media_hogar)] <- median(municipios_valencia_base$renta_media_hogar, na.rm = TRUE)
+
+municipios_valencia_base$esfuerzo_alquiler[is.na(municipios_valencia_base$esfuerzo_alquiler)] <- median(municipios_valencia_base$esfuerzo_alquiler, na.rm = TRUE)
+```
 
 ## ANÁLISIS EXPLORATORIO DE LA BASE FINAL
 
@@ -1265,8 +1273,7 @@ colSums(is.na(municipios_valencia_base[, c(
   "pct_contratos_agricultura",
   "pct_contratos_industria",
   "pct_contratos_construccion",
-  "pct_contratos_servicios"
-)]))
+  "pct_contratos_servicios")]))
 ```
 En general, la base final presenta un buen nivel de completitud. La mayoría de las variables no tienen valores faltantes, lo que indica que el proceso de integración de las distintas fuentes se ha realizado correctamente. Los faltantes se concentran en un número reducido de variables y responden, en general, a limitaciones propias de las fuentes utilizadas y no a errores de lectura o de cruce.
 
