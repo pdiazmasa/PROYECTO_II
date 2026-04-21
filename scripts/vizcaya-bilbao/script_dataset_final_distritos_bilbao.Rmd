@@ -379,21 +379,70 @@ head(distritos_bilbao_base[, c("nombre_distrito_norm",
                                 "ratio_zonas_verdes")])
 ```
 
-### Verificación de la estructura final
 
+## COMPROBACIÓN DE LA BASE FINAL
+
+### Comprobación final de nombres de variables
+```{r}
+colnames(distritos_bilbao_base)
+```
+
+### Vista general de la base final
 ```{r}
 head(distritos_bilbao_base)
 str(distritos_bilbao_base)
 dim(distritos_bilbao_base)
-colnames(distritos_bilbao_base)
 ```
 
-## ANÁLISIS EXPLORATORIO DE DATOS (AED)
+## ANÁLISIS EXPLORATORIO DE LA BASE FINAL
 
-Las variables seleccionadas para el clustering son: `indice_envejecimiento`, `ratio_colegio`, `ratio_hospital`, `esfuerzo_alquiler` y `ratio_zonas_verdes`.
+### Análisis de faltantes 
+```{r}
+colSums(is.na(distritos_bilbao_base[, c(
+  "cod_distrito",
+  "nombre_distrito",
+  "nombre_distrito_norm",
+  "pob_total",
+  "pob_menor_16",
+  "pob_mayor_65",
+  "indice_envejecimiento",
+  "num_colegios",
+  "ratio_colegio",
+  "num_hospitales",
+  "ratio_hospital",
+  "alquiler_m2",
+  "renta_media_hogar",
+  "esfuerzo_alquiler",
+  "num_zonas_verdes",
+  "ratio_zonas_verdes"
+)]))
+```
+En general, la base final de distritos presenta un nivel de completitud muy alto. Prácticamente todas las variables incluidas en el análisis no tienen valores faltantes, lo que indica que el proceso de construcción e integración de la base se ha realizado de forma correcta. Los únicos faltantes se localizan en *alquiler_m2* y *esfuerzo_alquiler*, con un único valor perdido en cada caso.
+
+
+## ANÁLISIS EXPLORATORIO DE LAS VARIABLES PARA CLUSTERING
+
+Con el fin de dar respuesta al objetivo 2 del proyecto, se va a aplicar una técnica de clustering sobre los distritos de Bilbao, con el propósito de identificar perfiles territoriales homogéneos a partir de sus características demográficas, residenciales y de acceso a servicios. Antes de realizar este análisis, resulta necesario estudiar en profundidad las variables que formarán parte del mismo.
+
+La selección de variables se ha realizado a partir de un análisis previo de correlaciones, con el objetivo de evitar redundancias excesivas y conservar únicamente aquellas variables que aportan información relevante y complementaria para la caracterización de los distritos. En este sentido, se han priorizado indicadores expresados en índices, ratios o medidas relativas, ya que permiten comparar distritos con tamaños poblacionales distintos en condiciones más homogéneas.
+
+Las variables finalmente seleccionadas recogen distintas dimensiones del fenómeno estudiado. Por una parte, *indice_envejecimiento* permite aproximar la estructura demográfica de cada distrito. Por otra, *ratio_colegio* y *ratio_hospital* aportan información sobre la disponibilidad de estos servicios. Además, *esfuerzo_alquiler* incorpora una dimensión socioeconómica, mientras que *ratio_zonas_verdes* permite aproximar la presencia de espacios verdes dentro de cada distrito.
+
+A continuación, se realiza un análisis exploratorio en profundidad de estas variables:
+
+### Análisis de faltantes
+```{r}
+colSums(is.na(distritos_bilbao_base[, c(
+  "indice_envejecimiento",
+  "ratio_colegio",
+  "ratio_hospital",
+  "esfuerzo_alquiler",
+  "ratio_zonas_verdes"
+)]))
+```
+En las variables seleccionadas para el clustering, el patrón de faltantes es prácticamente inexistente. En concreto, *indice_envejecimiento*, *ratio_colegio*, *ratio_hospital* y *ratio_zonas_verdes* no presentan valores ausentes, mientras que *esfuerzo_alquiler* registra un único valor faltante.
 
 ### Revisión de valores atípicos
-
 ```{r}
 boxplot(distritos_bilbao_base$indice_envejecimiento,
         main = "Boxplot de indice_envejecimiento")
@@ -411,7 +460,7 @@ boxplot(distritos_bilbao_base$ratio_zonas_verdes,
         main = "Boxplot de ratio_zonas_verdes")
 ```
 
-Dado el reducido número de distritos (8), los valores que puedan destacar como atípicos en los diagramas de caja no se eliminan, ya que probablemente reflejan perfiles reales y diferenciados de los distritos, más que errores en la construcción de las variables. La variabilidad entre distritos es esperable y constituye precisamente la base sobre la que se apoya el análisis de clustering.
+En general, los diagramas de caja no muestran una presencia muy acusada de valores atípicos en todas las variables seleccionadas. Los casos más claros aparecen sobre todo en *esfuerzo_alquiler* y *ratio_zonas_verdes*, mientras que *indice_envejecimiento*, *ratio_colegio* y *ratio_hospital* presentan una distribución más contenida. No obstante, dado el reducido número de distritos, estos valores no se eliminan, ya que probablemente responden a perfiles reales y diferenciados entre distritos de Bilbao, más que a errores en la construcción de las variables. Esta variabilidad resulta coherente con la heterogeneidad urbana existente y puede aportar información útil para el clustering posterior.
 
 ### Distribución de variables numéricas
 
@@ -437,7 +486,9 @@ hist(distritos_bilbao_base$ratio_zonas_verdes,
      xlab = "ratio_zonas_verdes")
 ```
 
-Los histogramas muestran las distribuciones de las cinco variables de clustering en los 8 distritos de Bilbao. Dada la pequeña muestra, las distribuciones no permiten extraer conclusiones estadísticas robustas, pero sí son útiles para identificar posibles concentraciones o dispersiones. El `indice_envejecimiento` permite distinguir entre distritos con estructuras demográficas más jóvenes y más envejecidas, coherente con las diferencias socioeconómicas entre zonas de Bilbao. Las variables de servicios (`ratio_colegio`, `ratio_hospital`) reflejan la concentración de recursos en determinados distritos, especialmente en aquellos con mayor peso poblacional o funcional. El `esfuerzo_alquiler` muestra cierta variabilidad, ligada tanto a los precios del alquiler como a los niveles de renta de cada distrito. Finalmente, `ratio_zonas_verdes` es esperable que muestre diferencias notables entre el centro y la periferia de la ciudad. En conjunto, la variabilidad observada refuerza la idoneidad de estas variables para la caracterización de perfiles distritales, aunque será necesario estandarizarlas antes de aplicar el clustering para evitar que las diferencias de escala condicionen la formación de los grupos.
+Los histogramas muestran distribuciones diferentes entre las variables seleccionadas para clustering, algo esperable porque recogen dimensiones distintas de los distritos. *indice_envejecimiento* y *ratio_colegio* presentan variabilidad entre distritos. *ratio_hospital* muestra una distribución más irregular, con varios valores bajos o nulos y algunos distritos con mayor dotación hospitalaria. Por su parte, *esfuerzo_alquiler* presenta una distribución más concentrada, mientras que *ratio_zonas_verdes* muestra una mayor asimetría.
+
+En conjunto, la variabilidad observada refuerza la utilidad de estas variables para el clustering, aunque será necesario estandarizarlas antes de aplicar la técnica para evitar que las diferencias de escala condicionen la formación de los grupos.
 
 ### Relaciones entre variables
 
@@ -445,7 +496,8 @@ En esta fase del AED no se profundiza en las relaciones bivariantes entre las va
 
 ### Conclusión
 
-El análisis exploratorio realizado sobre las variables seleccionadas para clustering muestra que los distritos de la ciudad de Bilbao presentan heterogeneidad en dimensiones como la estructura demográfica, la dotación de centros educativos y sanitarios, el esfuerzo económico asociado a la vivienda en alquiler y la presencia de zonas verdes. Aunque el número de distritos es reducido (8), la variabilidad observada en las variables analizadas es suficiente para sustentar un análisis de tipología distrital. Por ello, la base final construida se considera adecuada para abordar la caracterización de distritos planteada en el proyecto.
+El análisis exploratorio realizado sobre las variables seleccionadas para clustering muestra que los distritos de la ciudad de Bilbao presentan diferencias apreciables en dimensiones como la estructura demográfica, la dotación de centros educativos y sanitarios, el esfuerzo económico asociado a la vivienda en alquiler y la disponibilidad de zonas verdes. En conjunto, las variables analizadas muestran capacidad para diferenciar distritos, aunque la muestra es reducida y varias variables presentan cierta asimetría o valores destacados. Por ello, la base final construida se considera adecuada para abordar posteriormente la caracterización de distritos planteada en el proyecto.
+
 
 ## GUARDADO DE LA BASE FINAL
 
@@ -455,4 +507,5 @@ El análisis exploratorio realizado sobre las variables seleccionadas para clust
 write.csv(distritos_bilbao_base,
           "../../datasets/vizcaya-bilbao/distritos_bilbao_base_final.csv",
           row.names = FALSE)
+
 ```

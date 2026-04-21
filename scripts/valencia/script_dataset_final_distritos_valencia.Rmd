@@ -487,7 +487,7 @@ hist(distritos_valencia_base$ratio_zonas_verdes,
      main = "Histograma de ratio_zonas_verdes",
      xlab = "ratio_zonas_verdes")
 ```
-Los histogramas muestran distribuciones heterogéneas entre las variables seleccionadas para clustering, algo esperable porque recogen dimensiones distintas del perfil distrital. *indice_envejecimiento* presenta una concentración en valores intermedios, aunque con algún distrito claramente por encima del resto. *ratio_colegio* muestra una variabilidad apreciable entre distritos, mientras que *ratio_hospital* presenta una distribución muy asimétrica, con la mayoría de valores próximos a cero y solo unos pocos distritos con mayor dotación hospitalaria.
+Los histogramas muestran distribuciones heterogéneas entre las variables seleccionadas para clustering, algo esperable porque recogen dimensiones distintas de los distritos. *indice_envejecimiento* presenta una concentración en valores intermedios, aunque con algún distrito claramente por encima del resto. *ratio_colegio* muestra una variabilidad apreciable entre distritos, mientras que *ratio_hospital* presenta una distribución muy asimétrica, con la mayoría de valores próximos a cero y solo unos pocos distritos con mayor dotación hospitalaria.
 
 Por su parte, *esfuerzo_alquiler* presenta una distribución más compacta, lo que sugiere una mayor homogeneidad relativa entre distritos en comparación con otras variables. Finalmente, *ratio_zonas_verdes* también muestra diferencias entre distritos, reflejando una disponibilidad desigual de espacios verdes dentro de la ciudad.
 

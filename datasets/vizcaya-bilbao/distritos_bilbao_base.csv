@@ -1,9 +1,0 @@
-"cod_distrito","nombre_distrito","nombre_distrito_norm","pob_total","pob_menor_16","pob_mayor_65","indice_envejecimiento","num_colegios","ratio_colegio","num_hospitales","ratio_hospital","alquiler_m2","renta_media_hogar","esfuerzo_alquiler","num_zonas_verdes"
-1,"DEUSTU","deustu",48710,5561,13287,238.93,12,0.25,1,0.21,12.4,40907,29.1,14
-2,"URIBARRI","uribarri",35990,3939,9981,253.39,13,0.36,0,0,12.1,36591,31.75,12
-3,"OTXARKOAGA-TXURDINAGA","otxarkoaga",25039,2990,5880,196.66,13,0.52,1,0.4,NA,33946,NA,16
-4,"BEGOÑA","begona",40526,4603,11795,256.25,4,0.1,1,0.25,11.7,33814,33.22,14
-5,"IBAIONDO","ibaiondo",61805,8771,11108,126.64,16,0.26,0,0,13.1,36064,34.87,18
-6,"ABANDO","abando",51086,6022,13962,231.85,14,0.27,2,0.39,15.3,65628,22.38,11
-7,"ERREKALDE","errekalde",48615,5879,10786,183.47,8,0.16,0,0,12.1,35703,32.54,13
-8,"BASURTU-ZORROTZA","basurtu",32907,3974,8078,203.27,4,0.12,1,0.3,12.9,38191,32.43,18
