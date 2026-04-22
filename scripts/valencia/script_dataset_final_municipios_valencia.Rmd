@@ -1302,81 +1302,20 @@ colSums(is.na(municipios_valencia_base[, c(
   "pct_contratos_construccion")]))
 ```
 
-En las variables seleccionadas para clustering se mantiene el patrón de faltantes ya comentado previamente. En particular, *esfuerzo_alquiler* presenta 44 valores ausentes, lo que resulta especialmente relevante al tratarse de una de las variables seleccionadas para la formación de los clústeres. Por ello, antes de continuar con el análisis exploratorio en profundidad, se plantea un proceso de imputación que permita resolver este problema y trabajar posteriormente con una base más completa.
+En las variables seleccionadas para clustering se mantiene el patrón de faltantes ya comentado previamente. Dado que la aplicación de técnicas de clustering requiere trabajar con una base sin faltantes, resulta necesario abordar estos valores ausentes antes de continuar con el análisis. Por ello, a continuación se plantean distintos procedimientos orientados a tratar los faltantes detectados y a garantizar que la base final sea adecuada para la formación de los clústeres.
+
+### Eliminación
+Se excluyó el municipio de Sempere del análisis de clustering por presentar varios valores faltantes en variables clave, como indice_envejecimiento, pct_estudios_sup, renta_media_hogar y esfuerzo_alquiler. Además, se trata de un municipio muy pequeño y con una estructura demográfica extrema, lo que dificultaba su comparabilidad con el resto. Para evitar distorsiones en la formación de los clústeres, se optó por eliminar este caso del análisis.
+```{r}
+
+municipios_valencia_base <- municipios_valencia_base %>%
+  filter(nombre_municipio != "Sempere")
+```
 
 ### Imputación
 
-#### Cálculo de un valor de respaldo para la renta faltante
+#### Subtitulos
 
-```{r}
-renta_mediana <- median(municipios_valencia_base$renta_media_hogar, na.rm = TRUE)
-
-municipios_valencia_base$renta_usada <- ifelse(
-  is.na(municipios_valencia_base$renta_media_hogar),
-  renta_mediana,
-  municipios_valencia_base$renta_media_hogar)
-```
-
-#### Ajuste del modelo de imputación del alquiler
-
-```{r}
-modelo_alquiler <- lm(
-  precio_m2_alquiler ~ log(pob_total + 1) +
-    renta_usada +
-    consultorio_local +
-    distancia_hospital +
-    pct_hogares_100mbps,
-  data = municipios_valencia_base,
-  subset = !is.na(precio_m2_alquiler))
-
-summary(modelo_alquiler)
-coef(modelo_alquiler)
-```
-
-```{r}
-municipios_valencia_base$alquiler_faltaba <- is.na(municipios_valencia_base$precio_m2_alquiler)
-```
-
-#### Imputación directa de los valores faltantes de alquiler
-
-```{r}
-municipios_valencia_base$precio_m2_alquiler[is.na(municipios_valencia_base$precio_m2_alquiler)] <-
-  round(
-    predict(
-      modelo_alquiler,
-      newdata = municipios_valencia_base[is.na(municipios_valencia_base$precio_m2_alquiler), ]),1)
-```
-
-#### Cálculo esfuerzo_alquiler tras la imputación
-
-```{r}
-municipios_valencia_base$esfuerzo_alquiler <- 
-  ((municipios_valencia_base$precio_m2_alquiler * 80) / 
-     (municipios_valencia_base$renta_media_hogar / 12)) * 100
-```
-
-#### Revisión de algunos municipios cuyo alquiler ha sido imputado
-
-```{r}
-municipios_imputados <- municipios_valencia_base %>%
-  filter(alquiler_faltaba == TRUE) %>%
-  select(cod_municipio,
-         nombre_municipio,
-         pob_total,
-         renta_media_hogar,
-         precio_m2_alquiler,
-         esfuerzo_alquiler) %>%
-  head(10)
-
-municipios_imputados
-```
-
-#### Eliminación de variables auxiliares creadas en la imputación
-
-```{r}
-municipios_valencia_base <- municipios_valencia_base %>%
-  select(-renta_usada, -alquiler_faltaba)
-```
 
 ### Revisión de valores atípicos
 
