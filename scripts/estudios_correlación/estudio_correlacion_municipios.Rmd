@@ -524,12 +524,11 @@ En consecuencia, se ha optado por priorizar variables relativas o derivadas fren
 
 En el caso de las variables de contratos, se observa que los porcentajes sectoriales (pct_contratos_agricultura, pct_contratos_industria, pct_contratos_construccion, pct_contratos_servicios) presentan una dependencia estructural, ya que su suma es igual a 100. Por este motivo, no resulta adecuado incluirlas todas simultáneamente en el clustering, ya que introducirían redundancia adicional.
 
-Para abordar esta cuestión, se plantea realizar dos aproximaciones complementarias al análisis de clustering:
+Para abordar esta cuestión, se plantea realizar el clustering de la siguiente manera:
 
--Una primera versión sin variables de contratos, centrada en variables demográficas, de equipamientos, vivienda y conectividad, con el objetivo de obtener una segmentación más limpia y menos condicionada por la estructura económica.
--Una segunda versión incorporando parcialmente el bloque de contratos, utilizando únicamente tres de los cuatro porcentajes sectoriales (dejando una categoría implícita), con el fin de evaluar si la inclusión de la dimensión económica aporta información adicional relevante en la formación de los clusters.
+A partir de los criterios establecidos, las variables que se incluirán en el análisis de clustering serán exclusivamente las correspondientes al primer bloque, es decir, aquellas relacionadas con la dimensión demográfica, educativa, de equipamientos, vivienda y conectividad. De este modo, se pretende obtener una segmentación más limpia de los municipios, evitando que la estructura económica condicione directamente la formación de los grupos.
 
-A partir de estos criterios, la batería inicial de variables para el primer clustering sería:
+La batería inicial de variables seleccionadas para este clustering es la siguiente:
 
 pct_extranjeros
 indice_envejecimiento
@@ -543,10 +542,11 @@ distancia_hospital
 esfuerzo_alquiler
 pct_hogares_100mbps
 
-En la segunda versión del clustering, se añadirían:
+Adicionalmente, una vez obtenidos los clusters, se realizará una representación gráfica complementaria en la que cada municipio se coloreará según el tipo de contrato más común en él. Para ello, se construirá previamente una variable derivada a partir de las variables de porcentaje de contratos por sector:
 
 pct_contratos_agricultura
 pct_contratos_industria
 pct_contratos_construccion
+pct_contratos_servicios
 
-Este enfoque permite comparar distintas configuraciones del modelo y analizar en qué medida la inclusión de la estructura contractual mejora la interpretación y calidad de los clusters obtenidos.
+Esta visualización permitirá explorar de forma descriptiva la posible relación entre los grupos obtenidos y la estructura contractual dominante de cada municipio, sin incorporar directamente dichas variables al proceso de agrupamiento.
