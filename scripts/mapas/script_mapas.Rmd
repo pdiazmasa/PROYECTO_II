@@ -1,0 +1,138 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+# Carga de librerías necesarias
+library(shiny)
+library(leaflet)
+library(plotly) # Para gráficas interactivas
+library(dplyr)
+library(sf)
+```
+
+```{r}
+# =====================================================================
+# 1. CARGA Y PREPARACIÓN DE DATOS
+# =====================================================================
+# (Asegúrate de tener estos archivos en tu carpeta de trabajo)
+
+# VALENCIA
+df_vlc_distritos <- read.csv("../../datasets/valencia/distritos_valencia_base_final.csv")
+df_vlc_pueblos <- read.csv("../../datasets/valencia/municipios_valencia_base_final.csv")
+
+# BILBAO / VIZCAYA (Cargar siguiendo tu estructura)
+# df_bio_distritos <- read.csv("distritos_bilbao_base_final.csv")
+# df_biz_pueblos <- read.csv("municipios_vizcaya_base_final.csv")
+```
+
+```{r}
+# =====================================================================
+# 2. INTERFAZ DE USUARIO (UI)
+# =====================================================================
+ui <- navbarPage(
+  title = "📊 Observatorio Urbano: Valencia vs. Bilbao",
+  theme = bslib::bs_theme(bootswatch = "flatly"), # Un tema visual moderno
+  
+  # --- PESTAÑA 1: COMPARATIVA GENERAL ---
+  tabPanel("🏙️ Valencia vs. Bilbao",
+    fluidPage(
+      h2("Comparativa de Capitales"),
+      p("Análisis directo entre las dos ciudades principales."),
+      
+      fluidRow(
+        column(6, plotlyOutput("grafico_alquiler")),
+        column(6, plotlyOutput("grafico_renta"))
+      ),
+      br(),
+      wellPanel(
+        h4("Análisis de la comparativa"),
+        textOutput("interpretacion_comp")
+      )
+    )
+  ),
+  
+  # --- PESTAÑA 2: VALENCIA (CIUDAD vs PROVINCIA) ---
+  tabPanel("🍊 Valencia (Detalle)",
+    sidebarLayout(
+      sidebarPanel(
+        h3("Filtros Valencia"),
+        selectInput("var_vlc", "Variable a visualizar:",
+                    choices = c("Alquiler" = "alquiler_m2", "Renta" = "renta_media_hogar", "Envejecimiento" = "indice_envejecimiento")),
+        hr(),
+        p("Esta pestaña compara la dinámica de la capital frente a los municipios de la provincia.")
+      ),
+      mainPanel(
+        tabsetPanel(
+          tabPanel("Mapa Provincia", leafletOutput("mapa_vlc", height = "500px")),
+          tabPanel("Ciudad vs Pueblos", plotlyOutput("box_vlc"))
+        )
+      )
+    )
+  ),
+  
+  # --- PESTAÑA 3: VIZCAYA (CIUDAD vs PROVINCIA) ---
+  tabPanel("🌲 Vizcaya (Detalle)",
+    sidebarLayout(
+      sidebarPanel(
+        h3("Filtros Vizcaya"),
+        selectInput("var_viz", "Variable a visualizar:",
+                    choices = c("Alquiler" = "alquiler_m2", "Renta" = "renta_media_hogar")),
+        hr(),
+        p("Análisis del Gran Bilbao frente a las comarcas de Vizcaya.")
+      ),
+      mainPanel(
+        tabsetPanel(
+          tabPanel("Mapa Provincia", leafletOutput("mapa_viz", height = "500px")),
+          tabPanel("Bilbao vs Pueblos", plotlyOutput("box_viz"))
+        )
+      )
+    )
+  )
+)
+
+```
+
+```{r}
+# =====================================================================
+# 3. SERVIDOR (LÓGICA)
+# =====================================================================
+server <- function(input, output, session) {
+  
+  # --- Lógica Pestaña 1: Gráficos Comparativos ---
+  output$grafico_alquiler <- renderPlotly({
+    # Aquí calculamos la media de alquiler de ambas ciudades
+    media_vlc <- mean(df_vlc_distritos$alquiler_m2, na.rm = TRUE)
+    # media_bio <- mean(df_bio_distritos$alquiler_m2, na.rm = TRUE) # Descomentar cuando tengas los datos
+    media_bio <- 13.5 # Dato de ejemplo
+    
+    df_comp <- data.frame(
+      Ciudad = c("Valencia", "Bilbao"),
+      Precio = c(media_vlc, media_bio)
+    )
+    
+    plot_ly(df_comp, x = ~Ciudad, y = ~Precio, type = "bar", color = ~Ciudad,
+            colors = c("#f39c12", "#c0392b")) %>%
+      layout(title = "Precio Medio Alquiler (€/m2)")
+  })
+  
+  # --- Lógica Pestaña 2: Valencia (Boxplot Ciudad vs Provincia) ---
+  output$box_vlc <- renderPlotly({
+    # Unimos datos para ver la diferencia
+    ciudad <- data.frame(Zona = "Valencia Capital", Valor = df_vlc_distritos$renta_media_hogar)
+    provincia <- data.frame(Zona = "Resto Provincia", Valor = df_vlc_pueblos$renta_media_hogar)
+    df_union <- rbind(ciudad, provincia)
+    
+    plot_ly(df_union, y = ~Valor, color = ~Zona, type = "box") %>%
+      layout(title = "Dispersión de Renta: Capital vs Pueblos")
+  })
+  
+  # (Aquí irían los outputs de los mapas de Leaflet como vimos en el paso anterior)
+  # output$mapa_vlc <- renderLeaflet({ ... })
+  # output$mapa_viz <- renderLeaflet({ ... })
+}
+
+# LANZAR APLICACIÓN
+shinyApp(ui, server)
+```
