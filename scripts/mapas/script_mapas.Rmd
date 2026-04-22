@@ -10,6 +10,7 @@ library(leaflet)
 library(plotly) # Para gráficas interactivas
 library(dplyr)
 library(sf)
+library(stringr)
 ```
 
 ```{r}
@@ -135,4 +136,235 @@ server <- function(input, output, session) {
 
 # LANZAR APLICACIÓN
 shinyApp(ui, server)
+
+```
+
+```{r}
+
+# =======================================================
+# 2. CARGA Y PREPARACIÓN DE LOS DATOS
+# =======================================================
+
+# A) Cargar el mapa (Shapefile) y preparar coordenadas
+mapa_completo <- st_read("../../bases_de_datos/delimitaciones/MUNICIPIOS_5000_ETRS89.shp")
+
+mapa_vizcaya <- mapa_completo %>% 
+  filter(TERRITORIO == "BIZKAIA") %>% 
+  st_transform(crs = 4326) # Transformar para Leaflet
+
+# B) Cargar tu dataset numérico
+datos_vizcaya <- read.csv("../../datasets/vizcaya-bilbao/municipios_vizcaya_base_final.csv")
+
+# =======================================================
+# 3. CRUCE DE DATOS (MERGE)
+# =======================================================
+
+# Pasamos los nombres del mapa a minúsculas para que coincidan 
+# más fácilmente con la columna 'nombre_municipio_norm' de tu CSV.
+mapa_vizcaya <- mapa_vizcaya %>%
+  mutate(nombre_norm_mapa = tolower(NOMBRE_TOP))
+
+# Hacemos el cruce (unimos el mapa con el CSV)
+mapa_datos <- mapa_vizcaya %>%
+  left_join(datos_vizcaya, by = c("nombre_norm_mapa" = "nombre_municipio_norm"))
+
+
+# =======================================================
+# 4. CREAR EL MAPA COROPLÉTICO INTERACTIVO
+# =======================================================
+
+# Crear la paleta de colores (Verde -> Amarillo -> Rojo)
+# Invertimos la paleta para que Distancia Pequeña = Verde y Grande = Rojo
+paleta_distancia <- colorNumeric(
+  palette = c("green", "yellow", "red"), 
+  domain = mapa_datos$distancia_hospital,
+  na.color = "gray" # Si hay algún pueblo sin datos, se pintará de gris
+)
+
+# Dibujar el mapa con Leaflet
+leaflet(mapa_datos) %>%
+  addProviderTiles(providers$CartoDB.Positron) %>% # Fondo elegante y claro
+  
+  addPolygons(
+    fillColor = ~paleta_distancia(distancia_hospital), # Colorear según la distancia
+    color = "white",       # Color del borde del municipio
+    weight = 1,            # Grosor del borde
+    opacity = 1,
+    fillOpacity = 0.8,     # Intensidad del color
+    
+    # Efecto al pasar el ratón (Hover)
+    highlightOptions = highlightOptions(
+      weight = 3,
+      color = "#666",
+      fillOpacity = 1,
+      bringToFront = TRUE
+    ),
+    
+    # Etiqueta emergente con la info exacta (Nombre y Km)
+    label = ~paste0(NOMBRE_TOP, ": ", round(distancia_hospital, 1), " km al hospital")
+  ) %>%
+  
+  # Añadir la leyenda en la esquina
+  addLegend(
+    pal = paleta_distancia, 
+    values = ~distancia_hospital, 
+    opacity = 0.8, 
+    title = "Distancia al Hospital (km)",
+    position = "bottomright"
+  )
+```
+
+```{r}
+
+# 1. Cargar y preparar el mapa (Shapefile)
+# Importante: st_transform(4326) es vital para que se vea sobre el mapa real
+mapa_completo <- st_read("../../bases_de_datos/delimitaciones/MUNICIPIOS_5000_ETRS89.shp")
+
+mapa_vizcaya <- mapa_completo %>% 
+  filter(TERRITORIO == "BIZKAIA") %>% 
+  mutate(nombre_join = tolower(NOMBRE_TOP)) %>%
+  st_transform(4326) 
+
+# 2. Cargar y normalizar los datos del CSV
+datos_distancias <- read.csv("../../datasets/vizcaya-bilbao/dataset_distancias_vizcaya.csv")
+
+# 2. Normalizar los nombres conflictivos en el CSV
+datos_distancias_limpio <- datos_distancias %>%
+  mutate(
+    nombre_join = tolower(municipio),
+    
+    # Aplicamos las reglas con los ESPACIOS Y GUIONES EXACTOS del Shapefile
+    nombre_join = case_when(
+      str_detect(nombre_join, "karrantza") ~ "karrantza harana / valle de carranza",
+      str_detect(nombre_join, "urduña") ~ "urduña / orduña",
+      str_detect(nombre_join, "arrankudiaga") ~ "arrankudiaga-zollo",
+      str_detect(nombre_join, "munitibar") ~ "munitibar-arbatzegi gerrikaitz-",
+      str_detect(nombre_join, "limitado|limitadua") ~ "limitadua / el limitado",
+      str_detect(nombre_join, "usansolo") ~ "usansolo",
+      TRUE ~ nombre_join 
+    )
+  )
+
+# 3. Hacer el cruce (Join)
+mapa_final <- mapa_vizcaya %>%
+  left_join(datos_distancias_limpio, by = "nombre_join")
+
+# --- PARTE NUEVA: REPRESENTACIÓN DEL MAPA ---
+
+# 4. Configurar la paleta de colores (De Verde a Rojo)
+# Invertimos para que poca distancia sea verde y mucha sea rojo
+pal <- colorNumeric(
+  palette = "RdYlGn", 
+  domain = mapa_final$distancia_hospital,
+  reverse = TRUE
+)
+
+# 5. Crear el mapa interactivo
+leaflet(mapa_final) %>%
+  addProviderTiles(providers$CartoDB.Positron) %>% # Fondo claro y limpio
+  addPolygons(
+    fillColor = ~pal(distancia_hospital),
+    color = "white",      # Color de las líneas de división
+    weight = 1,
+    opacity = 1,
+    fillOpacity = 0.7,
+    highlightOptions = highlightOptions(
+      weight = 3,
+      color = "#666",
+      bringToFront = TRUE
+    ),
+    label = ~paste0(NOMBRE_TOP, ": ", round(distancia_hospital, 2), " km al hospital")
+  ) %>%
+  addLegend(
+    pal = pal, 
+    values = ~distancia_hospital, 
+    title = "Km al Hospital",
+    position = "bottomright"
+  )
+```
+
+```{r}
+library(sf)
+library(dplyr)
+library(stringr)
+library(leaflet)
+
+# 1. Cargar y preparar el mapa (Shapefile)
+mapa_completo <- st_read("../../bases_de_datos/delimitaciones/MUNICIPIOS_5000_ETRS89.shp")
+
+mapa_vizcaya <- mapa_completo %>% 
+  filter(TERRITORIO == "BIZKAIA") %>% 
+  mutate(nombre_join = tolower(NOMBRE_TOP)) %>%
+  st_transform(4326) 
+
+# 2. Cargar y normalizar los datos de distancias (CSV)
+datos_distancias <- read.csv("../../datasets/vizcaya-bilbao/dataset_distancias_vizcaya.csv")
+
+datos_distancias_limpio <- datos_distancias %>%
+  mutate(
+    nombre_join = tolower(municipio),
+    nombre_join = case_when(
+      str_detect(nombre_join, "karrantza") ~ "karrantza harana / valle de carranza",
+      str_detect(nombre_join, "urduña") ~ "urduña / orduña",
+      str_detect(nombre_join, "arrankudiaga") ~ "arrankudiaga-zollo",
+      str_detect(nombre_join, "munitibar") ~ "munitibar-arbatzegi gerrikaitz-",
+      str_detect(nombre_join, "limitado|limitadua") ~ "limitadua / el limitado",
+      str_detect(nombre_join, "usansolo") ~ "usansolo",
+      TRUE ~ nombre_join 
+    )
+  )
+
+# 3. Cargar el CSV de COORDENADAS de hospitales
+# Usamos sep = ";" porque tu archivo utiliza punto y coma
+hospitales_coords <- read.csv("../../datasets/vizcaya-bilbao/hospitales_vizcaya_coords.csv", sep = ";")
+
+# 4. Hacer el cruce (Join) entre mapa y datos de distancia
+mapa_final <- mapa_vizcaya %>%
+  left_join(datos_distancias_limpio, by = "nombre_join")
+
+# 5. Configurar la paleta de colores
+pal <- colorNumeric(
+  palette = "RdYlGn", 
+  domain = mapa_final$distancia_hospital,
+  reverse = TRUE
+)
+
+# 6. Crear el mapa interactivo
+leaflet() %>%
+  addProviderTiles(providers$CartoDB.Positron) %>% 
+  
+  # CAPA 1: Polígonos de los municipios (Coroplético)
+  addPolygons(
+    data = mapa_final,
+    fillColor = ~pal(distancia_hospital),
+    color = "white",
+    weight = 1,
+    opacity = 1,
+    fillOpacity = 0.7,
+    highlightOptions = highlightOptions(weight = 3, color = "#666", bringToFront = FALSE),
+    label = ~paste0(NOMBRE_TOP, ": ", round(distancia_hospital, 2), " km al hospital")
+  ) %>%
+  
+  # CAPA 2: Puntos de los hospitales
+  addCircleMarkers(
+    data = hospitales_coords,
+    lng = ~lon, lat = ~lat,
+    radius = 5,
+    color = "#2c3e50",       # Borde del punto (azul oscuro)
+    fillColor = "#e74c3c",   # Relleno del punto (rojo brillante)
+    fillOpacity = 1,
+    stroke = TRUE,
+    weight = 2,
+    popup = ~nombre_hospital, # Al hacer clic sale el nombre
+    label = ~nombre_hospital  # Al pasar el ratón sale el nombre
+  ) %>%
+  
+  # LEYENDA
+  addLegend(
+    data = mapa_final,
+    pal = pal, 
+    values = ~distancia_hospital, 
+    title = "Km al Hospital",
+    position = "bottomright"
+  )
 ```
