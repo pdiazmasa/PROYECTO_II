@@ -25,7 +25,7 @@ library(tidyr)
 
 ```{r}
 municipios_valencia <- read_csv("../../datasets/valencia/municipios_valencia_base_final.csv")
-municipios_vizcaya <- read_csv("../../datasets/vizcaya-bilbao/municipios_vizcaya_base.csv")
+municipios_vizcaya <- read_csv("../../datasets/vizcaya-bilbao/municipios_vizcaya_base_final.csv")
 ```
 
 ### Exploración inicial de ambas bases de datos

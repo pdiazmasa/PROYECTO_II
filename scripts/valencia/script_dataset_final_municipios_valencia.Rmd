@@ -1232,18 +1232,10 @@ head(municipios_valencia_base)
 dim(municipios_valencia_base)
 str(municipios_valencia_base)
 ```
-```{r}
-# Ajuste manual 
-municipios_valencia_base$indice_envejecimiento[is.na(municipios_valencia_base$indice_envejecimiento)] <- median(municipios_valencia_base$indice_envejecimiento, na.rm = TRUE)
-
-municipios_valencia_base$renta_media_hogar[is.na(municipios_valencia_base$renta_media_hogar)] <- median(municipios_valencia_base$renta_media_hogar, na.rm = TRUE)
-
-municipios_valencia_base$esfuerzo_alquiler[is.na(municipios_valencia_base$esfuerzo_alquiler)] <- median(municipios_valencia_base$esfuerzo_alquiler, na.rm = TRUE)
-```
 
 ## ANÁLISIS EXPLORATORIO DE LA BASE FINAL
 
-### Análisis de faltantes 
+### Análisis de faltantes
 
 ```{r}
 colSums(is.na(municipios_valencia_base[, c(
@@ -1275,10 +1267,10 @@ colSums(is.na(municipios_valencia_base[, c(
   "pct_contratos_construccion",
   "pct_contratos_servicios")]))
 ```
+
 En general, la base final presenta un buen nivel de completitud. La mayoría de las variables no tienen valores faltantes, lo que indica que el proceso de integración de las distintas fuentes se ha realizado correctamente. Los faltantes se concentran en un número reducido de variables y responden, en general, a limitaciones propias de las fuentes utilizadas y no a errores de lectura o de cruce.
 
 En concreto, *pct_estudios_sup* presenta 25 valores faltantes porque la base de nivel educativo solo ofrece información para municipios de 500 habitantes o más. Por su parte, *precio_m2_alquiler* y *esfuerzo_alquiler* presentan 44 valores faltantes, algo esperable en municipios donde no hay suficientes transacciones de vivienda para estimar el indicador. Además, *renta_media_hogar* e *indice_envejecimiento* presentan un valor faltante.
-
 
 ## ANÁLISIS EXPLORATORIO DE LAS VARIABLES PARA CLUSTERING
 
@@ -1307,9 +1299,9 @@ colSums(is.na(municipios_valencia_base[, c(
   "pct_hogares_100mbps",
   "pct_contratos_agricultura",
   "pct_contratos_industria",
-  "pct_contratos_construccion"
-)]))
+  "pct_contratos_construccion")]))
 ```
+
 En las variables seleccionadas para clustering se mantiene el patrón de faltantes ya comentado previamente. En particular, *esfuerzo_alquiler* presenta 44 valores ausentes, lo que resulta especialmente relevante al tratarse de una de las variables seleccionadas para la formación de los clústeres. Por ello, antes de continuar con el análisis exploratorio en profundidad, se plantea un proceso de imputación que permita resolver este problema y trabajar posteriormente con una base más completa.
 
 ### Imputación
@@ -1386,8 +1378,8 @@ municipios_valencia_base <- municipios_valencia_base %>%
   select(-renta_usada, -alquiler_faltaba)
 ```
 
-
 ### Revisión de valores atípicos
+
 ```{r}
 boxplot(municipios_valencia_base$pct_extranjeros,
         main = "Boxplot de pct_extranjeros")
@@ -1431,6 +1423,7 @@ boxplot(municipios_valencia_base$pct_contratos_industria,
 boxplot(municipios_valencia_base$pct_contratos_construccion,
         main = "Boxplot de pct_contratos_construccion")
 ```
+
 En general, los diagramas de caja muestran la presencia de valores atípicos en varias de las variables seleccionadas para clustering. Los casos más destacados aparecen en *indice_envejecimiento*, *pct_estudios_sup*, *ratio_colegios*, *ratio_centros_salud*, *ratio_hospital*, *distancia_hospital* y en las variables de estructura productiva, especialmente *pct_contratos_agricultura*, *pct_contratos_industria* y *pct_contratos_construccion*. En la mayoría de los casos, estos valores extremos parecen responder a municipios con perfiles muy diferenciados, más que a errores en la construcción de las variables. Por su parte, variables como *pct_extranjeros*, *renta_media_hogar* y *esfuerzo_alquiler* presentan una distribución más concentrada y un número menor de valores atípicos, mientras que *pct_hogares_100mbps* muestra una variabilidad reducida.
 
 ### Distribución de variables numéricas
@@ -1499,13 +1492,13 @@ Por su parte, en variables como *ratio_colegios*, *ratio_centros_salud*, *ratio_
 
 Finalmente, *pct_hogares_100mbps* se concentra en valores muy altos, próximos al 100, lo que resulta coherente tanto con la elevada extensión actual de la conectividad digital como con el enfoque del proyecto hacia perfiles residenciales en los que este factor puede ser especialmente relevante, como ocurre en el caso de la población teletrabajadora. En conjunto, estas distribuciones no invalidan el análisis de clustering, pero sí muestran la necesidad de trabajar posteriormente con variables estandarizadas para evitar que las diferencias de escala condicionen en exceso la formación de los grupos.
 
-
 ### Revisión de variables binarias
 
 ```{r}
 table(municipios_valencia_base$consultorio_local)
 table(municipios_valencia_base$internet_100mbps_mayor90)
 ```
+
 En cuanto a las variables binarias, *consultorio_local* sí presenta variabilidad, ya que permite distinguir entre municipios que disponen o no de este tipo de recurso sanitario de proximidad. En cambio, *internet_100mbps_mayor90* toma valor 1 en todos los municipios de la base final. Lejos de ser un problema, este resultado es coherente con el planteamiento del proyecto, ya que dicha variable se ha utilizado como criterio previo de selección para centrarnos en municipios con alta conectividad, un aspecto especialmente relevante dado que el perfil de interés es el de la población teletrabajadora.
 
 ### Relaciones entre variables
@@ -1513,8 +1506,8 @@ En cuanto a las variables binarias, *consultorio_local* sí presenta variabilida
 En esta fase del AED no se profundiza en las relaciones bivariantes entre las variables seleccionadas, ya que dicho análisis se desarrolla de forma específica en el documento de correlaciones. En consecuencia, aquí se ha priorizado la revisión individual de cada variable, atendiendo a su completitud, distribución y posibles valores atípicos. El estudio posterior de las correlaciones permitirá valorar con mayor precisión el grado de asociación entre variables y la posible existencia de redundancias antes de aplicar el clustering.
 
 ### Conclusión
-El análisis exploratorio realizado sobre las variables seleccionadas para clustering muestra que los municipios de la provincia de Valencia presentan una notable heterogeneidad en dimensiones como la estructura demográfica, el nivel educativo, el acceso a servicios, la conectividad digital, la especialización productiva y el mercado de la vivienda. En conjunto, las variables analizadas presentan capacidad para diferenciar perfiles municipales, aunque varias de ellas muestran asimetrías y algunos valores extremos, algo coherente con la diversidad territorial existente. Por ello, la base final construida se considera adecuada para abordar posteriormente la caracterización de municipios planteada en el proyecto.
 
+El análisis exploratorio realizado sobre las variables seleccionadas para clustering muestra que los municipios de la provincia de Valencia presentan una notable heterogeneidad en dimensiones como la estructura demográfica, el nivel educativo, el acceso a servicios, la conectividad digital, la especialización productiva y el mercado de la vivienda. En conjunto, las variables analizadas presentan capacidad para diferenciar perfiles municipales, aunque varias de ellas muestran asimetrías y algunos valores extremos, algo coherente con la diversidad territorial existente. Por ello, la base final construida se considera adecuada para abordar posteriormente la caracterización de municipios planteada en el proyecto.
 
 ## GUARDADO DE LA BASE FINAL
 
