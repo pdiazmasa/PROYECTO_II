@@ -442,6 +442,110 @@ colSums(is.na(distritos_bilbao_base[, c(
 ```
 En las variables seleccionadas para el clustering, el patrón de faltantes es prácticamente inexistente. En concreto, *indice_envejecimiento*, *ratio_colegio*, *ratio_hospital* y *ratio_zonas_verdes* no presentan valores ausentes, mientras que *esfuerzo_alquiler* registra un único valor faltante.
 
+### Imputación del precio del alquiler
+
+#### Selección de los distritos con `alquiler_m2` conocido para entrenar el modelo
+
+```{r}
+datos_xgb_bilbao <- distritos_bilbao_base %>%
+  filter(!is.na(alquiler_m2))
+```
+
+#### Construcción de la base de entrenamiento con el 100% de los distritos con `alquiler_m2` conocido
+
+```{r}
+X_train_bilbao_xgb <- datos_xgb_bilbao %>%
+  transmute(
+    log_pob_total = log(pob_total + 1),
+    renta_media_hogar = renta_media_hogar,
+    indice_envejecimiento = indice_envejecimiento,
+    ratio_colegio = ratio_colegio,
+    ratio_hospital = ratio_hospital,
+    num_zonas_verdes = num_zonas_verdes
+  ) %>%
+  as.matrix()
+```
+
+#### Variable respuesta del modelo final
+
+```{r}
+y_train_bilbao_xgb <- datos_xgb_bilbao$alquiler_m2
+```
+
+#### Ajuste del modelo XGBoost con el 100% de los distritos con `alquiler_m2` conocido
+
+```{r}
+set.seed(123)
+
+modelo_bilbao_xgb_final <- xgboost(
+  data = X_train_bilbao_xgb,
+  label = y_train_bilbao_xgb,
+  objective = "reg:squarederror",
+  nrounds = 100,
+  max_depth = 3,
+  eta = 0.1,
+  subsample = 0.8,
+  colsample_bytree = 0.8,
+  verbose = 0
+)
+```
+
+#### Identificación del distrito con `alquiler_m2` faltante antes de imputar
+
+```{r}
+distritos_bilbao_base$alquiler_faltaba <- is.na(distritos_bilbao_base$alquiler_m2)
+```
+
+#### Construcción de la base para predecir los valores faltantes reales
+
+```{r}
+X_pred_final_bilbao_xgb <- distritos_bilbao_base %>%
+  filter(is.na(alquiler_m2)) %>%
+  transmute(
+    log_pob_total = log(pob_total + 1),
+    renta_media_hogar = renta_media_hogar,
+    indice_envejecimiento = indice_envejecimiento,
+    ratio_colegio = ratio_colegio,
+    ratio_hospital = ratio_hospital,
+    num_zonas_verdes = num_zonas_verdes
+  ) %>%
+  as.matrix()
+```
+
+#### Imputación directa del valor faltante
+
+```{r}
+distritos_bilbao_base$alquiler_m2[
+  is.na(distritos_bilbao_base$alquiler_m2)
+] <- round(
+  predict(modelo_bilbao_xgb_final, X_pred_final_bilbao_xgb),
+  1
+)
+```
+
+#### Cálculo de esfuerzo_alquiler tras la imputación
+
+```{r}
+distritos_bilbao_base$esfuerzo_alquiler <- 
+  ((distritos_bilbao_base$alquiler_m2 * 80) / 
+     (distritos_bilbao_base$renta_media_hogar / 12)) * 100
+```
+
+#### Comprobación rápida de los valores imputados
+
+```{r}
+distritos_bilbao_base %>%
+  filter(alquiler_faltaba) %>%
+  select(nombre_distrito, alquiler_m2, esfuerzo_alquiler)
+```
+
+#### Eliminación de variable auxiliar creada durante la imputación
+
+```{r}
+distritos_bilbao_base <- distritos_bilbao_base %>%
+  select(-alquiler_faltaba)
+```
+
 ### Revisión de valores atípicos
 ```{r}
 boxplot(distritos_bilbao_base$indice_envejecimiento,

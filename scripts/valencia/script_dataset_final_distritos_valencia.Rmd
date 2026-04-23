@@ -445,6 +445,227 @@ colSums(is.na(distritos_valencia_base[, c(
 ```
 En las variables seleccionadas para el clustering, el patrón de faltantes es prácticamente inexistente. En concreto, *indice_envejecimiento*, *ratio_colegio*, *ratio_hospital* y *ratio_zonas_verdes* no presentan valores ausentes, mientras que *esfuerzo_alquiler* registra un único valor faltante.
 
+### Imputación del precio del alquiler
+
+#### Selección de los distritos con `alquiler_m2` conocido para entrenar el modelo
+
+```{r}
+datos_xgb_valencia <- distritos_valencia_base %>%
+  filter(!is.na(alquiler_m2))
+```
+
+#### División en muestra de entrenamiento y de prueba
+
+```{r}
+set.seed(123)
+
+id_train_valencia <- sample(
+  1:nrow(datos_xgb_valencia),
+  size = round(0.8 * nrow(datos_xgb_valencia))
+)
+
+train_data_valencia <- datos_xgb_valencia[id_train_valencia, ]
+test_data_valencia  <- datos_xgb_valencia[-id_train_valencia, ]
+```
+
+#### Construcción de la base de entrenamiento para la validación
+
+```{r}
+X_train_valencia_xgb <- train_data_valencia %>%
+  transmute(
+    log_pob_total = log(pob_total + 1),
+    renta_media_hogar = renta_media_hogar,
+    indice_envejecimiento = indice_envejecimiento,
+    ratio_colegio = ratio_colegio,
+    ratio_hospital = ratio_hospital,
+    num_zonas_verdes = num_zonas_verdes
+  ) %>%
+  as.matrix()
+```
+
+#### Variable respuesta de entrenamiento para la validación
+
+```{r}
+y_train_valencia_xgb <- train_data_valencia$alquiler_m2
+```
+
+#### Ajuste del modelo XGBoost de validación
+
+```{r}
+set.seed(123)
+
+modelo_valencia_xgb_valid <- xgboost(
+  data = X_train_valencia_xgb,
+  label = y_train_valencia_xgb,
+  objective = "reg:squarederror",
+  nrounds = 100,
+  max_depth = 3,
+  eta = 0.1,
+  subsample = 0.8,
+  colsample_bytree = 0.8,
+  verbose = 0
+)
+```
+
+#### Construcción de la base de prueba para la validación
+
+```{r}
+X_test_valencia_xgb <- test_data_valencia %>%
+  transmute(
+    log_pob_total = log(pob_total + 1),
+    renta_media_hogar = renta_media_hogar,
+    indice_envejecimiento = indice_envejecimiento,
+    ratio_colegio = ratio_colegio,
+    ratio_hospital = ratio_hospital,
+    num_zonas_verdes = num_zonas_verdes
+  ) %>%
+  as.matrix()
+```
+
+#### Variable respuesta real de la muestra de prueba
+
+```{r}
+y_test_valencia_xgb <- test_data_valencia$alquiler_m2
+```
+
+#### Predicción del modelo sobre la muestra de prueba
+
+```{r}
+pred_test_valencia_xgb <- predict(modelo_valencia_xgb_valid, X_test_valencia_xgb)
+```
+
+#### Comparación entre valor real y valor predicho en la prueba
+
+```{r}
+comparacion_valencia_xgb <- data.frame(
+  nombre_distrito = test_data_valencia$nombre_distrito,
+  alquiler_real = y_test_valencia_xgb,
+  alquiler_predicho = round(pred_test_valencia_xgb, 1)
+)
+
+comparacion_valencia_xgb$diferencia <- round(
+  comparacion_valencia_xgb$alquiler_real - comparacion_valencia_xgb$alquiler_predicho,
+  2
+)
+
+comparacion_valencia_xgb$error_absoluto <- round(
+  abs(comparacion_valencia_xgb$diferencia),
+  2
+)
+
+comparacion_valencia_xgb
+```
+
+#### Cálculo de métricas de error de la prueba
+
+```{r}
+mae_valencia_xgb <- mean(comparacion_valencia_xgb$error_absoluto)
+
+rmse_valencia_xgb <- sqrt(mean(
+  (comparacion_valencia_xgb$alquiler_real - comparacion_valencia_xgb$alquiler_predicho)^2
+))
+
+mae_valencia_xgb
+rmse_valencia_xgb
+```
+
+#### Construcción de la base de entrenamiento final con el 100% de los municipios con `alquiler_m2` conocido
+
+```{r}
+X_train_final_valencia_xgb <- distritos_valencia_base %>%
+  filter(!is.na(alquiler_m2)) %>%
+  transmute(
+    log_pob_total = log(pob_total + 1),
+    renta_media_hogar = renta_media_hogar,
+    indice_envejecimiento = indice_envejecimiento,
+    ratio_colegio = ratio_colegio,
+    ratio_hospital = ratio_hospital,
+    num_zonas_verdes = num_zonas_verdes
+  ) %>%
+  as.matrix()
+```
+
+#### Variable respuesta del modelo final
+
+```{r}
+y_train_final_valencia_xgb <- distritos_valencia_base %>%
+  filter(!is.na(alquiler_m2)) %>%
+  pull(alquiler_m2)
+```
+
+#### Ajuste del modelo final con XGBoost
+
+```{r}
+set.seed(123)
+
+modelo_valencia_xgb_final <- xgboost(
+  data = X_train_final_valencia_xgb,
+  label = y_train_final_valencia_xgb,
+  objective = "reg:squarederror",
+  nrounds = 100,
+  max_depth = 3,
+  eta = 0.1,
+  subsample = 0.8,
+  colsample_bytree = 0.8,
+  verbose = 0
+)
+```
+
+#### Identificación del distrito con `alquiler_m2` faltante antes de imputar
+
+```{r}
+distritos_valencia_base$alquiler_faltaba <- is.na(distritos_valencia_base$alquiler_m2)
+```
+
+#### Construcción de la base para predecir los valores faltantes reales
+
+```{r}
+X_pred_final_valencia_xgb <- distritos_valencia_base %>%
+  filter(is.na(alquiler_m2)) %>%
+  transmute(
+    log_pob_total = log(pob_total + 1),
+    renta_media_hogar = renta_media_hogar,
+    indice_envejecimiento = indice_envejecimiento,
+    ratio_colegio = ratio_colegio,
+    ratio_hospital = ratio_hospital,
+    num_zonas_verdes = num_zonas_verdes
+  ) %>%
+  as.matrix()
+```
+
+#### Imputación directa del valor faltante 
+```{r}
+distritos_valencia_base$alquiler_m2[
+  is.na(distritos_valencia_base$alquiler_m2)
+] <- round(
+  predict(modelo_valencia_xgb_final, X_pred_final_valencia_xgb),
+  1
+)
+```
+
+#### Cálculo de esfuerzo_alquiler tras la imputación
+
+```{r}
+distritos_valencia_base$esfuerzo_alquiler <- 
+  ((distritos_valencia_base$alquiler_m2 * 80) / 
+     (distritos_valencia_base$renta_media_hogar / 12)) * 100
+```
+
+#### Comprobación de los valores imputados
+
+```{r}
+distritos_valencia_base %>%
+  filter(alquiler_faltaba) %>%
+  select(nombre_distrito, alquiler_m2, esfuerzo_alquiler)
+```
+
+#### Eliminación de variable auxiliar creada durante la imputación
+
+```{r}
+distritos_valencia_base <- distritos_valencia_base %>%
+  select(-alquiler_faltaba)
+```
+
 ### Revisión de valores atípicos
 ```{r}
 boxplot(distritos_valencia_base$indice_envejecimiento,
