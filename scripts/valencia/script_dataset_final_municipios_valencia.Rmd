@@ -1312,10 +1312,496 @@ municipios_valencia_base <- municipios_valencia_base %>%
   filter(nombre_municipio != "Sempere")
 ```
 
-### Imputación
+### Imputación del alquiler
 
-#### Subtitulos
+Imputaremos los valores faltantes tanto de *alquiler_m2* como de *pct_estudios_sup* mediante un modelo de regresión XGBoost, realizando previamente una prueba del modelo con el 80% de los municipios que sí que tengan valor para entrenar al modelo, y el 20% restante para probarlo. De esta forma se podrán comparar sus valores reales en alquiler/estudios superiores con la estimación proporcionada por el modelo antes de imputar y comprobar el error del modelo.
 
+#### Carga de los paquetes necesarios
+
+```{r}
+library(xgboost)
+library(dplyr)
+```
+
+#### Selección de los municipios con alquiler conocido para validar el modelo
+
+```{r}
+datos_xgb <- municipios_valencia_base %>%
+  filter(!is.na(precio_m2_alquiler))
+```
+
+#### Sustituir los NA de renta_media_hogar por la mediana
+
+```{r}
+municipios_valencia_base$`renta_media_hogar`[
+  is.na(municipios_valencia_base$`renta_media_hogar`)
+] <- median(municipios_valencia_base$`renta_media_hogar`, na.rm = TRUE)
+```
+
+#### Comprobación rápida de faltantes en las variables explicativas
+
+No puede haber ninguna faltante para poder ajustar el modelo
+
+```{r}
+colSums(is.na(datos_xgb[, c(
+  "pob_total",
+  "renta_media_hogar",
+  "consultorio_local",
+  "distancia_hospital",
+  "pct_hogares_100mbps"
+)]))
+```
+
+#### División en muestra de entrenamiento y de prueba
+
+
+```{r}
+set.seed(123)
+
+id_train <- sample(
+  1:nrow(datos_xgb),
+  size = round(0.8 * nrow(datos_xgb))
+)
+
+train_data <- datos_xgb[id_train, ]
+test_data  <- datos_xgb[-id_train, ]
+```
+
+
+#### Construcción de la base de entrenamiento para la validación
+
+```{r}
+X_train_valid_xgb <- train_data %>%
+  transmute(
+    log_pob_total = log(pob_total + 1),
+    renta_media_hogar = renta_media_hogar,
+    consultorio_local = consultorio_local,
+    distancia_hospital = distancia_hospital,
+    pct_hogares_100mbps = pct_hogares_100mbps
+  ) %>%
+  as.matrix()
+```
+
+#### Variable respuesta de entrenamiento para la validación
+
+```{r}
+y_train_valid_xgb <- train_data$precio_m2_alquiler
+```
+
+#### Ajuste del modelo XGBoost de validación
+
+```{r}
+set.seed(123)
+
+modelo_alquiler_xgb_valid <- xgboost(
+  data = X_train_valid_xgb,
+  label = y_train_valid_xgb,
+  objective = "reg:squarederror",
+  nrounds = 100,
+  max_depth = 3,
+  eta = 0.1,
+  subsample = 0.8,
+  colsample_bytree = 0.8,
+  verbose = 0
+)
+```
+
+#### Construcción de la base de prueba para la validación
+
+```{r}
+X_test_valid_xgb <- test_data %>%
+  transmute(
+    log_pob_total = log(pob_total + 1),
+    renta_media_hogar = renta_media_hogar,
+    consultorio_local = consultorio_local,
+    distancia_hospital = distancia_hospital,
+    pct_hogares_100mbps = pct_hogares_100mbps
+  ) %>%
+  as.matrix()
+```
+
+#### Variable respuesta real de la muestra de prueba
+
+```{r}
+y_test_valid_xgb <- test_data$precio_m2_alquiler
+```
+
+#### Predicción del modelo sobre la muestra de prueba
+
+```{r}
+pred_test_valid_xgb <- predict(modelo_alquiler_xgb_valid, X_test_valid_xgb)
+```
+
+#### Comparación entre valor real y valor predicho en la prueba
+
+```{r}
+comparacion_xgb <- data.frame(
+  nombre_municipio = test_data$nombre_municipio,
+  alquiler_real = y_test_valid_xgb,
+  alquiler_predicho = round(pred_test_valid_xgb, 1)
+)
+
+comparacion_xgb$diferencia <- round(
+  comparacion_xgb$alquiler_real - comparacion_xgb$alquiler_predicho,
+  2
+)
+
+comparacion_xgb$error_absoluto <- round(
+  abs(comparacion_xgb$diferencia),
+  2
+)
+
+comparacion_xgb
+```
+
+
+#### Cálculo de métricas de error de la prueba
+
+```{r}
+mae_xgb <- mean(comparacion_xgb$error_absoluto)
+
+rmse_xgb <- sqrt(mean(
+  (comparacion_xgb$alquiler_real - comparacion_xgb$alquiler_predicho)^2
+))
+
+mae_xgb
+rmse_xgb
+```
+
+#### Ordenar los municipios donde más falla el modelo en la prueba
+
+```{r}
+comparacion_xgb <- comparacion_xgb[order(-comparacion_xgb$error_absoluto), ]
+
+comparacion_xgb
+```
+
+#### Construcción de la base de entrenamiento final con el 100% de los municipios con alquiler conocido
+
+```{r}
+X_train_final_xgb <- municipios_valencia_base %>%
+  filter(!is.na(precio_m2_alquiler)) %>%
+  transmute(
+    log_pob_total = log(pob_total + 1),
+    renta_media_hogar = renta_media_hogar,
+    consultorio_local = consultorio_local,
+    distancia_hospital = distancia_hospital,
+    pct_hogares_100mbps = pct_hogares_100mbps
+  ) %>%
+  as.matrix()
+```
+
+#### Variable respuesta del modelo final
+
+```{r}
+y_train_final_xgb <- municipios_valencia_base %>%
+  filter(!is.na(precio_m2_alquiler)) %>%
+  pull(precio_m2_alquiler)
+```
+
+#### Ajuste del modelo final con XGBoost
+
+```{r}
+set.seed(123)
+
+modelo_alquiler_xgb_final <- xgboost(
+  data = X_train_final_xgb,
+  label = y_train_final_xgb,
+  objective = "reg:squarederror",
+  nrounds = 100,
+  max_depth = 3,
+  eta = 0.1,
+  subsample = 0.8,
+  colsample_bytree = 0.8,
+  verbose = 0
+)
+```
+
+#### Identificación de los municipios con alquiler faltante antes de imputar
+
+```{r}
+municipios_valencia_base$alquiler_faltaba <- is.na(municipios_valencia_base$precio_m2_alquiler)
+
+```
+
+#### Construcción de la base para predecir los valores faltantes reales
+
+```{r}
+X_pred_final_xgb <- municipios_valencia_base %>%
+  filter(is.na(precio_m2_alquiler)) %>%
+  transmute(
+    log_pob_total = log(pob_total + 1),
+    renta_media_hogar = renta_media_hogar,
+    consultorio_local = consultorio_local,
+    distancia_hospital = distancia_hospital,
+    pct_hogares_100mbps = pct_hogares_100mbps
+  ) %>%
+  as.matrix()
+```
+
+#### Imputación directa de los valores faltantes de alquiler
+
+```{r}
+municipios_valencia_base$precio_m2_alquiler[
+  is.na(municipios_valencia_base$precio_m2_alquiler)
+] <- round(
+  predict(modelo_alquiler_xgb_final, X_pred_final_xgb),
+  1
+)
+```
+
+#### Cálculo de esfuerzo_alquiler tras la imputación
+
+```{r}
+municipios_valencia_base$esfuerzo_alquiler <- 
+  ((municipios_valencia_base$precio_m2_alquiler * 80) / 
+     (municipios_valencia_base$renta_media_hogar / 12)) * 100
+```
+
+
+#### Comprobación de los valores imputados
+
+```{r}
+municipios_valencia_base %>%
+  filter(alquiler_faltaba) %>%
+  select(nombre_municipio, precio_m2_alquiler, esfuerzo_alquiler)
+```
+
+#### Eliminación de variable auxiliar creada durante la imputación
+
+
+```{r}
+municipios_valencia_base <- municipios_valencia_base %>%
+  select(-alquiler_faltaba)
+```
+
+### Imputación del % de estudios superiores
+
+#### Selección de los municipios con `pct_estudios_sup` conocido para entrenar el modelo
+  
+```{r}
+datos_xgb_estudios <- municipios_valencia_base %>%
+  filter(!is.na(pct_estudios_sup))
+```
+
+#### Comprobación rápida de faltantes en las variables explicativas
+
+```{r}
+colSums(is.na(datos_xgb_estudios[, c(
+  "pob_total",
+  "renta_media_hogar",
+  "consultorio_local",
+  "distancia_hospital",
+  "pct_hogares_100mbps",
+  "precio_m2_alquiler"
+)]))
+```
+
+#### División en muestra de entrenamiento y de prueba
+
+```{r}
+set.seed(123)
+
+id_train_estudios <- sample(
+  1:nrow(datos_xgb_estudios),
+  size = round(0.8 * nrow(datos_xgb_estudios))
+)
+
+train_data_estudios <- datos_xgb_estudios[id_train_estudios, ]
+test_data_estudios  <- datos_xgb_estudios[-id_train_estudios, ]
+```
+
+#### Construcción de la base de entrenamiento para la validación
+
+```{r}
+X_train_estudios_xgb <- train_data_estudios %>%
+  transmute(
+    log_pob_total = log(pob_total + 1),
+    renta_media_hogar = renta_media_hogar,
+    consultorio_local = consultorio_local,
+    distancia_hospital = distancia_hospital,
+    pct_hogares_100mbps = pct_hogares_100mbps,
+    precio_m2_alquiler = precio_m2_alquiler
+  ) %>%
+  as.matrix()
+```
+
+#### Variable respuesta de entrenamiento para la validación
+
+```{r}
+y_train_estudios_xgb <- train_data_estudios$pct_estudios_sup
+```
+
+#### Ajuste del modelo XGBoost de validación
+
+```{r}
+set.seed(123)
+
+modelo_estudios_xgb_valid <- xgboost(
+  data = X_train_estudios_xgb,
+  label = y_train_estudios_xgb,
+  objective = "reg:squarederror",
+  nrounds = 100,
+  max_depth = 3,
+  eta = 0.1,
+  subsample = 0.8,
+  colsample_bytree = 0.8,
+  verbose = 0
+)
+```
+
+#### Construcción de la base de prueba para la validación
+
+```{r}
+X_test_estudios_xgb <- test_data_estudios %>%
+  transmute(
+    log_pob_total = log(pob_total + 1),
+    renta_media_hogar = renta_media_hogar,
+    consultorio_local = consultorio_local,
+    distancia_hospital = distancia_hospital,
+    pct_hogares_100mbps = pct_hogares_100mbps,
+    precio_m2_alquiler = precio_m2_alquiler
+  ) %>%
+  as.matrix()
+```
+
+#### Variable respuesta real de la muestra de prueba
+
+```{r}
+y_test_estudios_xgb <- test_data_estudios$pct_estudios_sup
+```
+
+#### Predicción del modelo sobre la muestra de prueba
+
+```{r}
+pred_test_estudios_xgb <- predict(modelo_estudios_xgb_valid, X_test_estudios_xgb)
+```
+
+#### Comparación entre valor real y valor predicho en la prueba
+
+```{r}
+comparacion_estudios_xgb <- data.frame(
+  nombre_municipio = test_data_estudios$nombre_municipio,
+  estudios_real = y_test_estudios_xgb,
+  estudios_predicho = round(pred_test_estudios_xgb, 1)
+)
+
+comparacion_estudios_xgb$diferencia <- round(
+  comparacion_estudios_xgb$estudios_real - comparacion_estudios_xgb$estudios_predicho,
+  2
+)
+
+comparacion_estudios_xgb$error_absoluto <- round(
+  abs(comparacion_estudios_xgb$diferencia),
+  2
+)
+
+comparacion_estudios_xgb
+```
+
+#### Cálculo de métricas de error de la prueba
+
+```{r}
+mae_estudios_xgb <- mean(comparacion_estudios_xgb$error_absoluto)
+
+rmse_estudios_xgb <- sqrt(mean(
+  (comparacion_estudios_xgb$estudios_real - comparacion_estudios_xgb$estudios_predicho)^2
+))
+
+mae_estudios_xgb
+rmse_estudios_xgb
+```
+
+#### Ordenar los municipios donde más falla el modelo en la prueba
+
+```{r}
+comparacion_estudios_xgb <- comparacion_estudios_xgb[order(-comparacion_estudios_xgb$error_absoluto), ]
+
+comparacion_estudios_xgb
+```
+
+#### Construcción de la base de entrenamiento final con el 100% de los municipios con `pct_estudios_sup` conocido
+
+```{r}
+X_train_final_estudios_xgb <- municipios_valencia_base %>%
+  filter(!is.na(pct_estudios_sup)) %>%
+  transmute(
+    log_pob_total = log(pob_total + 1),
+    renta_media_hogar = renta_media_hogar,
+    consultorio_local = consultorio_local,
+    distancia_hospital = distancia_hospital,
+    pct_hogares_100mbps = pct_hogares_100mbps,
+    precio_m2_alquiler = precio_m2_alquiler
+  ) %>%
+  as.matrix()
+```
+
+#### Variable respuesta del modelo final
+
+```{r}
+y_train_final_estudios_xgb <- municipios_valencia_base %>%
+  filter(!is.na(pct_estudios_sup)) %>%
+  pull(pct_estudios_sup)
+```
+
+#### Ajuste del modelo final con XGBoost
+
+```{r}
+set.seed(123)
+
+modelo_estudios_xgb_final <- xgboost(
+  data = X_train_final_estudios_xgb,
+  label = y_train_final_estudios_xgb,
+  objective = "reg:squarederror",
+  nrounds = 100,
+  max_depth = 3,
+  eta = 0.1,
+  subsample = 0.8,
+  colsample_bytree = 0.8,
+  verbose = 0
+)
+```
+
+#### Identificación de los municipios con `pct_estudios_sup` faltante antes de imputar
+
+```{r}
+municipios_valencia_base$estudios_faltaban <- is.na(municipios_valencia_base$pct_estudios_sup)
+```
+
+#### Construcción de la base para predecir los valores faltantes reales
+
+```{r}
+X_pred_final_estudios_xgb <- municipios_valencia_base %>%
+  filter(is.na(pct_estudios_sup)) %>%
+  transmute(
+    log_pob_total = log(pob_total + 1),
+    renta_media_hogar = renta_media_hogar,
+    consultorio_local = consultorio_local,
+    distancia_hospital = distancia_hospital,
+    pct_hogares_100mbps = pct_hogares_100mbps,
+    precio_m2_alquiler = precio_m2_alquiler
+  ) %>%
+  as.matrix()
+```
+
+#### Imputación directa de los valores faltantes de `pct_estudios_sup`
+
+```{r}
+municipios_valencia_base$pct_estudios_sup[
+  is.na(municipios_valencia_base$pct_estudios_sup)
+] <- round(
+  predict(modelo_estudios_xgb_final, X_pred_final_estudios_xgb),
+  1
+)
+```
+
+#### Comprobación rápida de los valores imputados
+
+```{r}
+municipios_valencia_base %>%
+  filter(estudios_faltaban) %>%
+  select(nombre_municipio, pct_estudios_sup)
+```
 
 ### Revisión de valores atípicos
 
