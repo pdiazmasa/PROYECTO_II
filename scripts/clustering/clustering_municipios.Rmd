@@ -1,0 +1,128 @@
+---
+title: "clustering_municipios"
+author: "Emma Torres"
+date: "2026-04-24"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Preparación de datos
+
+Cargamos los paquetes necesarios.
+```{r}
+library(tidyverse)
+library(readr)
+library(tidyverse)
+library(readr)
+library(cluster)
+library(factoextra)
+library(NbClust)
+```
+
+Cargamos los datasets finales de municipios.
+```{r}
+municipios_valencia <- read_csv("municipios_valencia_base_final.csv", show_col_types = FALSE)
+municipios_bizkaia <- read_csv("municipios_vizcaya_base_final.csv", show_col_types = FALSE)
+
+#municipios_valencia <- read_csv("../../datasets/valencia/municipios_valencia_base_final.csv", show_col_types = FALSE)
+#municipios_bizkaia <- read_csv("../../datasets/vizcaya-bilbao/municipios_vizcaya_base_final.csv", show_col_types = FALSE)
+
+head(municipios_valencia)
+dim(municipios_valencia)
+
+head(municipios_bizkaia)
+dim(municipios_bizkaia)
+```
+
+En primer lugar, añadimos la provincia para cada observación y creamos un dataset conjunto.
+```{r}
+municipios_valencia <- municipios_valencia %>%
+  mutate(provincia = "Valencia")
+
+municipios_bizkaia <- municipios_bizkaia %>%
+  mutate(provincia = "Bizkaia")
+
+municipios <- bind_rows(municipios_valencia, municipios_bizkaia)
+
+dim(municipios)
+table(municipios$provincia)
+```
+
+Ahora seleccionamos las variables activas del clustering, las cuales han sido seleccionadas tras realizar el estudio de correlación correspondiente a los datasets de municipios. Para ello, creamos la matriz numérica `datos_clustering`con dichas variables activas. 
+```{r}
+datos_clustering <- municipios %>%
+  select(
+    pct_extranjeros,
+    indice_envejecimiento,
+    pct_estudios_sup,
+    ratio_colegios,
+    distancia_centro_educativo,
+    ratio_centros_salud,
+    consultorio_local,
+    ratio_hospital,
+    distancia_hospital,
+    esfuerzo_alquiler,
+    pct_hogares_100mbps)
+```
+
+Revisamos los valores faltantes en las variables activas, ya que no puede haber ningún faltante para realizar en análisis de clustering.
+```{r}
+faltantes_clustering <- datos_clustering %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(
+    cols = everything(),
+    names_to = "variable",
+    values_to = "num_faltantes") %>% arrange(desc(num_faltantes))
+
+faltantes_clustering
+```
+
+Ahora conservamos información auxiliar de los municipios para interpretar después.
+```{r}
+info_municipios <- municipios %>%
+  select(
+    cod_municipio,
+    nombre_municipio,
+    provincia)
+```
+
+  
+Aunque no haya faltantes, conviene crear igualmente estos objetos porque los usaremos en todo el análisis, además de realizar la compobación de que no exista ningún valor faltante en las observaciones.
+```{r}
+filas_completas <- complete.cases(datos_clustering)
+
+datos_clustering_completo <- datos_clustering[filas_completas, ]
+
+info_municipios_completo <- info_municipios[filas_completas, ]
+
+dim(datos_clustering_completo)
+dim(info_municipios_completo)
+
+colSums(is.na(datos_clustering_completo))
+```
+Como todas las variables tienen 0 faltantes, comprobamos que aún siguen teniendo 249 filas.
+
+Antes de calcular distancias, debemos estandarizar los datos, ya que tenemos variables en escalas distintas. Para ello, centramos y escalamos mediante la función `scale()`. 
+```{r}
+datos_clustering_scaled <- scale(datos_clustering_completo)
+
+summary(datos_clustering_scaled)
+```
+
+Finalmente, se guarda la matriz estandarizada con el nombre *matriz_clustering*, que será el objeto utilizado en los siguientes apartados para calcular distancias y aplicar los distintos métodos de clustering.
+```{r}
+matriz_clustering <- datos_clustering_scaled
+```
+
+## Elección de la medida de distancia y tendencia de agrupamiento
+
+
+
+
+
+### NOTA: descomentar primera celda y añadir "naturaleza_contractual" info extra guardada para luego
