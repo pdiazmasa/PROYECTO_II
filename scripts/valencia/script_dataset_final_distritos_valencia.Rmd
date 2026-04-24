@@ -729,6 +729,6 @@ El análisis exploratorio realizado sobre las variables seleccionadas para clust
 
 ```{r}
 write.csv(distritos_valencia_base,
-          "../../datasets/valencia/distritos_valencia_base_final.csv.csv",
+          "../../datasets/valencia/distritos_valencia_base_final.csv",
           row.names = FALSE)
 ```
