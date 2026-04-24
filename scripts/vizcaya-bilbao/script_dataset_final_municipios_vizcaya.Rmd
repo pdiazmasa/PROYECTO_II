@@ -1366,20 +1366,6 @@ municipios_bizkaia_base$`renta_media_hogar`[
 ] <- median(municipios_bizkaia_base$`renta_media_hogar`, na.rm = TRUE)
 ```
 
-#### Comprobación rápida de faltantes en las variables explicativas
-
-No puede haber ninguna faltante para poder ajustar el modelo
-
-```{r}
-colSums(is.na(datos_xgb[, c(
-  "pob_total",
-  "renta_media_hogar",
-  "consultorio_local",
-  "distancia_hospital",
-  "pct_hogares_100mbps"
-)]))
-```
-
 #### División en muestra de entrenamiento y de prueba
 
 
@@ -1614,19 +1600,6 @@ datos_xgb_estudios <- municipios_bizkaia_base %>%
   filter(!is.na(pct_estudios_sup))
 ```
 
-#### Comprobación rápida de faltantes en las variables explicativas
-
-```{r}
-colSums(is.na(datos_xgb_estudios[, c(
-  "pob_total",
-  "renta_media_hogar",
-  "consultorio_local",
-  "distancia_hospital",
-  "pct_hogares_100mbps",
-  "precio_m2_alquiler"
-)]))
-```
-
 #### División en muestra de entrenamiento y de prueba
 
 ```{r}
@@ -1833,6 +1806,12 @@ municipios_bizkaia_base %>%
   select(nombre_municipio, pct_estudios_sup)
 ```
 
+#### Eliminación de variable auxiliar creada durante la imputación
+
+```{r}
+municipios_bizkaia_base <- municipios_bizkaia_base %>%
+  select(-estudios_faltaban)
+```
 
 ### Revisión de valores atípicos 
 ```{r}
