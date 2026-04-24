@@ -1086,6 +1086,124 @@ summary(
   municipios_valencia_base$pct_contratos_servicios)
 ```
 
+## NATURALEZA CONTRACTUAL DE LOS MUNICIPIOS
+
+### Variables de contratos utilizadas
+
+```{r}
+vars_contratos <- c(
+  "pct_contratos_agricultura",
+  "pct_contratos_industria",
+  "pct_contratos_construccion",
+  "pct_contratos_servicios"
+)
+
+colSums(is.na(municipios_valencia_base[, vars_contratos]))
+```
+
+### Cálculo de umbrales de especialización sectorial
+
+```{r}
+umbral_agricultura <- quantile(
+  municipios_valencia_base$pct_contratos_agricultura,
+  probs = 0.75,
+  na.rm = TRUE
+)
+
+umbral_industria <- quantile(
+  municipios_valencia_base$pct_contratos_industria,
+  probs = 0.75,
+  na.rm = TRUE
+)
+
+umbral_construccion <- quantile(
+  municipios_valencia_base$pct_contratos_construccion,
+  probs = 0.75,
+  na.rm = TRUE
+)
+
+umbral_servicios <- quantile(
+  municipios_valencia_base$pct_contratos_servicios,
+  probs = 0.75,
+  na.rm = TRUE
+)
+
+umbrales_contratos <- data.frame(
+  sector = c("Agricultura", "Industria", "Construcción", "Servicios"),
+  umbral_percentil_75 = c(
+    umbral_agricultura,
+    umbral_industria,
+    umbral_construccion,
+    umbral_servicios
+  )
+)
+
+umbrales_contratos
+```
+
+### Identificación temporal de sectores destacados
+
+```{r}
+agricultura_alta <- municipios_valencia_base$pct_contratos_agricultura >= umbral_agricultura
+industria_alta <- municipios_valencia_base$pct_contratos_industria >= umbral_industria
+construccion_alta <- municipios_valencia_base$pct_contratos_construccion >= umbral_construccion
+servicios_alta <- municipios_valencia_base$pct_contratos_servicios >= umbral_servicios
+
+agricultura_alta[is.na(agricultura_alta)] <- FALSE
+industria_alta[is.na(industria_alta)] <- FALSE
+construccion_alta[is.na(construccion_alta)] <- FALSE
+servicios_alta[is.na(servicios_alta)] <- FALSE
+
+n_sectores_destacados <- as.numeric(agricultura_alta) +
+  as.numeric(industria_alta) +
+  as.numeric(construccion_alta) +
+  as.numeric(servicios_alta)
+
+table(n_sectores_destacados)
+```
+
+### Creación de la variable naturaleza_contratos
+
+```{r}
+municipios_valencia_base <- municipios_valencia_base %>%
+  mutate(
+    naturaleza_contratos = case_when(
+      n_sectores_destacados == 0 ~ "Mixto / sin especialización clara",
+      n_sectores_destacados == 1 & agricultura_alta ~ "Agrícola",
+      n_sectores_destacados == 1 & industria_alta ~ "Industrial",
+      n_sectores_destacados == 1 & construccion_alta ~ "Construcción",
+      n_sectores_destacados == 1 & servicios_alta ~ "Servicios",
+      agricultura_alta & construccion_alta ~ "Agro-construcción",
+      construccion_alta & servicios_alta ~ "Construcción-servicios",
+      TRUE ~ "Mixto especializado"
+    )
+  )
+
+municipios_valencia_base$naturaleza_contratos <- factor(
+  municipios_valencia_base$naturaleza_contratos,
+  levels = c(
+    "Agrícola",
+    "Industrial",
+    "Construcción",
+    "Servicios",
+    "Agro-construcción",
+    "Construcción-servicios",
+    "Mixto especializado",
+    "Mixto / sin especialización clara"
+  )
+)
+
+table(municipios_valencia_base$naturaleza_contratos)
+```
+### Comprobación final de la variable creada
+
+```{r}
+table(municipios_valencia_base$naturaleza_contratos)
+
+municipios_valencia_base %>%
+  count(naturaleza_contratos, sort = TRUE)
+```
+
 ## BLOQUE DE INTERNET
 
 ### Lectura y exploración inicial de la base de internet
