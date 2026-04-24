@@ -5,12 +5,13 @@ output: html_notebook
 
 ```{r}
 # Carga de librerías necesarias
-library(shiny)
-library(leaflet)
+library(shiny) # Marco de trabajo para construir aplicaciones web e interfaces interactivas directamente desde R.
+library(leaflet) # Biblioteca para crear mapas interactivos y dinámicos compatibles con coordenadas geográficas.
 library(plotly) # Para gráficas interactivas
-library(dplyr)
-library(sf)
-library(stringr)
+library(dplyr) # Gramática especializada en la manipulación y transformación de datos estructurados en tablas.
+library(sf) # Sistema para manejar datos espaciales (puntos, líneas y polígonos) como objetos de datos estandarizados.
+library(stringr) # Conjunto de funciones diseñadas para facilitar la limpieza y el procesamiento de cadenas de texto.
+
 ```
 
 ```{r}
@@ -136,7 +137,6 @@ server <- function(input, output, session) {
 
 # LANZAR APLICACIÓN
 shinyApp(ui, server)
-
 ```
 
 ```{r}
@@ -283,13 +283,7 @@ leaflet(mapa_final) %>%
   )
 ```
 
-```{r}
-library(sf)
-library(dplyr)
-library(stringr)
-library(leaflet)
-
-# 1. Cargar y preparar el mapa (Shapefile)
+```{r}# 1. Cargar y preparar el mapa (Shapefile)}
 mapa_completo <- st_read("../../bases_de_datos/delimitaciones/MUNICIPIOS_5000_ETRS89.shp")
 
 mapa_vizcaya <- mapa_completo %>% 
