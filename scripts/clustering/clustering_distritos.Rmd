@@ -73,6 +73,44 @@ vars_clustering <- c(
   "ratio_zonas_verdes")
 ```
 
+Antes de aplicar el clustering, comprobamos si existen valores faltantes en las variables seleccionadas. Esta revisión es necesaria porque los métodos de clustering trabajan a partir de una matriz numérica completa y no pueden calcular correctamente las distancias si hay valores ausentes.
+```{r}
+colSums(is.na(distritos_clustering[, vars_clustering]))
+```
+A continuación, se crea la matriz de datos que se utilizará en el clustering. Esta matriz contiene exclusivamente las cinco variables activas seleccionada.
+
+```{r}
+datos_distritos <- distritos_clustering %>%select(all_of(vars_clustering))
+
+head(datos_distritos)
+summary(datos_distritos)
+```
+Antes de calcular las distancias, se centran y escalan las variables. Este paso es necesario porque las variables están medidas en escalas diferentes. Si no se estandarizaran, las variables con valores numéricamente más grandes podrían tener más peso en la formación de los clusters.
+```{r}
+datos_distritos2 <- scale(
+  datos_distritos,
+  center = TRUE,
+  scale = TRUE
+)
+
+head(datos_distritos2)
+summary(datos_distritos2)
+```
+Tras el escalado, todas las variables quedan expresadas en una escala comparable, con media cero y desviación típica uno. Esto permite que todas contribuyan de forma equilibrada al cálculo de las distancias entre distritos.
+
+Finalmente, se guarda una base auxiliar con la información identificativa de cada distrito. Esta base no se utiliza para calcular los clusters, pero será necesaria más adelante para interpretar los grupos obtenidos y relacionar cada observación con su ciudad y distrito correspondiente.
+```{r}
+info_distritos <- distritos_clustering %>%
+  select(
+    ciudad,
+    cod_distrito,
+    nombre_distrito,
+    nombre_distrito_norm)
+
+head(info_distritos)
+```
+
+
 ## Elección de la medida de distancia y tendencia de agrupamiento
 
 
