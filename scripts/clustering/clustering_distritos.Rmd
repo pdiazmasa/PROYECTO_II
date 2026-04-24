@@ -6,14 +6,72 @@ date: "2026-04-24"
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+library(mice)
+library(cluster)
+library(factoextra)
+library(NbClust)
+library(clValid)
+library(PLSandO)
+library(aricode)
+library(biostatcolors)
 ```
 
 # Análisis Clustering Distritos
 
-
 ## Preparación datos
 <!-- Selección de variables a incluir en el modelo? Centrado y escalado? Transformación de variables? -->
-En primer lugar, se construye una base conjunta con los distritos de Valencia y Bilbao. Para poder diferenciar posteriormente a qué ciudad pertenece cada distrito, se añade una variable llamada *ciudad* antes de unir ambas bases.
+
+Cargamos los datasets finales de distritos de Valencia y Bilbao, que serán la base del análisis de clustering.
+```{r}
+distritos_valencia_base <- read_csv("../../datasets/valencia/distritos_valencia_base_final.csv", show_col_types = FALSE)
+
+distritos_bilbao_base <- read_csv("../../datasets/vizcaya-bilbao/distritos_bilbao_base_final.csv",show_col_types =FALSE)
+
+head(distritos_valencia_base)
+dim(distritos_valencia_base)
+
+head(distritos_bilbao_base)
+dim(distritos_bilbao_base)
+```
+
+En primer lugar, añadimos la ciudad a cada observación para poder identificar posteriormente si cada distrito pertenece a Valencia o a Bilbao. Después, unimos ambas bases en un único dataset conjunto.
+```{r}
+distritos_valencia_clust <- distritos_valencia_base %>%mutate(ciudad = "Valencia")
+
+distritos_bilbao_clust <- distritos_bilbao_base %>%mutate(ciudad = "Bilbao")
+
+distritos_clustering <- bind_rows(distritos_valencia_clust,distritos_bilbao_clust)
+
+dim(distritos_clustering)
+table(distritos_clustering$ciudad)
+```
+A continuación, seleccionamos las variables necesarias para el análisis. Las variables *ciudad*, *cod_distrito*y *nombre_distrito_norm* se conservan como identificadores, mientras que el clustering se realizará sobre *indice_envejecimiento*, *ratio_colegio*, *ratio_hospital*, *esfuerzo_alquiler* y *ratio_zonas_verdes*.
+```{r}
+distritos_clustering <- distritos_clustering %>%
+  select(
+    ciudad,
+    cod_distrito,
+    nombre_distrito_norm,
+    indice_envejecimiento,
+    ratio_colegio,
+    ratio_hospital,
+    esfuerzo_alquiler,
+    ratio_zonas_verdes)
+
+head(distritos_clustering)
+dim(distritos_clustering)
+```
+
+Estas variables se han escogido a partir del estudio previo de correlaciones. La variable *indice_envejecimiento* recoge la estructura demográfica, *ratio_colegio* y *ratio_hospital* representan la dotación relativa de servicios, *esfuerzo_alquiler* incorpora la dimensión residencial y socioeconómica, y *ratio_zonas_verdes* mide la disponibilidad relativa de espacios verdes.
+```{r}
+vars_clustering <- c(
+  "indice_envejecimiento",
+  "ratio_colegio",
+  "ratio_hospital",
+  "esfuerzo_alquiler",
+  "ratio_zonas_verdes")
+```
 
 ## Elección de la medida de distancia y tendencia de agrupamiento
 
