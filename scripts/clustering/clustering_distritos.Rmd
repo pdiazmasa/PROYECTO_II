@@ -1,0 +1,39 @@
+---
+title: "clustering_distritos"
+output: html_document
+date: "2026-04-24"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Análisis Clustering Distritos
+
+
+## Preparación datos
+<!-- Selección de variables a incluir en el modelo? Centrado y escalado? Transformación de variables? -->
+En primer lugar, se construye una base conjunta con los distritos de Valencia y Bilbao. Para poder diferenciar posteriormente a qué ciudad pertenece cada distrito, se añade una variable llamada *ciudad* antes de unir ambas bases.
+
+## Elección de la medida de distancia y tendencia de agrupamiento
+
+
+
+
+## Determinación del número de clústeres
+
+
+
+
+## Comparación de métodos de clustering
+
+<!-- Indicar claramente el método elegido y justificar la decisión. -->
+
+
+## Interpretación de los resultados del clustering
+
+
+### Caracterización de los clústeres obtenidos
+
+
+### Relación de los clústeres con otras variables 
