@@ -912,125 +912,6 @@ municipios_bizkaia_base[municipios_bizkaia_base$renta_media_hogar < 10000,
 renta[renta$renta_media_hogar < 10000, ]
 ```
 
-## BLOQUE DE INTERNET
-
-### Lectura y exploración inicial de la base de internet
-
-```{r}
-internet <- read_excel("../../bases_de_datos/internet/acceso_internet_municipios.xlsx",
-                       sheet = "Municipio_%hogar")
-
-head(internet)
-dim(internet)
-colnames(internet)
-```
-
-### Selección de municipios de Vizcaya
-
-```{r}
-internet_vizcaya <- internet %>%
-  filter(Provincia == "Bizkaia")
-
-dim(internet_vizcaya)
-head(internet_vizcaya)
-```
-
-### Construcción del código de municipio
-
-```{r}
-internet_vizcaya <- internet_vizcaya %>%
-  mutate(cod_municipio = str_pad(CMUN, width = 5, side = "left", pad = "0"))
-
-head(internet_vizcaya[, c("CMUN", "cod_municipio", "Municipio")], 10)
-```
-
-### Selección de la variable de cobertura
-
-```{r}
-col_cobertura <- grep("^Cob\\. 100Mbps.*junio 2024",
-                      colnames(internet_vizcaya),
-                      value = TRUE)
-
-internet_vizcaya <- internet_vizcaya[, c("cod_municipio",
-                                         "Municipio",
-                                         col_cobertura)]
-
-colnames(internet_vizcaya) <- c("cod_municipio",
-                                "nombre_municipio",
-                                "pct_hogares_100mbps")
-
-internet_vizcaya$nombre_municipio <- str_squish(internet_vizcaya$nombre_municipio)
-internet_vizcaya$nombre_municipio_norm <- normalizar_municipio(internet_vizcaya$nombre_municipio)
-
-head(internet_vizcaya)
-```
-
-### Creación de la variable pct_hogares_100mbps
-
-```{r}
-internet_vizcaya$pct_hogares_100mbps <- 
-  as.numeric(internet_vizcaya$pct_hogares_100mbps) * 100
-
-head(internet_vizcaya[, c("cod_municipio", "pct_hogares_100mbps")])
-summary(internet_vizcaya$pct_hogares_100mbps)
-sum(is.na(internet_vizcaya$pct_hogares_100mbps))
-```
-
-### Creación de la variable internet_100mbps_mayor90
-
-```{r}
-internet_vizcaya$internet_100mbps_mayor90 <- 
-  ifelse(internet_vizcaya$pct_hogares_100mbps > 90, 1, 0)
-
-head(internet_vizcaya[, c("cod_municipio",
-                          "pct_hogares_100mbps",
-                          "internet_100mbps_mayor90")])
-
-table(internet_vizcaya$internet_100mbps_mayor90, useNA = "ifany")
-```
-
-### Incorporación a la base principal
-
-```{r}
-cols_eliminar <- colnames(municipios_bizkaia_base) %in% c("pct_hogares_100mbps",
-                                                          "internet_100mbps_mayor90")
-
-municipios_bizkaia_base <- municipios_bizkaia_base[, !cols_eliminar]
-
-municipios_bizkaia_base <- left_join(municipios_bizkaia_base,
-                                     internet_vizcaya[, c("cod_municipio",
-                                                          "pct_hogares_100mbps",
-                                                          "internet_100mbps_mayor90")],
-                                     by = "cod_municipio")
-
-head(municipios_bizkaia_base[, c("cod_municipio",
-                                 "nombre_municipio",
-                                 "pct_hogares_100mbps",
-                                 "internet_100mbps_mayor90")])
-```
-
-### Comprobación de resultados del bloque de internet
-
-```{r}
-sum(is.na(municipios_bizkaia_base$pct_hogares_100mbps))
-sum(is.na(municipios_bizkaia_base$internet_100mbps_mayor90))
-
-summary(municipios_bizkaia_base$pct_hogares_100mbps)
-table(municipios_bizkaia_base$internet_100mbps_mayor90, useNA = "ifany")
-```
-
-### Eliminación de los pueblos con mala conectividad a internet
-
-```{r}
-municipios_bizkaia_base <- municipios_bizkaia_base %>%
-  filter(internet_100mbps_mayor90 == 1)
-
-head(municipios_bizkaia_base)
-dim(municipios_bizkaia_base)
-sum(municipios_bizkaia_base$internet_100mbps_mayor90 == 0, na.rm = TRUE)
-nrow(municipios_bizkaia_base)
-```
-
 ## BLOQUE DE CONTRATOS
 
 ### Lectura y exploración inicial de la base de contratos
@@ -1244,6 +1125,131 @@ sum(is.na(municipios_bizkaia_base$pct_contratos_servicios))
 
 ```{r}
 municipios_bizkaia_base$suma_pct_contratos <- NULL
+```
+
+## BLOQUE DE INTERNET
+
+### Lectura y exploración inicial de la base de internet
+
+```{r}
+internet <- read_excel("../../bases_de_datos/internet/acceso_internet_municipios.xlsx",
+                       sheet = "Municipio_%hogar")
+
+head(internet)
+dim(internet)
+colnames(internet)
+```
+
+### Selección de municipios de Vizcaya
+
+```{r}
+internet_vizcaya <- internet %>%
+  filter(Provincia == "Bizkaia")
+
+dim(internet_vizcaya)
+head(internet_vizcaya)
+```
+
+### Construcción del código de municipio
+
+```{r}
+internet_vizcaya <- internet_vizcaya %>%
+  mutate(cod_municipio = str_pad(CMUN, width = 5, side = "left", pad = "0"))
+
+head(internet_vizcaya[, c("CMUN", "cod_municipio", "Municipio")], 10)
+```
+
+### Selección de la variable de cobertura
+
+```{r}
+col_cobertura <- grep("^Cob\\. 100Mbps.*junio 2024",
+                      colnames(internet_vizcaya),
+                      value = TRUE)
+
+internet_vizcaya <- internet_vizcaya[, c("cod_municipio",
+                                         "Municipio",
+                                         col_cobertura)]
+
+colnames(internet_vizcaya) <- c("cod_municipio",
+                                "nombre_municipio",
+                                "pct_hogares_100mbps")
+
+internet_vizcaya$nombre_municipio <- str_squish(internet_vizcaya$nombre_municipio)
+internet_vizcaya$nombre_municipio_norm <- normalizar_municipio(internet_vizcaya$nombre_municipio)
+
+head(internet_vizcaya)
+```
+
+### Creación de la variable pct_hogares_100mbps
+
+```{r}
+internet_vizcaya$pct_hogares_100mbps <- 
+  as.numeric(internet_vizcaya$pct_hogares_100mbps) * 100
+
+head(internet_vizcaya[, c("cod_municipio", "pct_hogares_100mbps")])
+summary(internet_vizcaya$pct_hogares_100mbps)
+sum(is.na(internet_vizcaya$pct_hogares_100mbps))
+```
+
+### Creación de la variable internet_100mbps_mayor90
+
+```{r}
+internet_vizcaya$internet_100mbps_mayor90 <- 
+  ifelse(internet_vizcaya$pct_hogares_100mbps > 90, 1, 0)
+
+head(internet_vizcaya[, c("cod_municipio",
+                          "pct_hogares_100mbps",
+                          "internet_100mbps_mayor90")])
+
+table(internet_vizcaya$internet_100mbps_mayor90, useNA = "ifany")
+```
+
+### Incorporación a la base principal
+
+```{r}
+cols_eliminar <- colnames(municipios_bizkaia_base) %in% c("pct_hogares_100mbps",
+                                                          "internet_100mbps_mayor90")
+
+municipios_bizkaia_base <- municipios_bizkaia_base[, !cols_eliminar]
+
+municipios_bizkaia_base <- left_join(municipios_bizkaia_base,
+                                     internet_vizcaya[, c("cod_municipio",
+                                                          "pct_hogares_100mbps",
+                                                          "internet_100mbps_mayor90")],
+                                     by = "cod_municipio")
+
+head(municipios_bizkaia_base[, c("cod_municipio",
+                                 "nombre_municipio",
+                                 "pct_hogares_100mbps",
+                                 "internet_100mbps_mayor90")])
+```
+
+### Comprobación de resultados del bloque de internet
+
+```{r}
+sum(is.na(municipios_bizkaia_base$pct_hogares_100mbps))
+sum(is.na(municipios_bizkaia_base$internet_100mbps_mayor90))
+
+summary(municipios_bizkaia_base$pct_hogares_100mbps)
+table(municipios_bizkaia_base$internet_100mbps_mayor90, useNA = "ifany")
+```
+
+### Exportación del dataset sin la eliminación de los pueblos con mala conectividad a internet
+
+```{r}
+write.csv(municipios_bizkaia_base, "../../datasets/vizcaya-bilbao/municipios_vizcaya_todos_municipios.csv", row.names = FALSE)
+```
+
+### Eliminación de los pueblos con mala conectividad a internet
+
+```{r}
+municipios_bizkaia_base <- municipios_bizkaia_base %>%
+  filter(internet_100mbps_mayor90 == 1)
+
+head(municipios_bizkaia_base)
+dim(municipios_bizkaia_base)
+sum(municipios_bizkaia_base$internet_100mbps_mayor90 == 0, na.rm = TRUE)
+nrow(municipios_bizkaia_base)
 ```
 
 ## COMPROBACIÓN DE LA BASE FINAL
@@ -1964,5 +1970,4 @@ El análisis exploratorio realizado sobre las variables seleccionadas para clust
 
 ```{r}
 write.csv(municipios_bizkaia_base, "../../datasets/vizcaya-bilbao/municipios_vizcaya_base_final.csv", row.names = FALSE)
-
 ```
