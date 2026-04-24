@@ -26,11 +26,8 @@ library(NbClust)
 
 Cargamos los datasets finales de municipios.
 ```{r}
-municipios_valencia <- read_csv("municipios_valencia_base_final.csv", show_col_types = FALSE)
-municipios_bizkaia <- read_csv("municipios_vizcaya_base_final.csv", show_col_types = FALSE)
-
-#municipios_valencia <- read_csv("../../datasets/valencia/municipios_valencia_base_final.csv", show_col_types = FALSE)
-#municipios_bizkaia <- read_csv("../../datasets/vizcaya-bilbao/municipios_vizcaya_base_final.csv", show_col_types = FALSE)
+municipios_valencia <- read_csv("../../datasets/valencia/municipios_valencia_base_final.csv", show_col_types = FALSE)
+municipios_bizkaia <- read_csv("../../datasets/vizcaya-bilbao/municipios_vizcaya_base_final.csv", show_col_types = FALSE)
 
 head(municipios_valencia)
 dim(municipios_valencia)
@@ -88,7 +85,8 @@ info_municipios <- municipios %>%
   select(
     cod_municipio,
     nombre_municipio,
-    provincia)
+    provincia,
+    naturaleza_contratos)
 ```
 
   
@@ -125,4 +123,3 @@ matriz_clustering <- datos_clustering_scaled
 
 
 
-### NOTA: descomentar primera celda y añadir "naturaleza_contractual" info extra guardada para luego
