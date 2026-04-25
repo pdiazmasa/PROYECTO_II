@@ -17,11 +17,10 @@ Cargamos los paquetes necesarios.
 ```{r}
 library(tidyverse)
 library(readr)
-library(tidyverse)
-library(readr)
 library(cluster)
 library(factoextra)
 library(NbClust)
+library(gridExtra)
 ```
 
 Cargamos los datasets finales de municipios.
@@ -50,7 +49,7 @@ dim(municipios)
 table(municipios$provincia)
 ```
 
-Ahora seleccionamos las variables activas del clustering, las cuales han sido seleccionadas tras realizar el estudio de correlación correspondiente a los datasets de municipios. Para ello, creamos la matriz numérica `datos_clustering`con dichas variables activas. 
+Ahora seleccionamos las variables activas del clustering, las cuales han sido seleccionadas tras realizar el estudio de correlación correspondiente a los datasets de municipios. Para ello, creamos el objeto datos_clustering, que contiene únicamente dichas variables activas.
 ```{r}
 datos_clustering <- municipios %>%
   select(
@@ -67,7 +66,7 @@ datos_clustering <- municipios %>%
     pct_hogares_100mbps)
 ```
 
-Revisamos los valores faltantes en las variables activas, ya que no puede haber ningún faltante para realizar en análisis de clustering.
+Revisamos los valores faltantes en las variables activas, ya que no puede haber ningún faltante para realizar el análisis de clustering.
 ```{r}
 faltantes_clustering <- datos_clustering %>%
   summarise(across(everything(), ~ sum(is.na(.)))) %>%
@@ -90,7 +89,7 @@ info_municipios <- municipios %>%
 ```
 
   
-Aunque no haya faltantes, conviene crear igualmente estos objetos porque los usaremos en todo el análisis, además de realizar la compobación de que no exista ningún valor faltante en las observaciones.
+Aunque no haya faltantes, conviene crear igualmente estos objetos porque los usaremos en todo el análisis, además de realizar la comprobación de que no exista ningún valor faltante en las observaciones.
 ```{r}
 filas_completas <- complete.cases(datos_clustering)
 
@@ -103,7 +102,7 @@ dim(info_municipios_completo)
 
 colSums(is.na(datos_clustering_completo))
 ```
-Como todas las variables tienen 0 faltantes, comprobamos que aún siguen teniendo 249 filas.
+Como el número de observaciones se mantiene en 249, se comprueba que no se ha eliminado ningún municipio por valores faltantes.. Además, de igual modo, vemos que ninguna de las variables cuenta con valores faltantes.
 
 Antes de calcular distancias, debemos estandarizar los datos, ya que tenemos variables en escalas distintas. Para ello, centramos y escalamos mediante la función `scale()`. 
 ```{r}
@@ -119,7 +118,143 @@ matriz_clustering <- datos_clustering_scaled
 
 ## Elección de la medida de distancia y tendencia de agrupamiento
 
+Una vez preparada la matriz numérica estandarizada, se selecciona la medida de distancia que se utilizará para cuantificar la disimilitud entre municipios. Como las variables activas son numéricas y han sido previamente centradas y escaladas, se emplea la distancia euclídea.
+
+Esta medida resulta adecuada porque permite comparar los municipios en un espacio multidimensional donde todas las variables contribuyen en una escala común. Además, la distancia euclídea es una de las medidas más utilizadas en combinación con métodos como el clustering jerárquico con criterio de Ward y el algoritmo k-means.
+
+Antes de aplicar los métodos de agrupamiento, se analiza también la tendencia de agrupamiento de los datos mediante el estadístico Hopkins. El objetivo es comprobar si los municipios presentan cierta estructura interna o si, por el contrario, se distribuyen de forma aproximadamente aleatoria en el espacio definido por las variables seleccionadas.
+
+A continuación, realizamos el cálculo de la matriz de distancias euclídeas a partir de la matriz estandarizada. Esta matriz recoge la disimilitud entre cada par de municipios según las variables activas seleccionadas.
+```{r}
+dist_municipios <- dist(
+  matriz_clustering,
+  method = "euclidean")
+
+dist_municipios
+```
+
+Visualizamos dicha matriz de distancias. Con esta visualización podremos observar si existen bloques de municipios más similares entre sí. La presencia de zonas más homogéneas puede sugerir una cierta estructura agrupable en los datos.
+```{r}
+fviz_dist(
+  dist_municipios,
+  show_labels = FALSE)
+```
+La visualización de la matriz de distancias muestra diferencias apreciables entre municipios, con zonas de menor y mayor disimilitud. Aunque el gráfico resulta denso por el elevado número de observaciones, se observan varias líneas verticales y horizontales más oscuras, que corresponden a municipios con un perfil bastante diferente al del resto. 
+
+Ahora calculamos la tendencia de agrupamiento con el estadístico de Hopkins, el cual permite evaluar si los datos presentan tendencia de agrupamiento. Valores cercanos a 0,5 indican una distribución aproximadamente aleatoria, mientras que valores más próximos a 1 sugieren una mayor tendencia a formar clústeres.
+```{r}
+set.seed(123)
+
+hopkins_municipios <- get_clust_tendency(
+  matriz_clustering,
+  n = nrow(matriz_clustering) - 1,
+  graph = TRUE)
+
+hopkins_municipios$hopkins_stat
+```
+Como el estadístico de Hopkins presenta un valor de 0,9999974, y este es muy próximo a 1, nos indica una tendencia de agrupamiento muy clara, ya que los datos no parecen distribuirse de forma aleatoria en el espacio definido por las variables seleccionadas. Por tanto, con ello se justifica continuar con el análisis de clustering, aplicando distintos métodos para identificar grupos de municipios con características similares.
+
+## Determinación del número de clústeres
+
+Una vez comprobada la existencia de tendencia de agrupamiento en los datos, se procede a determinar el número adecuado de clústeres. Para ello se utilizan varios criterios complementarios que se muestran a continuación, ya que no existe una única regla automática que garantice la mejor solución.
+
+En primer lugar, se utiliza el método de Silhouette, que permite evaluar la calidad de la asignación de las observaciones a los grupos; los valores más altos indican que los municipios están mejor agrupados dentro de su clúster y más separados de los demás. Simultáneamente, en segundo lugar, se aplica el método del codo mediante la suma de cuadrados intra-clúster, que analiza cómo disminuye la variabilidad interna de los grupos al aumentar el número de clústeres. El objetivo es identificar un punto a partir del cual añadir más grupos apenas mejora la compactación de la solución.
+```{r}
+## Función auxiliar para aplicar WSS con hcut
+
+hcut_wss <- function(x, k, ...) {
+  if (k == 1) {
+    list(cluster = rep(1, nrow(x)))} 
+  else {
+    hcut(
+      x = x,
+      k = k,
+      hc_method = "ward.D2",
+      hc_metric = "euclidean")}}
+```
+
+```{r}
+p1 <- fviz_nbclust(
+  x = matriz_clustering,
+  FUNcluster = hcut,
+  method = "silhouette",
+  hc_method = "ward.D2",
+  k.max = 10,
+  verbose = FALSE,
+  diss = dist_municipios) +
+  labs(title = "Número de clústeres según Silhouette")
+
+p2 <- fviz_nbclust(
+  x = matriz_clustering,
+  FUNcluster = hcut_wss,
+  method = "wss",
+  hc_method = "ward.D2",
+  k.max = 10,
+  verbose = FALSE) +
+  labs(title = "Número de clústeres según WSS")
+
+grid.arrange(p1, p2, nrow = 1)
+```
+El gráfico de Silhouette alcanza su valor máximo para *k = 2*, lo que indica que, según este criterio, la partición en dos clústeres es la que presenta una mejor separación media entre grupos. A partir de ese valor, la silueta disminuye notablemente para *k = 3* y *k = 4*, aunque vuelve a aumentar de forma progresiva para valores superiores de k.
+
+Por su parte, el método del codo muestra una disminución continua de la suma de cuadrados intra-clúster conforme aumenta el número de grupos. La reducción es más marcada entre *k = 1* y *k = 4*, y posteriormente la curva empieza a suavizarse. Esto sugiere que una solución en torno a 3 o 4 clústeres podría ser razonable desde el punto de vista de la compactación interna.
+
+En conjunto, los dos criterios no señalan exactamente la misma solución: Silhouette favorece una división más simple en 2 clústeres, mientras que el método del codo permite considerar una estructura algo más detallada, especialmente con 3 o 4 grupos. Por ello, la elección final del número de clústeres deberá completarse con otros criterios y con la interpretación sustantiva de los grupos obtenidos.
+
+Finalmente, se utiliza la función NbClust, que compara distintos índices de validación interna para proponer un número adecuado de clústeres. Este criterio se interpreta de forma complementaria a los métodos de Silhouette y WSS, ya que permite contrastar si la solución sugerida por los gráficos anteriores se mantiene al considerar un conjunto más amplio de índices.
+```{r}
+set.seed(123)
+
+nb_municipios <- NbClust(
+  data = matriz_clustering,
+  distance = "euclidean",
+  min.nc = 2,
+  max.nc = 10,
+  method = "ward.D2",
+  index = "alllong")
+
+fviz_nbclust(nb_municipios) +
+  labs(title = "Número de clústeres según NbClust")
+```
+Los resultados de `NbClust` muestran que la opción más respaldada por los índices de validación interna es la solución de *k = 2* clústeres. Este resultado coincide con el método de Silhouette, que también alcanza su valor máximo para dos grupos. Aunque el método del codo permite valorar soluciones algo más detalladas, especialmente en torno a 3 o 4 clústeres, se decide continuar inicialmente con *k = 2*, al ser la alternativa con mayor apoyo estadístico y ofrecer una partición clara de los municipios en dos grandes perfiles diferenciados.
+
+A continuación, representamos el dendrograma del clustering jerárquico utilizando la distancia euclídea y el método de Ward.D2. Este dendrograma permite observar visualmente cómo se van agrupando los municipios en función de su similitud.
+```{r}
+clustering_jerarquico <- hclust(
+  d = dist_municipios,
+  method = "ward.D2")
+
+fviz_dend(
+  clustering_jerarquico,
+  k = 2,
+  show_labels = FALSE,
+  rect = TRUE,
+  rect_fill = FALSE,
+  rect_border = "black",
+  main = "Dendrograma del clustering jerárquico",
+  xlab = "Municipios",
+  ylab = "Altura",
+  cex = 0.3,
+  lwd = 0.4)
+```
+El dendrograma muestra la estructura jerárquica obtenida mediante el método de Ward y la distancia euclídea. Al cortar el árbol en *k = 2* clústeres, se observa una división principal entre dos grandes grupos de municipios. Esta solución es coherente con los resultados obtenidos previamente mediante el método de la silueta y `NbClust`, que señalaban dos clústeres como la alternativa más adecuada.
+
+Aunque el dendrograma presenta muchas ramas debido al número de municipios analizados, permite comprobar visualmente que existe una separación clara entre los dos grupos principales. Por tanto, se mantiene inicialmente la solución de *k = 2* para continuar el análisis.
+
+A partir del corte del dendrograma en dos grupos, se asigna a cada municipio su clúster correspondiente. La siguient tabla de frecuencias permite comprobar el tamaño de cada grupo y valorar si la partición obtenida está equilibrada o si uno de los clústeres concentra una mayor proporción de municipios.
+```{r}
+cluster_jerarquico <- cutree(
+  clustering_jerarquico,
+  k = 2)
+
+info_municipios_cluster <- info_municipios_completo %>%
+  mutate(cluster_jerarquico = as.factor(cluster_jerarquico))
+
+table(info_municipios_cluster$cluster_jerarquico)
+```
+La solución obtenida no reparte los municipios de forma totalmente equilibrada, ya que uno de los clústeres agrupa un mayor número de observaciones. Sin embargo, esta situación es habitual en datos territoriales, donde pueden existir muchos municipios con perfiles similares y un grupo más reducido con características más diferenciadas.
+
+## Comparación de métodos de clustering
 
 
-
-
+### CREO QUE VAMOS A TENER QUE REVISAR LO DE QUE NOS DE K=2 (SOLO 2 CLUSTERS EN LUGAR DE MÁS)
