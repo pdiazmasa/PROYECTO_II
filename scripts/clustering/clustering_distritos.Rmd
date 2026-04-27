@@ -1,14 +1,29 @@
 ---
 title: "clustering_distritos"
-output: html_document
+author: "Emma Torres"
 date: "2026-04-24"
+output:
+  html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Análisis Clustering Distritos
+
+## Preparación datos
+
+Cargamos los paquetes necesarios.
+```{r}
+library(tidyverse)
+library(readr)
+library(NbClust)
+library(gridExtra)
 library(knitr)
-library(mice)
 library(cluster)
+library(readr)
 library(factoextra)
 library(NbClust)
 library(clValid)
@@ -17,16 +32,12 @@ library(aricode)
 library(biostatcolors)
 ```
 
-# Análisis Clustering Distritos
-
-## Preparación datos
-<!-- Selección de variables a incluir en el modelo? Centrado y escalado? Transformación de variables? -->
 
 Cargamos los datasets finales de distritos de Valencia y Bilbao, que serán la base del análisis de clustering.
 ```{r}
 distritos_valencia_base <- read_csv("../../datasets/valencia/distritos_valencia_base_final.csv", show_col_types = FALSE)
 
-distritos_bilbao_base <- read_csv("../../datasets/vizcaya-bilbao/distritos_bilbao_base_final.csv",show_col_types =FALSE)
+distritos_bilbao_base <- read_csv("../../datasets/vizcaya-bilbao/distritos_bilbao_base_final.csv", show_col_types = FALSE)
 
 head(distritos_valencia_base)
 dim(distritos_valencia_base)
@@ -37,99 +48,365 @@ dim(distritos_bilbao_base)
 
 En primer lugar, añadimos la ciudad a cada observación para poder identificar posteriormente si cada distrito pertenece a Valencia o a Bilbao. Después, unimos ambas bases en un único dataset conjunto.
 ```{r}
-distritos_valencia_clust <- distritos_valencia_base %>%mutate(ciudad = "Valencia")
+distritos_valencia_clust <- distritos_valencia_base %>%
+  mutate(ciudad = "Valencia")
 
-distritos_bilbao_clust <- distritos_bilbao_base %>%mutate(ciudad = "Bilbao")
+distritos_bilbao_clust <- distritos_bilbao_base %>%
+  mutate(ciudad = "Bilbao")
 
-distritos_clustering <- bind_rows(distritos_valencia_clust,distritos_bilbao_clust)
+distritos <- bind_rows(distritos_valencia_clust, distritos_bilbao_clust)
 
-dim(distritos_clustering)
-table(distritos_clustering$ciudad)
+dim(distritos)
+table(distritos$ciudad)
 ```
-A continuación, seleccionamos las variables necesarias para el análisis. Las variables *ciudad*, *cod_distrito*y *nombre_distrito_norm* se conservan como identificadores, mientras que el clustering se realizará sobre *indice_envejecimiento*, *ratio_colegio*, *ratio_hospital*, *esfuerzo_alquiler* y *ratio_zonas_verdes*.
+
+Ahora seleccionamos las variables activas del clustering, las cuales han sido seleccionadas tras realizar el estudio de correlación correspondiente a los datasets de distritos. Para ello, creamos el objeto `datos_clustering`, que contiene únicamente dichas variables activas.
 ```{r}
-distritos_clustering <- distritos_clustering %>%
+datos_clustering <- distritos %>%
   select(
-    ciudad,
-    cod_distrito,
-    nombre_distrito_norm,
     indice_envejecimiento,
     ratio_colegio,
     ratio_hospital,
     esfuerzo_alquiler,
     ratio_zonas_verdes)
-
-head(distritos_clustering)
-dim(distritos_clustering)
 ```
 
-Estas variables se han escogido a partir del estudio previo de correlaciones. La variable *indice_envejecimiento* recoge la estructura demográfica, *ratio_colegio* y *ratio_hospital* representan la dotación relativa de servicios, *esfuerzo_alquiler* incorpora la dimensión residencial y socioeconómica, y *ratio_zonas_verdes* mide la disponibilidad relativa de espacios verdes.
+Estas variables han sido escogidas a partir del estudio previo de correlaciones. La variable *indice_envejecimiento* recoge la estructura demográfica, *ratio_colegio* y *ratio_hospital* representan la dotación relativa de servicios, *esfuerzo_alquiler* incorpora la dimensión residencial y socioeconómica, y *ratio_zonas_verdes* mide la disponibilidad relativa de espacios verdes.
+
+Revisamos los valores faltantes en las variables activas, ya que no puede haber ningún faltante para realizar el análisis de clustering.
 ```{r}
-vars_clustering <- c(
-  "indice_envejecimiento",
-  "ratio_colegio",
-  "ratio_hospital",
-  "esfuerzo_alquiler",
-  "ratio_zonas_verdes")
+faltantes_clustering <- datos_clustering %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(
+    cols = everything(),
+    names_to = "variable",
+    values_to = "num_faltantes") %>% arrange(desc(num_faltantes))
+
+faltantes_clustering
 ```
 
-Antes de aplicar el clustering, comprobamos si existen valores faltantes en las variables seleccionadas. Esta revisión es necesaria porque los métodos de clustering trabajan a partir de una matriz numérica completa y no pueden calcular correctamente las distancias si hay valores ausentes.
+Ahora conservamos información auxiliar de los distritos para interpretar después.
 ```{r}
-colSums(is.na(distritos_clustering[, vars_clustering]))
-```
-A continuación, se crea la matriz de datos que se utilizará en el clustering. Esta matriz contiene exclusivamente las cinco variables activas seleccionada.
-
-```{r}
-datos_distritos <- distritos_clustering %>%select(all_of(vars_clustering))
-
-head(datos_distritos)
-summary(datos_distritos)
-```
-Antes de calcular las distancias, se centran y escalan las variables. Este paso es necesario porque las variables están medidas en escalas diferentes. Si no se estandarizaran, las variables con valores numéricamente más grandes podrían tener más peso en la formación de los clusters.
-```{r}
-datos_distritos2 <- scale(
-  datos_distritos,
-  center = TRUE,
-  scale = TRUE
-)
-
-head(datos_distritos2)
-summary(datos_distritos2)
-```
-Tras el escalado, todas las variables quedan expresadas en una escala comparable, con media cero y desviación típica uno. Esto permite que todas contribuyan de forma equilibrada al cálculo de las distancias entre distritos.
-
-Finalmente, se guarda una base auxiliar con la información identificativa de cada distrito. Esta base no se utiliza para calcular los clusters, pero será necesaria más adelante para interpretar los grupos obtenidos y relacionar cada observación con su ciudad y distrito correspondiente.
-```{r}
-info_distritos <- distritos_clustering %>%
+info_distritos <- distritos %>%
   select(
     ciudad,
     cod_distrito,
-    nombre_distrito,
     nombre_distrito_norm)
-
-head(info_distritos)
 ```
 
+Aunque no haya faltantes, conviene crear igualmente estos objetos porque los usaremos en todo el análisis, además de realizar la comprobación de que no exista ningún valor faltante en las observaciones.
+```{r}
+filas_completas <- complete.cases(datos_clustering)
+
+datos_clustering_completo <- datos_clustering[filas_completas, ]
+
+info_distritos_completo <- info_distritos[filas_completas, ]
+
+dim(datos_clustering_completo)
+dim(info_distritos_completo)
+
+colSums(is.na(datos_clustering_completo))
+```
+
+Como el número de observaciones se mantiene, se comprueba que no se ha eliminado ningún distrito por valores faltantes. Además, de igual modo, vemos que ninguna de las variables cuenta con valores faltantes.
+
+Antes de calcular distancias, debemos estandarizar los datos, ya que tenemos variables en escalas distintas. Para ello, centramos y escalamos mediante la función `scale()`.
+```{r}
+datos_clustering_scaled <- scale(datos_clustering_completo)
+
+summary(datos_clustering_scaled)
+```
+
+Finalmente, se guarda la matriz estandarizada con el nombre *matriz_clustering*, que será el objeto utilizado en los siguientes apartados para calcular distancias y aplicar los distintos métodos de clustering.
+```{r}
+matriz_clustering <- datos_clustering_scaled
+```
 
 ## Elección de la medida de distancia y tendencia de agrupamiento
 
+Una vez preparada la matriz numérica estandarizada, se selecciona la medida de distancia que se utilizará para cuantificar la disimilitud entre distritos. Como las variables activas son numéricas y han sido previamente centradas y escaladas, se emplea la distancia euclídea.
 
+Esta medida resulta adecuada porque permite comparar los distritos en un espacio multidimensional donde todas las variables contribuyen en una escala común. Además, la distancia euclídea es una de las medidas más utilizadas en combinación con métodos como el clustering jerárquico con criterio de Ward y el algoritmo k-means.
+
+Antes de aplicar los métodos de agrupamiento, se analiza también la tendencia de agrupamiento de los datos mediante el estadístico Hopkins. El objetivo es comprobar si los distritos presentan cierta estructura interna o si, por el contrario, se distribuyen de forma aproximadamente aleatoria en el espacio definido por las variables seleccionadas.
+
+A continuación, realizamos el cálculo de la matriz de distancias euclídeas a partir de la matriz estandarizada. Esta matriz recoge la disimilitud entre cada par de distritos según las variables activas seleccionadas.
+```{r}
+dist_distritos <- dist(
+  matriz_clustering,
+  method = "euclidean")
+
+dist_distritos
+```
+
+Visualizamos dicha matriz de distancias. Con esta visualización podremos observar si existen bloques de distritos más similares entre sí. La presencia de zonas más homogéneas puede sugerir una cierta estructura agrupable en los datos.
+```{r}
+fviz_dist(
+  dist_distritos,
+  show_labels = FALSE)
+```
+La visualización de la matriz de distancias muestra diferencias apreciables entre distritos. Se observan varias líneas verticales y horizontales con colores más intensos, que corresponden a distritos que presentan mayor disimilitud respecto al resto de observaciones.
+
+Ahora calculamos la tendencia de agrupamiento con el estadístico de Hopkins, el cual permite evaluar si los datos presentan tendencia de agrupamiento. Valores cercanos a 0,5 indican una distribución aproximadamente aleatoria, mientras que valores más próximos a 1 sugieren una mayor tendencia a formar clústeres.
+```{r}
+set.seed(123)
+
+hopkins_distritos <- get_clust_tendency(
+  matriz_clustering,
+  n = nrow(matriz_clustering) - 1,
+  graph = TRUE)
+
+hopkins_distritos$hopkins_stat
+```
+El valor del estadístico de Hopkins obtenido es 0.6178. Este valor se encuentra por encima de 0.5, por lo que los datos no parecen distribuirse de forma completamente aleatoria en el espacio definido por las variables seleccionadas. Sin embargo, al no tratarse de un valor muy próximo a 1, la tendencia de agrupamiento no puede considerarse muy fuerte, sino más bien moderada. Por tanto, el resultado sugiere que puede existir cierta estructura interna en los datos, aunque esta no es especialmente marcada.
 
 
 ## Determinación del número de clústeres
 
+Una vez comprobada la existencia de tendencia de agrupamiento en los datos, se procede a determinar el número adecuado de clústeres. Para ello se utilizan varios criterios complementarios que se muestran a continuación, ya que no existe una única regla automática que garantice la mejor solución.
 
+En primer lugar, se utiliza el método de Silhouette, que permite evaluar la calidad de la asignación de las observaciones a los grupos; los valores más altos indican que los distritos están mejor agrupados dentro de su clúster y más separados de los demás. Simultáneamente, en segundo lugar, se aplica el método del codo mediante la suma de cuadrados intra-clúster, que analiza cómo disminuye la variabilidad interna de los grupos al aumentar el número de clústeres. El objetivo es identificar un punto a partir del cual añadir más grupos apenas mejora la compactación de la solución.
+```{r}
+## Función auxiliar para aplicar WSS con hcut
 
+hcut_wss <- function(x, k, ...) {
+  if (k == 1) {
+    list(cluster = rep(1, nrow(x)))}
+  else {
+    hcut(
+      x = x,
+      k = k,
+      hc_method = "ward.D2",
+      hc_metric = "euclidean")}}
+```
+
+```{r}
+p1 <- fviz_nbclust(
+  x = matriz_clustering,
+  FUNcluster = hcut,
+  method = "silhouette",
+  hc_method = "ward.D2",
+  k.max = 10,
+  verbose = FALSE,
+  diss = dist_distritos) +
+  labs(title = "Número de clústeres según Silhouette")
+
+p2 <- fviz_nbclust(
+  x = matriz_clustering,
+  FUNcluster = hcut_wss,
+  method = "wss",
+  hc_method = "ward.D2",
+  k.max = 10,
+  verbose = FALSE) +
+  labs(title = "Número de clústeres según WSS")
+
+grid.arrange(p1, p2, nrow = 1)
+```
+
+El gráfico de Silhouette alcanza su valor máximo para *k = 2*, aunque el valor para *k = 3* es muy similar. Esto indica que, según este criterio, ambas soluciones presentan una separación media comparable entre grupos. A partir de *k = 4*, la silueta disminuye de forma clara, por lo que soluciones con más clústeres parecen menos adecuadas.
+
+Por su parte, el método del codo muestra una disminución continua de la suma de cuadrados intra-clúster conforme aumenta el número de grupos. La reducción es especialmente marcada entre *k = 1* y *k = 3*, y posteriormente la curva desciende de forma más progresiva. Esto sugiere que una solución de 3 clústeres puede ser razonable desde el punto de vista de la compactación interna.
+
+En conjunto, los dos criterios apuntan a una solución sencilla de 2 o 3 clústeres. Aunque Silhouette favorece ligeramente la opción de *k = 2*, se selecciona finalmente *k = 3*, ya que permite obtener una clasificación más informativa e interpretable de los distritos sin generar un número excesivo de grupos.
+
+Finalmente, se utiliza la función NbClust, que compara distintos índices de validación interna para proponer un número adecuado de clústeres. Este criterio se interpreta de forma complementaria a los métodos de Silhouette y WSS, ya que permite contrastar si la solución sugerida por los gráficos anteriores se mantiene al considerar un conjunto más amplio de índices.
+```{r}
+set.seed(123)
+
+nb_distritos <- NbClust(
+  data = matriz_clustering,
+  distance = "euclidean",
+  min.nc = 2,
+  max.nc = 10,
+  method = "ward.D2",
+  index = "alllong")
+
+fviz_nbclust(nb_distritos) +
+  labs(title = "Número de clústeres según NbClust")
+```
+Los resultados de *NbClust* muestran que la opción más respaldada por los índices de validación interna es *k = 2*, con 10 índices a favor. Sin embargo, la solución de *k = 3* también recibe un apoyo importante, con 8 índices a favor, por lo que ambas alternativas pueden considerarse razonables desde el punto de vista estadístico.
+
+Este resultado se contrasta con los métodos anteriores. El gráfico de Silhouette alcanza su valor máximo en *k = 2*, aunque el valor para *k = 3* es muy similar, mientras que el método del codo muestra una reducción importante de la variabilidad intra-clúster hasta aproximadamente *k = 3*. Por tanto, aunque la solución de 2 clústeres es ligeramente más respaldada por algunos criterios, la opción de 3 clústeres permite obtener una clasificación más detallada de los distritos.
+
+Teniendo en cuenta el objetivo del análisis, se decide continuar con una solución de *k = 3*. 
+
+A continuación, representamos el dendrograma del clustering jerárquico utilizando la distancia euclídea y el método de Ward.D2. Este dendrograma permite observar visualmente cómo se van agrupando los distritos en función de su similitud.
+```{r}
+clustering_jerarquico <- hclust(
+  d = dist_distritos,
+  method = "ward.D2")
+
+fviz_dend(
+  clustering_jerarquico,
+  k = 3,
+  show_labels = TRUE,
+  rect = TRUE,
+  rect_fill = FALSE,
+  rect_border = "black",
+  main = "Dendrograma del clustering jerárquico",
+  xlab = "Distritos",
+  ylab = "Altura",
+  cex = 0.5,
+  lwd = 0.4)
+```
+
+El dendrograma muestra la estructura jerárquica obtenida mediante el método de Ward y la distancia euclídea. Al cortar el árbol en *k = 3* clústeres, se observa una división formada por dos grupos principales de distritos y un tercer clúster de tamaño muy reducido, compuesto por un distrito con un perfil diferenciado respecto al resto.
+
+Esta solución es coherente con la decisión de trabajar con *k = 3*, ya que permite captar más matices que una partición en dos grupos. Sin embargo, debe interpretarse con cautela, porque uno de los clústeres no representa un grupo amplio de distritos, sino un caso particular que se separa del resto por sus características en las variables analizadas.
+
+A diferencia del caso de los municipios, el número más reducido de distritos permite visualizar las etiquetas en el dendrograma, lo que facilita identificar directamente qué distritos quedan agrupados en cada rama. En este caso, el dendrograma sugiere una estructura donde la mayoría de distritos se distribuyen en dos grandes bloques, mientras que uno de ellos aparece como un perfil singular.
+
+A partir del corte del dendrograma en tres grupos, se asigna a cada distrito su clúster correspondiente. La siguiente tabla de frecuencias permite comprobar el tamaño de cada grupo y valorar si la partición obtenida está equilibrada o si uno de los clústeres concentra una mayor proporción de distritos.
+```{r}
+cluster_jerarquico <- cutree(
+  clustering_jerarquico,
+  k = 3)
+
+info_distritos_cluster <- info_distritos_completo %>%
+  mutate(cluster_jerarquico = as.factor(cluster_jerarquico))
+
+table(info_distritos_cluster$cluster_jerarquico)
+```
+
+La solución obtenida no reparte los distritos de forma totalmente equilibrada, ya que uno de los clústeres agrupa un mayor número de observaciones. Sin embargo, esta situación es habitual en datos territoriales, donde pueden existir muchos distritos con perfiles similares y un grupo más reducido con características más diferenciadas.
 
 ## Comparación de métodos de clustering
 
-<!-- Indicar claramente el método elegido y justificar la decisión. -->
+En este apartado se comparan distintos métodos de clustering aplicados sobre la misma matriz de datos previamente escalada. Como en la fase anterior se ha decidido continuar con una solución de tres clústeres, todos los métodos se aplican con *k = 3*. De esta forma, la comparación entre métodos es coherente y permite valorar si las agrupaciones obtenidas son similares o si dependen mucho del algoritmo utilizado.
 
+En primer lugar, se aplica clustering jerárquico con el método de Ward, ya que este método busca formar grupos internamente homogéneos minimizando la variabilidad dentro de los clústeres.
+
+```{r}
+clustering_jerarquico <- hclust(
+  d = dist_distritos,
+  method = "ward.D2"
+)
+
+fviz_dend(
+  clustering_jerarquico,
+  k = 3,
+  show_labels = TRUE,
+  rect = TRUE,
+  rect_fill = FALSE,
+  rect_border = "black",
+  main = "Dendrograma del clustering jerárquico",
+  xlab = "Distritos",
+  ylab = "Altura",
+  cex = 0.5,
+  lwd = 0.4
+)
+```
+
+El dendrograma permite visualizar cómo se van fusionando progresivamente los distritos hasta formar una estructura jerárquica. Al cortar el árbol en tres clústeres, se obtiene una partición formada por dos grupos principales y un clúster de tamaño más reducido. Esta solución permite captar más matices que una división en dos grupos, aunque debe interpretarse teniendo en cuenta que los clústeres pueden no estar equilibrados en tamaño.
+
+A continuación, se asigna a cada distrito el clúster correspondiente según el corte del dendrograma en tres grupos.
+
+```{r}
+cluster_jerarquico <- cutree(
+  clustering_jerarquico,
+  k = 3
+)
+
+distritos_cluster <- info_distritos_completo %>%
+  mutate(cluster_jerarquico = as.factor(cluster_jerarquico))
+
+table(distritos_cluster$cluster_jerarquico)
+```
+
+La tabla anterior muestra cuántos distritos quedan asignados a cada uno de los clústeres.
+
+Después se aplica el método de k-medias, también con tres clústeres, para comparar sus resultados con los obtenidos mediante clustering jerárquico.
+
+```{r}
+set.seed(123)
+
+clustering_kmeans <- kmeans(x = matriz_clustering,centers = 3,nstart = 25)
+
+distritos_cluster <- distritos_cluster %>%
+  mutate(cluster_kmeans = as.factor(clustering_kmeans$cluster))
+
+table(distritos_cluster$cluster_kmeans)
+```
+
+En tercer lugar, se aplica el método PAM (Partitioning Around Medoids), también conocido como k-medoides. Al igual que k-medias, es un método de partición, pero en lugar de representar cada clúster mediante un centroide promedio, utiliza observaciones reales como representantes de los grupos. Esto puede hacerlo más robusto frente a observaciones extremas.
+
+```{r}
+set.seed(123)
+
+clustering_pam <- pam(x = matriz_clustering, k = 3,metric = "euclidean")
+
+distritos_cluster <- distritos_cluster %>%
+  mutate(cluster_pam = as.factor(clustering_pam$clustering))
+
+table(distritos_cluster$cluster_pam)
+```
+
+El método PAM también divide los distritos en tres grupos, pero lo hace utilizando medoides, es decir, distritos reales que actúan como representantes de cada clúster. La tabla anterior permite comprobar si la solución obtenida con PAM reparte los distritos de forma similar a los métodos anteriores o si genera una partición diferente.
+
+Para comparar los tres métodos utilizados, se construyen tablas cruzadas entre la clasificación jerárquica, la clasificación de k-medias y la clasificación PAM. Todas las soluciones se han obtenido con tres clústeres, por lo que estas tablas permiten comprobar si los métodos asignan los distritos de forma similar o si la agrupación depende del algoritmo utilizado.
+```{r}
+# Comparación entre clustering jerárquico y k-medias
+tabla_jerarquico_kmeans <- table(
+  Jerarquico = distritos_cluster$cluster_jerarquico,
+  Kmeans = distritos_cluster$cluster_kmeans)
+
+tabla_jerarquico_kmeans
+
+# Comparación entre clustering jerárquico y PAM
+tabla_jerarquico_pam <- table(
+  Jerarquico = distritos_cluster$cluster_jerarquico,
+  PAM = distritos_cluster$cluster_pam)
+
+tabla_jerarquico_pam
+
+# Comparación entre k-medias y PAM
+tabla_kmeans_pam <- table(
+  Kmeans = distritos_cluster$cluster_kmeans,
+  PAM = distritos_cluster$cluster_pam)
+
+tabla_kmeans_pam
+```
+
+Las tablas cruzadas permiten comparar las asignaciones obtenidas por los distintos métodos. La comparación entre el método jerárquico y k-medias permite analizar si la solución principal se mantiene al utilizar un método de partición basado en centroides. Por su parte, la comparación con PAM permite evaluar si el uso de medoides en lugar de centroides modifica la agrupación de los distritos. En función del grado de coincidencia entre los tres métodos, se podrá valorar si la estructura detectada es robusta o si depende en mayor medida del algoritmo utilizado.
+
+También se puede visualizar la solución obtenida mediante k-medias sobre las dos primeras dimensiones principales.
+```{r}
+fviz_cluster(
+  clustering_kmeans,
+  data = matriz_clustering,
+  geom = "point",
+  ellipse.type = "convex",
+  main = "Clustering k-medias con k = 3")
+```
+
+De forma complementaria, se puede visualizar también la solución jerárquica.
+
+```{r}
+fviz_cluster(
+  list(
+    data = matriz_clustering,
+    cluster = distritos_cluster$cluster_jerarquico),
+  geom = "point",
+  ellipse.type = "convex",
+  main = "Clustering jerárquico con k = 3")
+```
+
+Por último, se visualiza también la solución obtenida mediante PAM.
+
+```{r}
+fviz_cluster(
+  clustering_pam,
+  data = matriz_clustering,
+  geom = "point",
+  ellipse.type = "convex",
+  main = "Clustering PAM con k = 3")
+```
+
+Tras aplicar los tres métodos, se mantiene el clustering jerárquico con método Ward.D2 y *k = 3* como solución principal. Esta decisión se justifica porque el método jerárquico es coherente con la distancia euclídea utilizada, permite representar el proceso de agrupamiento mediante un dendrograma y facilita la interpretación de la estructura obtenida. Además, el dendrograma muestra una partición clara en dos grupos principales y un tercer clúster de tamaño reducido, que recoge un distrito con un perfil especialmente diferenciado.La comparación con k-medias y PAM muestra que la estructura general de los datos no es completamente idéntica entre métodos. En el caso de k-medias, la representación gráfica muestra tres grupos relativamente diferenciados, aunque las tablas cruzadas indican que las asignaciones no coinciden exactamente con las del método jerárquico. Por su parte, PAM obtiene una solución más equilibrada en tamaño, pero con mayor solapamiento visual entre algunos grupos.Por tanto, la solución de *k = 3* se considera útil para captar una mayor heterogeneidad entre distritos, pero debe interpretarse con cautela. 
 
 ## Interpretación de los resultados del clustering
-
 
 ### Caracterización de los clústeres obtenidos
 
 
-### Relación de los clústeres con otras variables 
+### Relación de los clústeres con otras variables
