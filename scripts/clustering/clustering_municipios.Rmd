@@ -199,24 +199,7 @@ El gráfico de Silhouette alcanza su valor máximo para *k = 2*, lo que indica q
 
 Por su parte, el método del codo muestra una disminución continua de la suma de cuadrados intra-clúster conforme aumenta el número de grupos. La reducción es más marcada entre *k = 1* y *k = 4*, y posteriormente la curva empieza a suavizarse. Esto sugiere que una solución en torno a 3 o 4 clústeres podría ser razonable desde el punto de vista de la compactación interna.
 
-En conjunto, los dos criterios no señalan exactamente la misma solución: Silhouette favorece una división más simple en 2 clústeres, mientras que el método del codo permite considerar una estructura algo más detallada, especialmente con 3 o 4 grupos. Por ello, la elección final del número de clústeres deberá completarse con otros criterios y con la interpretación sustantiva de los grupos obtenidos.
-
-Finalmente, se utiliza la función NbClust, que compara distintos índices de validación interna para proponer un número adecuado de clústeres. Este criterio se interpreta de forma complementaria a los métodos de Silhouette y WSS, ya que permite contrastar si la solución sugerida por los gráficos anteriores se mantiene al considerar un conjunto más amplio de índices.
-```{r}
-set.seed(123)
-
-nb_municipios <- NbClust(
-  data = matriz_clustering,
-  distance = "euclidean",
-  min.nc = 2,
-  max.nc = 10,
-  method = "ward.D2",
-  index = "alllong")
-
-fviz_nbclust(nb_municipios) +
-  labs(title = "Número de clústeres según NbClust")
-```
-Los resultados de `NbClust` muestran que la opción más respaldada por los índices de validación interna es la solución de *k = 2* clústeres. Este resultado coincide con el método de Silhouette, que también alcanza su valor máximo para dos grupos. Aunque el método del codo permite valorar soluciones algo más detalladas, especialmente en torno a 3 o 4 clústeres, se decide continuar inicialmente con *k = 2*, al ser la alternativa con mayor apoyo estadístico y ofrecer una partición clara de los municipios en dos grandes perfiles diferenciados.
+En conjunto, los dos criterios no señalan exactamente la misma solución: Silhouette favorece una división más simple en 2 clústeres, mientras que el método del codo permite considerar una estructura algo más detallada, especialmente con 3 o 4 grupos. 
 
 A continuación, representamos el dendrograma del clustering jerárquico utilizando la distancia euclídea y el método de Ward.D2. Este dendrograma permite observar visualmente cómo se van agrupando los municipios en función de su similitud.
 ```{r}
@@ -226,7 +209,7 @@ clustering_jerarquico <- hclust(
 
 fviz_dend(
   clustering_jerarquico,
-  k = 2,
+  k = 10,
   show_labels = FALSE,
   rect = TRUE,
   rect_fill = FALSE,
@@ -245,7 +228,7 @@ A partir del corte del dendrograma en dos grupos, se asigna a cada municipio su 
 ```{r}
 cluster_jerarquico <- cutree(
   clustering_jerarquico,
-  k = 2)
+  k = 10)
 
 info_municipios_cluster <- info_municipios_completo %>%
   mutate(cluster_jerarquico = as.factor(cluster_jerarquico))
@@ -253,8 +236,6 @@ info_municipios_cluster <- info_municipios_completo %>%
 table(info_municipios_cluster$cluster_jerarquico)
 ```
 La solución obtenida no reparte los municipios de forma totalmente equilibrada, ya que uno de los clústeres agrupa un mayor número de observaciones. Sin embargo, esta situación es habitual en datos territoriales, donde pueden existir muchos municipios con perfiles similares y un grupo más reducido con características más diferenciadas.
-
-### CREO QUE VAMOS A TENER QUE REVISAR LO DE QUE NOS DE K=2 (SOLO 2 CLUSTERS EN LUGAR DE MÁS)
 
 ## Comparación de métodos de clustering
 
@@ -265,12 +246,11 @@ En primer lugar, se aplica clustering jerárquico con el método de Ward, ya que
 ```{r}
 clustering_jerarquico <- hclust(
   d = dist_municipios,
-  method = "ward.D2"
-)
+  method = "ward.D2")
 
 fviz_dend(
   clustering_jerarquico,
-  k = 2,
+  k = 10,
   show_labels = FALSE,
   rect = TRUE,
   rect_fill = FALSE,
@@ -279,8 +259,7 @@ fviz_dend(
   xlab = "Municipios",
   ylab = "Altura",
   cex = 0.3,
-  lwd = 0.4
-)
+  lwd = 0.4)
 ```
 
 El dendrograma permite visualizar cómo se van fusionando progresivamente los municipios hasta formar una estructura jerárquica. Al cortar el árbol en dos clústeres, se obtiene una primera partición de los municipios en dos grupos diferenciados.
@@ -290,8 +269,7 @@ A continuación, se asigna a cada municipio el clúster correspondiente según e
 ```{r}
 cluster_jerarquico <- cutree(
   clustering_jerarquico,
-  k = 2
-)
+  k = 10)
 
 municipios_cluster <- info_municipios_completo %>%
   mutate(cluster_jerarquico = as.factor(cluster_jerarquico))
@@ -308,9 +286,8 @@ set.seed(123)
 
 clustering_kmeans <- kmeans(
   x = matriz_clustering,
-  centers = 2,
-  nstart = 25
-)
+  centers = 10,
+  nstart = 25)
 
 municipios_cluster <- municipios_cluster %>%
   mutate(cluster_kmeans = as.factor(clustering_kmeans$cluster))
@@ -325,9 +302,8 @@ set.seed(123)
 
 clustering_pam <- pam(
   x = matriz_clustering,
-  k = 2,
-  metric = "euclidean"
-)
+  k = 10,
+  metric = "euclidean")
 
 # Asignación de clústeres PAM
 municipios_cluster <- municipios_cluster %>%
@@ -343,24 +319,21 @@ Para comparar los tres métodos utilizados, se construyen tablas cruzadas entre 
 # Comparación entre clustering jerárquico y k-medias
 tabla_jerarquico_kmeans <- table(
   Jerarquico = municipios_cluster$cluster_jerarquico,
-  Kmeans = municipios_cluster$cluster_kmeans
-)
+  Kmeans = municipios_cluster$cluster_kmeans)
 
 tabla_jerarquico_kmeans
 
 # Comparación entre clustering jerárquico y PAM
 tabla_jerarquico_pam <- table(
   Jerarquico = municipios_cluster$cluster_jerarquico,
-  PAM = municipios_cluster$cluster_pam
-)
+  PAM = municipios_cluster$cluster_pam)
 
 tabla_jerarquico_pam
 
 # Comparación entre k-medias y PAM
 tabla_kmeans_pam <- table(
   Kmeans = municipios_cluster$cluster_kmeans,
-  PAM = municipios_cluster$cluster_pam
-)
+  PAM = municipios_cluster$cluster_pam)
 
 tabla_kmeans_pam
 ```
@@ -374,8 +347,7 @@ fviz_cluster(
   data = matriz_clustering,
   geom = "point",
   ellipse.type = "convex",
-  main = "Clustering k-medias con k = 2"
-)
+  main = "Clustering k-medias con k = 10")
 ```
 
 De forma complementaria, se puede visualizar también la solución jerárquica.
@@ -384,12 +356,10 @@ De forma complementaria, se puede visualizar también la solución jerárquica.
 fviz_cluster(
   list(
     data = matriz_clustering,
-    cluster = municipios_cluster$cluster_jerarquico
-  ),
+    cluster = municipios_cluster$cluster_jerarquico),
   geom = "point",
   ellipse.type = "convex",
-  main = "Clustering jerárquico con k = 2"
-)
+  main = "Clustering jerárquico con k = 10")
 ```
 Por último, se visualiza también la solución obtenida mediante PAM.
 
@@ -399,12 +369,38 @@ fviz_cluster(
   data = matriz_clustering,
   geom = "point",
   ellipse.type = "convex",
-  main = "Clustering PAM con k = 2"
-)
+  main = "Clustering PAM con k = 10")
 ```
 
 
 Tras aplicar los tres métodos, se mantiene inicialmente el clustering jerárquico con método Ward.D2 y dos clústeres como solución principal, ya que es coherente con la distancia euclídea utilizada, permite representar el proceso mediante un dendrograma y busca formar grupos compactos y homogéneos. No obstante, la comparación con k-medias y PAM permite comprobar si la estructura detectada es estable o si depende del método de agrupamiento utilizado.
+
+```{r}
+colores <- biostatcolors::getbiostatColors()[1:2]
+
+par(mfrow = c(1, 2))
+
+plot(
+  sil_jerarquico,
+  col = colores,
+  border = NA,
+  main = "WARD")
+
+plot(
+  sil_kmeans,
+  col = colores,
+  border = NA,
+  main = "K-MEDIAS")
+
+plot(
+  sil_pam,
+  col = colores,
+  border = NA,
+  main = "K-MEDOIDES")
+
+par(mfrow = c(1, 1))
+```
+
 
 ## Interpretación de los resultados
 
@@ -422,13 +418,11 @@ vars_clustering <- c(
   "ratio_hospital",
   "distancia_hospital",
   "esfuerzo_alquiler",
-  "pct_hogares_100mbps"
-)
+  "pct_hogares_100mbps")
 
 datos_interpretacion <- bind_cols(
   municipios_cluster,
-  datos_clustering_completo
-)
+  datos_clustering_completo)
 
 # Clúster principal seleccionado
 misclust <- municipios_cluster$cluster_jerarquico
@@ -437,8 +431,7 @@ misclust <- municipios_cluster$cluster_jerarquico
 library(PLSandO)
 miPCA <- pca(
   matriz_clustering,
-  scaling = "none"
-)
+  scaling = "none")
 
 # Gráfico de varianza explicada
 pcaPlot(miPCA, type = "scree")
@@ -452,8 +445,7 @@ K <- 4
 knitr::kable(
   miPCA$explVar[1:K, ],
   digits = 2,
-  caption = "Varianza explicada por las primeras componentes principales"
-)
+  caption = "Varianza explicada por las primeras componentes principales")
 ```
 
 En principio, se revisa cuánta variabilidad explican las primeras componentes principales. Para la interpretación gráfica se seleccionan cuatro componentes, de forma que se pueda visualizar la PC1 frente a la PC2 y la PC3 frente a la PC4, sin repetir componentes.
@@ -465,8 +457,7 @@ p1 <- pcaPlot(
   comp = 1:2,
   colBy = data.frame("cluster" = misclust),
   labels = FALSE,
-  repel = TRUE
-)
+  repel = TRUE)
 
 p2 <- pcaPlot(
   miPCA,
@@ -474,8 +465,7 @@ p2 <- pcaPlot(
   comp = 3:4,
   colBy = data.frame("cluster" = misclust),
   labels = FALSE,
-  repel = TRUE
-)
+  repel = TRUE)
 
 p3 <- pcaPlot(
   miPCA,
@@ -484,8 +474,7 @@ p3 <- pcaPlot(
   colBy = "contrib",
   labels = TRUE,
   repel = TRUE,
-  col = "hot"
-)
+  col = "hot")
 
 p4 <- pcaPlot(
   miPCA,
@@ -494,8 +483,7 @@ p4 <- pcaPlot(
   colBy = "contrib",
   labels = TRUE,
   repel = TRUE,
-  col = "hot"
-)
+  col = "hot")
 
 p1
 p2
@@ -513,10 +501,8 @@ mediasCluster <- datos_interpretacion %>%
   summarise(
     across(
       all_of(vars_clustering),
-      ~ mean(.x, na.rm = TRUE)
-    ),
-    .groups = "drop"
-  )
+      ~ mean(.x, na.rm = TRUE)),
+    .groups = "drop")
 
 mediasCluster_matriz <- as.data.frame(mediasCluster)
 rownames(mediasCluster_matriz) <- paste0("c", mediasCluster_matriz$cluster_jerarquico)
@@ -524,8 +510,7 @@ mediasCluster_matriz <- mediasCluster_matriz[, -1]
 
 knitr::kable(
   t(round(mediasCluster_matriz, 2)),
-  caption = "Perfil medio de los clústeres"
-)
+  caption = "Perfil medio de los clústeres")
 ```
 
 También se representa gráficamente el perfil medio de los clústeres para observar de forma visual qué variables diferencian más a cada grupo.
@@ -539,23 +524,20 @@ matplot(
   lwd = 2,
   lty = 1,
   main = "Perfil medio de los clústeres",
-  xaxt = "n"
-)
+  xaxt = "n")
 
 axis(
   side = 1,
   at = 1:ncol(mediasCluster_matriz),
   labels = colnames(mediasCluster_matriz),
-  las = 2
-)
+  las = 2)
 
 legend(
   "topleft",
   legend = rownames(mediasCluster_matriz),
   lwd = 2,
   lty = 1,
-  bty = "n"
-)
+  bty = "n")
 ```
 El análisis del perfil medio de los clústeres permite caracterizar de forma más precisa cada grupo de municipios.
 El clúster 1 presenta valores más elevados en el índice de envejecimiento y en las distancias a servicios como hospitales y centros educativos. Esto sugiere que agrupa municipios más envejecidos y con menor accesibilidad a infraestructuras básicas.
@@ -569,8 +551,7 @@ Además de interpretar los clústeres a partir de las variables activas utilizad
 ```{r}
 table(
   Cluster = municipios_cluster$cluster_jerarquico,
-  Naturaleza = municipios_cluster$naturaleza_contratos
-)
+  Naturaleza = municipios_cluster$naturaleza_contratos)
 ```
 
 Para interpretar mejor esta relación, se calculan también los porcentajes por clúster.
@@ -579,10 +560,8 @@ Para interpretar mejor esta relación, se calculan también los porcentajes por 
 tabla_naturaleza_pct <- prop.table(
   table(
     Cluster = municipios_cluster$cluster_jerarquico,
-    Naturaleza = municipios_cluster$naturaleza_contratos
-  ),
-  margin = 1
-) * 100
+    Naturaleza = municipios_cluster$naturaleza_contratos),
+  margin = 1) * 100
 
 round(tabla_naturaleza_pct, 2)
 ```
@@ -596,8 +575,7 @@ pca_plot_datos <- as.data.frame(prcomp(matriz_clustering)$x[, 1:2])
 pca_plot_datos <- pca_plot_datos %>%
   mutate(
     cluster_jerarquico = municipios_cluster$cluster_jerarquico,
-    naturaleza_contratos = municipios_cluster$naturaleza_contratos
-  )
+    naturaleza_contratos = municipios_cluster$naturaleza_contratos)
 
 ggplot(
   pca_plot_datos,
@@ -605,17 +583,14 @@ ggplot(
     x = PC1,
     y = PC2,
     color = naturaleza_contratos,
-    shape = cluster_jerarquico
-  )
-) +
+    shape = cluster_jerarquico)) +
   geom_point(size = 2, alpha = 0.8) +
   labs(
     title = "**Municipios coloreados según naturaleza de los contratos**",
     x = "PC1",
     y = "PC2",
     color = "Naturaleza contratos",
-    shape = "Clúster jerárquico"
-  ) +
+    shape = "Clúster jerárquico") +
   theme_minimal()
 ```
 La representación gráfica de los clústeres coloreados según la variable naturaleza_contratos no muestra una separación clara entre categorías. Se observa una elevada superposición entre los distintos tipos de municipios, lo que sugiere que la naturaleza de los contratos no es un factor determinante en la formación de los clústeres. Por tanto, esta variable no parece aportar una diferenciación relevante en la interpretación de los grupos obtenidos y no se tendrá en cuenta como elemento explicativo principal.
@@ -629,21 +604,3 @@ Se compararon distintos métodos, concretamente clustering jerárquico con méto
 La interpretación mediante PCA y perfiles medios muestra que las variables que más diferencian los clústeres son el indice_envejecimiento, la distancia_hospital y la distancia_centro_educativo. El clúster 1 agrupa municipios más envejecidos y con menor accesibilidad a servicios, mientras que el clúster 2 recoge municipios menos envejecidos, mejor conectados y con mejores indicadores socioeducativos y de accesibilidad.
 
 Por último, la variable naturaleza_contratos se utiliza como apoyo externo para completar la interpretación, permitiendo relacionar los grupos obtenidos con la composición sectorial de la contratación municipal.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
