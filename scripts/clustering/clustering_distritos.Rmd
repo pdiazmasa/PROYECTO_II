@@ -383,7 +383,61 @@ fviz_cluster(
   main = "Clustering PAM con k = 3")
 ```
 
-Tras aplicar los tres métodos, se mantiene el clustering jerárquico con método Ward.D2 y *k = 3* como solución principal. Esta decisión se justifica porque el método jerárquico es coherente con la distancia euclídea utilizada, permite representar el proceso de agrupamiento mediante un dendrograma y facilita la interpretación de la estructura obtenida. Además, el dendrograma muestra una partición clara en dos grupos principales y un tercer clúster de tamaño reducido, que recoge un distrito con un perfil especialmente diferenciado.La comparación con k-medias y PAM muestra que la estructura general de los datos no es completamente idéntica entre métodos. En el caso de k-medias, la representación gráfica muestra tres grupos relativamente diferenciados, aunque las tablas cruzadas indican que las asignaciones no coinciden exactamente con las del método jerárquico. Por su parte, PAM obtiene una solución más equilibrada en tamaño, pero con mayor solapamiento visual entre algunos grupos.Por tanto, la solución de *k = 3* se considera útil para captar una mayor heterogeneidad entre distritos, pero debe interpretarse con cautela. 
+```{r}
+sil_jerarquico <- silhouette(
+  cluster_jerarquico,
+  dist_distritos)
+
+sil_kmeans <- silhouette(
+  clustering_kmeans$cluster,
+  dist_distritos)
+
+sil_pam <- silhouette(
+  clustering_pam$clustering,
+  dist_distritos)
+
+comparacion_silhouette <- tibble(
+  Metodo = c("Jerárquico Ward.D2", "K-medias", "PAM"),
+  Silhouette_media = c(
+    summary(sil_jerarquico)$avg.width,
+    summary(sil_kmeans)$avg.width,
+    summary(sil_pam)$avg.width))
+
+knitr::kable(
+  comparacion_silhouette,
+  digits = 3,
+  caption = "Comparación de la silueta media entre métodos")
+```
+Representamos:
+```{r}
+colores <- biostatcolors::getbiostatColors()[1:3]
+
+par(mfrow = c(1, 3))
+
+plot(
+  sil_jerarquico,
+  col = colores,
+  border = NA,
+  main = "WARD")
+
+plot(
+  sil_kmeans,
+  col = colores,
+  border = NA,
+  main = "K-MEDIAS")
+
+plot(
+  sil_pam,
+  col = colores,
+  border = NA,
+  main = "K-MEDOIDES")
+
+par(mfrow = c(1, 1))
+```
+
+La comparación mediante silhouette muestra que el clustering jerárquico Ward.D2 obtiene la mayor silueta media, con un valor de 0.31, seguido de k-medias con 0.28 y PAM con 0.16. Esto indica que, entre los tres métodos comparados, Ward.D2 ofrece la partición más consistente para *k = 3*, aunque la separación entre grupos es moderada. Además, PAM presenta un clúster con silueta media negativa, lo que sugiere una peor asignación de algunas observaciones.
+
+Por tanto, se mantiene el clustering jerárquico con método Ward.D2 y *k = 3* como solución principal. Esta elección es coherente con la distancia euclídea utilizada, permite representar la estructura mediante el dendrograma y obtiene el mejor resultado de silhouette entre los métodos comparados. No obstante, la solución debe interpretarse con cautela, ya que uno de los clústeres está formado por un único distrito y la separación global entre grupos no es muy elevada.
 
 ## Interpretación de los resultados del clustering
 
