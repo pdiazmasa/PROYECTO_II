@@ -209,25 +209,6 @@ Por su parte, el método del codo muestra una disminución continua de la suma d
 
 En conjunto, los dos criterios apuntan a una solución sencilla de 2 o 3 clústeres. Aunque Silhouette favorece ligeramente la opción de *k = 2*, se selecciona finalmente *k = 3*, ya que permite obtener una clasificación más informativa e interpretable de los distritos sin generar un número excesivo de grupos.
 
-Finalmente, se utiliza la función NbClust, que compara distintos índices de validación interna para proponer un número adecuado de clústeres. Este criterio se interpreta de forma complementaria a los métodos de Silhouette y WSS, ya que permite contrastar si la solución sugerida por los gráficos anteriores se mantiene al considerar un conjunto más amplio de índices.
-```{r}
-set.seed(123)
-
-nb_distritos <- NbClust(
-  data = matriz_clustering,
-  distance = "euclidean",
-  min.nc = 2,
-  max.nc = 10,
-  method = "ward.D2",
-  index = "alllong")
-
-fviz_nbclust(nb_distritos) +
-  labs(title = "Número de clústeres según NbClust")
-```
-Los resultados de *NbClust* muestran que la opción más respaldada por los índices de validación interna es *k = 2*, con 10 índices a favor. Sin embargo, la solución de *k = 3* también recibe un apoyo importante, con 8 índices a favor, por lo que ambas alternativas pueden considerarse razonables desde el punto de vista estadístico.
-
-Este resultado se contrasta con los métodos anteriores. El gráfico de Silhouette alcanza su valor máximo en *k = 2*, aunque el valor para *k = 3* es muy similar, mientras que el método del codo muestra una reducción importante de la variabilidad intra-clúster hasta aproximadamente *k = 3*. Por tanto, aunque la solución de 2 clústeres es ligeramente más respaldada por algunos criterios, la opción de 3 clústeres permite obtener una clasificación más detallada de los distritos.
-
 Teniendo en cuenta el objetivo del análisis, se decide continuar con una solución de *k = 3*. 
 
 A continuación, representamos el dendrograma del clustering jerárquico utilizando la distancia euclídea y el método de Ward.D2. Este dendrograma permite observar visualmente cómo se van agrupando los distritos en función de su similitud.
