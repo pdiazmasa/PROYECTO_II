@@ -21,6 +21,8 @@ library(cluster)
 library(factoextra)
 library(NbClust)
 library(gridExtra)
+library(PLSandO)
+library(plotly)
 ```
 
 Cargamos el dataset final de municipios de Valencia.
@@ -141,6 +143,7 @@ hopkins_municipios <- get_clust_tendency(
 
 hopkins_municipios$hopkins_stat
 ```
+Como el estadístico de Hopkins presenta un valor de 0,8322813, y este es próximo a 1, nos indica una tendencia de agrupamiento clara, ya que los datos no parecen distribuirse de forma aleatoria en el espacio definido por las variables seleccionadas. Por tanto, con ello se justifica continuar con el análisis de clustering, aplicando distintos métodos para identificar grupos de municipios con características similares.
 
 ## Determinación del número de clústeres
 
@@ -183,12 +186,15 @@ p2 <- fviz_nbclust(
 
 grid.arrange(p1, p2, nrow = 1)
 ```
+El gráfico de Silhouette alcanza su valor máximo para k = 3, aunque los valores se mantienen estables y próximos entre k = 4 y k = 10 (en torno a 0,15–0,18), sin degradarse de forma apreciable.
+Por su parte, el método del codo muestra una disminución continua de la suma de cuadrados intra-clúster, sin que se aprecie un punto de inflexión claro, con una suavización progresiva a partir de k = 5.
+Dado que el objetivo del análisis es obtener una clasificación suficientemente granular de los municipios de Valencia que permita identificar perfiles diferenciados, y teniendo en cuenta que los 210 municipios permiten sostener grupos de tamaño razonable (aproximadamente 35 por grupo), se opta por una solución de k = 6 clústeres. Esta elección prioriza el criterio sustantivo frente al estadístico.
 
 ## Comparación de métodos de clustering
 
-En este apartado se comparan distintos métodos de clustering aplicados sobre la misma matriz de datos previamente escalada. Como en la fase anterior se ha seleccionado inicialmente una solución de diez clústeres, todos los métodos se aplican con `k = 10`. De esta forma, la comparación entre métodos es coherente y permite valorar si las agrupaciones obtenidas son similares o si dependen mucho del algoritmo utilizado.
+En este apartado se comparan distintos métodos de clustering aplicados sobre la misma matriz de datos previamente escalada. Como en la fase anterior se ha seleccionado una solución de seis clústeres, todos los métodos se aplican con `k = 6`. De esta forma, la comparación entre métodos es coherente y permite valorar si las agrupaciones obtenidas son similares o si dependen mucho del algoritmo utilizado.
 
-En primer lugar, se aplica clustering jerárquico con el método de Ward, ya que este método busca formar grupos internamente homogéneos minimizando la variabilidad dentro de los clústeres.
+En primer lugar, se aplica clustering jerárquico con el método de Ward, ya que este método busca formar grupos homogéneos minimizando la variabilidad dentro de los clústeres.
 
 ```{r}
 clustering_jerarquico <- hclust(
@@ -197,7 +203,7 @@ clustering_jerarquico <- hclust(
 
 fviz_dend(
   clustering_jerarquico,
-  k = 10,
+  k = 6,
   show_labels = FALSE,
   rect = TRUE,
   rect_fill = FALSE,
@@ -208,19 +214,21 @@ fviz_dend(
   cex = 0.3,
   lwd = 0.4)
 ```
+El dendrograma muestra la estructura jerárquica obtenida mediante el método de Ward y la distancia euclídea. Al cortar el árbol en k = 6 clústeres, se obtiene una partición de los municipios en seis grupos diferenciados. La altura de fusión entre los dos grandes bloques principales es elevada, lo que indica que existen diferencias sustanciales entre ellos. Esta solución es coherente con el objetivo de clasificación del análisis.
 
-A partir del corte del dendrograma en diez grupos, se asigna a cada municipio su clúster correspondiente. La siguiente tabla de frecuencias permite comprobar el tamaño de cada grupo y valorar si la partición obtenida está equilibrada o si uno de los clústeres concentra una mayor proporción de municipios.
+A partir del corte del dendrograma en seis grupos, se asigna a cada municipio su clúster correspondiente. La siguiente tabla de frecuencias permite comprobar el tamaño de cada grupo y valorar si la partición obtenida está equilibrada o si uno de los clústeres concentra una mayor proporción de municipios.
 
 ```{r}
 cluster_jerarquico <- cutree(
   clustering_jerarquico,
-  k = 10)
+  k = 6)
 
 municipios_cluster <- info_municipios_completo %>%
   mutate(cluster_jerarquico = as.factor(cluster_jerarquico))
 
 table(municipios_cluster$cluster_jerarquico)
 ```
+La solución obtenida no reparte los municipios de forma totalmente equilibrada, ya que el método jerárquico tiende a generar algunos grupos de tamaño muy reducido cuando existen observaciones con perfiles muy atípicos. Esta situación es habitual en datos territoriales, donde pueden existir municipios con características muy singulares que forman grupos propios.
 
 Después se aplica el método de k-medias para comparar sus resultados con los obtenidos mediante clustering jerárquico.
 
@@ -229,7 +237,7 @@ set.seed(123)
 
 clustering_kmeans <- kmeans(
   x = matriz_clustering,
-  centers = 10,
+  centers = 6,
   nstart = 25)
 
 municipios_cluster <- municipios_cluster %>%
@@ -245,7 +253,7 @@ set.seed(123)
 
 clustering_pam <- pam(
   x = matriz_clustering,
-  k = 10,
+  k = 6,
   metric = "euclidean")
 
 # Asignación de clústeres PAM
@@ -255,6 +263,7 @@ municipios_cluster <- municipios_cluster %>%
 # Tamaño de cada clúster en PAM
 table(municipios_cluster$cluster_pam)
 ```
+El método PAM también divide los municipios en seis grupos, pero lo hace utilizando medoides, es decir, municipios reales que actúan como representantes de cada clúster. La tabla anterior permite comprobar si la solución obtenida con PAM reparte los municipios de forma similar a los métodos anteriores o si genera una partición diferente.
 
 Para comparar los tres métodos utilizados, se construyen tablas cruzadas entre la clasificación jerárquica, la clasificación de k-medias y la clasificación PAM.
 ```{r}
@@ -279,6 +288,9 @@ tabla_kmeans_pam <- table(
 
 tabla_kmeans_pam
 ```
+Las tablas cruzadas permiten comparar las asignaciones obtenidas por los distintos métodos. En la comparación entre jerárquico y k-medias se aprecian correspondencias parciales entre algunos grupos, aunque la distribución de municipios entre clústeres difiere de forma notable, lo que es esperable dado que ambos métodos siguen estrategias de optimización distintas. La comparación con PAM muestra un grado de acuerdo moderado. En conjunto, la correspondencia entre métodos no es total, lo que indica que la elección del algoritmo tiene un impacto real en la clasificación de los municipios con perfiles más intermedios o próximos a las fronteras entre grupos.
+
+También se puede visualizar la solución obtenida mediante k-medias sobre las dos primeras dimensiones principales.
 
 ```{r}
 fviz_cluster(
@@ -286,8 +298,11 @@ fviz_cluster(
   data = matriz_clustering,
   geom = "point",
   ellipse.type = "convex",
-  main = "Clustering k-medias con k = 10 - Municipios Valencia")
+  main = "Clustering k-medias con k = 6 - Municipios Valencia")
 ```
+La visualización de k-medias muestra una separación razonablemente clara entre los seis grupos en el espacio de las dos primeras componentes principales, con grupos compactos y bien delimitados, aunque con cierta superposición en la zona central del gráfico.
+
+De forma complementaria, se puede visualizar también la solución jerárquica.
 
 ```{r}
 fviz_cluster(
@@ -296,8 +311,11 @@ fviz_cluster(
     cluster = municipios_cluster$cluster_jerarquico),
   geom = "point",
   ellipse.type = "convex",
-  main = "Clustering jerárquico con k = 10 - Municipios Valencia")
+  main = "Clustering jerárquico con k = 6 - Municipios Valencia")
 ```
+La solución jerárquica presenta una estructura similar en las dimensiones principales, aunque se aprecian diferencias en la asignación de municipios en las zonas de mayor solapamiento. Destaca la presencia de grupos de tamaño muy reducido, que corresponden a municipios con perfiles muy singulares.
+
+Por último, se visualiza también la solución obtenida mediante PAM.
 
 ```{r}
 fviz_cluster(
@@ -305,8 +323,9 @@ fviz_cluster(
   data = matriz_clustering,
   geom = "point",
   ellipse.type = "convex",
-  main = "Clustering PAM con k = 10 - Municipios Valencia")
+  main = "Clustering PAM con k = 6 - Municipios Valencia")
 ```
+La solución PAM muestra una distribución de los municipios más compacta en algunos grupos respecto al método jerárquico, aunque también presenta mayor solapamiento entre clústeres adyacentes en el espacio bidimensional.
 
 ```{r}
 # Calcular objetos silhouette para cada método
@@ -323,7 +342,7 @@ sil_pam <- silhouette(
   dist_municipios)
 
 # Gráfico de silueta para los tres métodos
-colores <- biostatcolors::getbiostatColors()[1:10]
+colores <- biostatcolors::getbiostatColors()[1:6]
 
 par(mfrow = c(1, 3))
 
@@ -347,6 +366,7 @@ plot(
 
 par(mfrow = c(1, 1))
 ```
+Tras aplicar los tres métodos con k = 6, se opta por k-medias como solución principal, ya que obtiene la anchura de silueta media más alta (0,18), frente a WARD y K-MEDOIDES, ambos con 0,16. Si bien WARD presenta el clúster 1 con valor negativo (-0,02) y un clúster 5 de apenas 2 municipios, lo que refleja la tendencia del método jerárquico a generar grupos muy pequeños con observaciones atípicas, k-medias también presenta el clúster 5 en negativo (-0,01) y el clúster 6 con un valor muy bajo (0,04). K-MEDOIDES registra el clúster 1 prácticamente en cero (-0,004) y los clústeres 5 y 6 con valores bajos. En este contexto, k-medias ofrece la distribución más equilibrada de municipios entre grupos (ningún grupo con menos de 5 observaciones) y la mejor calidad global de agrupamiento, por lo que se selecciona como método principal para la interpretación.
 
 ## Interpretación de los resultados
 
@@ -370,11 +390,10 @@ datos_interpretacion <- bind_cols(
   municipios_cluster,
   datos_clustering_completo)
 
-# Clúster principal seleccionado
-misclust <- municipios_cluster$cluster_jerarquico
+# Clúster principal seleccionado (k-medias)
+misclust <- municipios_cluster$cluster_kmeans
 
 # PCA sobre la matriz utilizada en el clustering
-library(PLSandO)
 miPCA <- pca(
   matriz_clustering,
   scaling = "none")
@@ -436,12 +455,13 @@ p2
 p3
 p4
 ```
+A partir de los gráficos de puntuaciones, se observa que en el plano PC1-PC2 los clústeres 1, 4 y 6 quedan claramente separados del resto, mientras que los clústeres 2, 3 y 5 se concentran en la zona central con mayor solapamiento. En el plano PC3-PC4, el clúster 1 se separa notablemente en el eje vertical, lo que indica que tiene un perfil diferencial también en las componentes de menor peso.
 
-Para complementar la interpretación mediante PCA, se calcula el perfil medio de cada clúster a partir de las variables activas utilizadas en el análisis.
+Los gráficos de correlaciones muestran que en PC1-PC2 las variables más discriminantes son consultorio_local y ratio_centros_salud en el eje vertical, y distancia_hospital, distancia_centro_educativo e indice_envejecimiento en el horizontal. En PC3-PC4 destacan ratio_colegios y ratio_hospital como las de mayor contribución. En conjunto, la accesibilidad a servicios y el envejecimiento son las dimensiones que más estructuran la variabilidad entre municipios.
 
 ```{r}
 mediasCluster <- datos_interpretacion %>%
-  group_by(cluster_jerarquico) %>%
+  group_by(cluster_kmeans) %>%
   summarise(
     across(
       all_of(vars_clustering),
@@ -449,13 +469,14 @@ mediasCluster <- datos_interpretacion %>%
     .groups = "drop")
 
 mediasCluster_matriz <- as.data.frame(mediasCluster)
-rownames(mediasCluster_matriz) <- paste0("c", mediasCluster_matriz$cluster_jerarquico)
+rownames(mediasCluster_matriz) <- paste0("c", mediasCluster_matriz$cluster_kmeans)
 mediasCluster_matriz <- mediasCluster_matriz[, -1]
 
 knitr::kable(
   t(round(mediasCluster_matriz, 2)),
   caption = "Perfil medio de los clústeres - Municipios Valencia")
 ```
+
 También se representa gráficamente el perfil medio de los clústeres para observar de forma visual qué variables diferencian más a cada grupo.
 
 ```{r}
@@ -496,13 +517,15 @@ legend(
   cex = 0.8)
 ```
 
+El análisis de clustering de los municipios de la provincia de Valencia ha permitido identificar seis perfiles diferenciados a partir de variables demográficas, socioeconómicas, educativas, sanitarias, digitales y de accesibilidad. Tras comprobar una tendencia de agrupamiento clara (Hopkins = 0,832), se optó por k = 6 clústeres, apoyándose en la estabilidad de la curva de Silhouette y la suavización del codo a partir de k = 5. De los tres métodos comparados, k-medias se selecciona como solución principal al obtener la mayor silueta media (0,18) y la distribución más equilibrada entre grupos. El PCA muestra que las variables más discriminantes son la distancia al hospital, la distancia al centro educativo y el índice de envejecimiento. Por último, la variable naturaleza_contratos no determina la formación de los clústeres, aunque revela patrones complementarios relevantes como la orientación a servicios del clúster 1 (60%) o el carácter industrial del clúster 3 (33,33%).
+
 ## Relación de los clústeres con la naturaleza de los contratos
 
 Además de interpretar los clústeres a partir de las variables activas utilizadas en el análisis, se incorpora la variable *naturaleza_contratos* como variable externa de apoyo. Esta variable no se ha utilizado para construir los clústeres, sino que se emplea posteriormente para analizar si los grupos obtenidos presentan diferencias en la composición sectorial de la contratación.
 
 ```{r}
 table(
-  Cluster = municipios_cluster$cluster_jerarquico,
+  Cluster = municipios_cluster$cluster_kmeans,
   Naturaleza = municipios_cluster$naturaleza_contratos)
 ```
 
@@ -511,46 +534,128 @@ Para interpretar mejor esta relación, se calculan también los porcentajes por 
 ```{r}
 tabla_naturaleza_pct <- prop.table(
   table(
-    Cluster = municipios_cluster$cluster_jerarquico,
-    Naturaleza = municipios_cluster$naturaleza_contratos),
-  margin = 1) * 100
+    Cluster = municipios_cluster$cluster_kmeans,
+    Naturaleza = municipios_cluster$naturaleza_contratos),margin = 1) * 100
 
 round(tabla_naturaleza_pct, 2)
 ```
 
-Finalmente, se representa gráficamente la solución jerárquica coloreando los municipios según la variable *naturaleza_contratos*. De esta forma, se puede observar si la estructura de los clústeres se relaciona visualmente con la naturaleza predominante de los contratos.
+Finalmente, se representa gráficamente la solución de k-medias coloreando los municipios según la variable *naturaleza_contratos*. De esta forma, se puede observar si la estructura de los clústeres se relaciona visualmente con la naturaleza predominante de los contratos.
 
 ```{r}
-
 pca_plot_datos <- as.data.frame(prcomp(matriz_clustering)$x[, 1:2])
 
 pca_plot_datos <- pca_plot_datos %>%
   mutate(
-    cluster_jerarquico = municipios_cluster$cluster_jerarquico,
-    naturaleza_contratos = municipios_cluster$naturaleza_contratos)
+    cluster_kmeans       = municipios_cluster$cluster_kmeans,
+    naturaleza_contratos = municipios_cluster$naturaleza_contratos,
+    nombre_municipio     = info_municipios_completo$nombre_municipio)
 
-ggplot(
-  pca_plot_datos,
-  aes(
-    x = PC1,
-    y = PC2,
-    color = naturaleza_contratos,
-    shape = cluster_jerarquico)) +
-  geom_point(size = 2, alpha = 0.8) +
-  scale_shape_manual(values = 1:10) +
-  labs(
-    title = "Municipios Valencia coloreados según naturaleza de los contratos",
-    x = "PC1",
-    y = "PC2",
-    color = "Naturaleza contratos",
-    shape = "Clúster jerárquico") +
-  theme_minimal()
+colores_clusters <- c(
+  "1" = "#E41A1C", "2" = "#377EB8", "3" = "#4DAF4A",
+  "4" = "#FF7F00", "5" = "#984EA3", "6" = "#A65628")
+
+simbolos_contratos <- c("circle", "square", "diamond",
+                        "triangle-up", "cross", "x", "triangle-down", "star")
+
+# Tabla de porcentajes hardcodeada con los valores reales
+pct_tabla <- data.frame(
+  cluster = rep(1:6, each = 8),
+  naturaleza = rep(c(
+    "Agrícola", "Agro-construcción", "Construcción",
+    "Construcción-servicios", "Industrial",
+    "Mixto / sin especialización clara",
+    "Mixto especializado", "Servicios"), 6),
+  pct = c(
+    # Clúster 1
+    20.00, 0.00, 0.00, 0.00, 0.00, 20.00, 0.00, 60.00,
+    # Clúster 2
+    22.22, 13.89, 12.50, 0.00, 15.28, 9.72, 6.94, 19.44,
+    # Clúster 3
+    10.26, 0.00, 12.82, 5.13, 33.33, 17.95, 5.13, 15.38,
+    # Clúster 4
+    6.52, 0.00, 10.87, 2.17, 21.74, 21.74, 2.17, 34.78,
+    # Clúster 5
+    27.59, 0.00, 17.24, 3.45, 20.69, 3.45, 6.90, 20.69,
+    # Clúster 6
+    15.79, 10.53, 5.26, 0.00, 26.32, 21.05, 10.53, 10.53))
+
+tipos_contrato  <- unique(pca_plot_datos$naturaleza_contratos)
+niveles_cluster <- levels(pca_plot_datos$cluster_kmeans)
+
+trazas <- list()
+for (cl in niveles_cluster) {
+  for (i in seq_along(tipos_contrato)) {
+    tipo <- tipos_contrato[i]
+    sub  <- pca_plot_datos %>%
+      filter(cluster_kmeans == cl, naturaleza_contratos == tipo)
+
+    pct_val <- pct_tabla %>%
+      filter(cluster == as.numeric(cl), naturaleza == tipo) %>%
+      pull(pct)
+    pct_val <- ifelse(length(pct_val) == 0, 0, pct_val)
+
+    label_leyenda <- paste0(tipo, " (", pct_val, "%)")
+
+    trazas[[length(trazas) + 1]] <- list(
+      x = sub$PC1, y = sub$PC2,
+      name        = label_leyenda,
+      legendgroup = label_leyenda,
+      showlegend  = TRUE,
+      marker = list(
+        color   = colores_clusters[cl],
+        symbol  = simbolos_contratos[i],
+        size    = 9, opacity = 0.85,
+        line    = list(color = "white", width = 0.5)),
+      text = sub$nombre_municipio,
+      hovertemplate = paste0(
+        "<b>%{text}</b><br>Naturaleza: ", tipo,
+        "<br>PC1: %{x:.2f}<br>PC2: %{y:.2f}<extra></extra>"),
+      visible = (cl == "1"))
+  }
+}
+
+botones <- lapply(seq_along(niveles_cluster), function(idx) {
+  n   <- length(tipos_contrato)
+  vis <- rep(FALSE, length(niveles_cluster) * n)
+  vis[((idx - 1) * n + 1):(idx * n)] <- TRUE
+  list(method  = "update",
+       args    = list(list(visible = vis)),
+       label   = paste("Clúster", niveles_cluster[idx]))
+})
+
+fig <- plot_ly()
+for (tr in trazas) {
+  fig <- fig %>% add_trace(
+    x = tr$x, y = tr$y, mode = "markers", type = "scatter",
+    name        = tr$name,
+    legendgroup = tr$legendgroup,
+    showlegend  = tr$showlegend,
+    marker      = tr$marker,
+    text        = tr$text,
+    hovertemplate = tr$hovertemplate,
+    visible     = tr$visible)
+}
+
+fig %>% layout(
+  title  = "Municipios Valencia: clúster y naturaleza de contratos",
+  xaxis  = list(title = "PC1 (24.8%)"),
+  yaxis  = list(title = "PC2 (14.4%)"),
+  legend = list(title = list(text = "Naturaleza contratos")),
+  updatemenus = list(list(
+    type = "dropdown", active = 0,
+    x = 0.01, xanchor = "left", y = 1.12, yanchor = "top",
+    buttons = botones,
+    bgcolor = "#f0f0f0", bordercolor = "#cccccc",
+    font = list(size = 12))))
 ```
 
-## Conclusión 
+La representación gráfica no muestra una separación espacial clara entre tipos de contrato, con una elevada superposición entre categorías. No obstante, la tabla de porcentajes revela algunos patrones: el clúster 1 concentra la mayor proporción de municipios de servicios (60%), el clúster 5 es el más agrícola (27,59%) y el clúster 3 el más industrial (33,33%). En conjunto, aunque la naturaleza de los contratos no determina la formación de los clústeres, sí aporta caracterizaciones complementarias relevantes para algunos grupos.
 
-El análisis de clustering de los municipios de Valencia ha permitido identificar perfiles diferenciados a partir de variables demográficas, socioeconómicas, educativas, sanitarias, digitales y de accesibilidad. Tras preparar y escalar los datos, se optó por una solución de k = 10 clústeres, priorizando el criterio sustantivo de obtener una clasificación granular.
+## Conclusión
 
-Se compararon tres métodos: clustering jerárquico con Ward.D2, k-medias y PAM. El método jerárquico se mantiene como solución principal por ser el más equilibrado en calidad de agrupamiento, sin ningún clúster con valor de silueta negativo.
+El análisis de clustering de los municipios de la provincia de Valencia ha permitido identificar seis perfiles diferenciados a partir de variables demográficas, socioeconómicas, educativas, sanitarias, digitales y de accesibilidad. Tras preparar y escalar los datos, se comprobó una tendencia de agrupamiento clara (Hopkins = 0,832). Para la elección de k = 6, el gráfico de Silhouette muestra una zona estable con una ligera recuperación en k = 6 respecto a valores anteriores, mientras que el método del codo refleja una suavización progresiva de la reducción intra-clúster a partir de k = 5, lo que indica que k = 6 ofrece un equilibrio adecuado entre calidad estadística y utilidad interpretativa para los 210 municipios analizados.
 
-La interpretación mediante PCA y perfiles medios permite identificar las variables que más diferencian los clústeres, como el índice de envejecimiento, la distancia al hospital y la distancia al centro educativo.
+Se compararon tres métodos: clustering jerárquico con Ward.D2, k-medias y PAM. El método k-medias se selecciona como solución principal por obtener la mayor anchura de silueta media (0,18) y la distribución más equilibrada de municipios entre grupos, frente al método jerárquico, que genera clústeres de tamaño muy reducido (clúster 5 con apenas 2 municipios) y presenta el clúster 1 con silueta negativa (-0,02), y PAM, que obtiene una silueta media de 0,16 con grupos también menos equilibrados.
+
+La interpretación mediante PCA muestra que las variables que más contribuyen a la diferenciación de los clústeres son la accesibilidad a servicios, especialmente la distancia al hospital y al centro educativo, junto con el índice de envejecimiento. Por último, la variable naturaleza_contratos, utilizada como apoyo externo, no determina la formación de los clústeres, aunque sí revela patrones relevantes en grupos específicos, como la orientación a servicios del clúster 1 (60%) o el carácter industrial del clúster 3 (33,33%).Sonnet 4.6
