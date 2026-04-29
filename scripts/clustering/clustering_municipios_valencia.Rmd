@@ -609,9 +609,7 @@ for (cl in niveles_cluster) {
       hovertemplate = paste0(
         "<b>%{text}</b><br>Naturaleza: ", tipo,
         "<br>PC1: %{x:.2f}<br>PC2: %{y:.2f}<extra></extra>"),
-      visible = (cl == "1"))
-  }
-}
+      visible = (cl == "1"))}}
 
 botones <- lapply(seq_along(niveles_cluster), function(idx) {
   n   <- length(tipos_contrato)
@@ -619,8 +617,7 @@ botones <- lapply(seq_along(niveles_cluster), function(idx) {
   vis[((idx - 1) * n + 1):(idx * n)] <- TRUE
   list(method  = "update",
        args    = list(list(visible = vis)),
-       label   = paste("Clúster", niveles_cluster[idx]))
-})
+       label   = paste("Clúster", niveles_cluster[idx]))})
 
 fig <- plot_ly()
 for (tr in trazas) {
@@ -632,8 +629,7 @@ for (tr in trazas) {
     marker      = tr$marker,
     text        = tr$text,
     hovertemplate = tr$hovertemplate,
-    visible     = tr$visible)
-}
+    visible     = tr$visible)}
 
 fig %>% layout(
   title  = "Municipios Valencia: clúster y naturaleza de contratos",
