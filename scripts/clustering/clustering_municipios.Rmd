@@ -375,7 +375,7 @@ plot(
 
 par(mfrow = c(1, 1))
 ```
-
+Tras aplicar los tres métodos con k = 10, se mantiene el clustering jerárquico con método Ward.D2 como solución principal. Aunque k-medias obtiene una anchura de silueta media ligeramente superior (0.19 frente a 0.18), presenta el clúster 6 con valor negativo (-0.05), lo que indica que algunos municipios están mejor asignados fuera de su grupo. PAM obtiene la silueta media más baja (0.13) y registra dos clústeres con valores negativos (clúster 5: -0.09, clúster 6: 0.02), lo que refleja una peor calidad de agrupamiento. El método jerárquico ofrece la solución más equilibrada: ningún clúster presenta silueta negativa, los grupos son internamente homogéneos y la partición es coherente con la distancia euclídea utilizada.
 
 ## Interpretación de los resultados
 
