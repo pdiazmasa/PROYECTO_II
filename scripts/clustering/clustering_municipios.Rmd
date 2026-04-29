@@ -228,7 +228,7 @@ fviz_dend(
 
 El dendrograma muestra la estructura jerárquica obtenida mediante el método de Ward y la distancia euclídea. Al cortar el árbol en k = 10 clústeres, se obtiene una partición más detallada de los municipios en diez grupos diferenciados. Esta solución es coherente con el objetivo de clasificación granular del análisis.
 
-A partir del corte del dendrograma en diez grupos, se asigna a cada municipio su clúster correspondiente. La siguient tabla de frecuencias permite comprobar el tamaño de cada grupo y valorar si la partición obtenida está equilibrada o si uno de los clústeres concentra una mayor proporción de municipios.
+A partir del corte del dendrograma en diez grupos, se asigna a cada municipio su clúster correspondiente. La siguiente tabla de frecuencias permite comprobar el tamaño de cada grupo y valorar si la partición obtenida está equilibrada o si uno de los clústeres concentra una mayor proporción de municipios.
 
 ```{r}
 cluster_jerarquico <- cutree(
@@ -589,3 +589,6 @@ Se compararon tres métodos: clustering jerárquico con Ward.D2, k-medias y PAM.
 La interpretación mediante PCA y perfiles medios muestra que las variables que más diferencian los clústeres son el índice de envejecimiento, la distancia al hospital y la distancia al centro educativo. Destacan especialmente el clúster 5 (municipios muy envejecidos), el clúster 7 (peor accesibilidad a servicios), el clúster 9 (municipios urbanos con alta formación) y el clúster 10 (mayor presión en el mercado de alquiler).
 
 Por último, la variable naturaleza_contratos, utilizada como apoyo externo, no determina la formación de los clústeres, aunque sí aporta caracterizaciones relevantes en grupos específicos como el clúster 9 (100% servicios) o el clúster 8 (mayoría agrícola).
+
+### COMENTARIOS:
+Faltaría por cambiar los clusters de 10 a 7 y modificar las interpretaciones en base a ese cambio. 

@@ -480,21 +480,19 @@ knitr::kable(
 También se representa gráficamente el perfil medio de los clústeres para observar de forma visual qué variables diferencian más a cada grupo.
 
 ```{r}
-colores_plot <- c(
-  "#E41A1C", "#377EB8", "#4DAF4A", "#FF7F00", "#984EA3",
-  "#A65628", "#F781BF", "#999999", "#00CED1", "#FFD700")
+medias_escaladas <- apply(mediasCluster_matriz, 2, function(x) (x - min(x)) / (max(x) - min(x)))
 
-tipos_linea <- c(1, 2, 3, 4, 5, 6, 1, 2, 3, 4)
+colores_plot <- c("#E41A1C", "#377EB8", "#4DAF4A", "#FF7F00", "#984EA3", "#A65628")
 
-par(mar = c(8, 4, 4, 2))
+par(mar = c(8, 4, 4, 6))  # <-- margen derecho aumentado
 
 matplot(
-  t(sqrt(mediasCluster_matriz)),
+  t(medias_escaladas),
   type = "l",
-  ylab = "Escala raíz cuadrada",
+  ylab = "Valor normalizado (0-1)",
   xlab = "",
-  lwd = 2,
-  lty = tipos_linea,
+  lwd = 3,
+  lty = 1,
   col = colores_plot,
   main = "Perfil medio de los clústeres - Municipios Valencia",
   xaxt = "n")
@@ -504,17 +502,17 @@ axis(
   at = 1:ncol(mediasCluster_matriz),
   labels = colnames(mediasCluster_matriz),
   las = 2,
-  cex.axis = 0.75)
+  cex.axis = 0.8)
 
 legend(
-  "topleft",
+  x = par("usr")[2],
+  y = par("usr")[4],
   legend = rownames(mediasCluster_matriz),
-  lwd = 2,
-  lty = tipos_linea,
+  lwd = 3,
   col = colores_plot,
   bty = "n",
-  ncol = 2,
-  cex = 0.8)
+  ncol = 1,
+  xpd = TRUE)
 ```
 
 El análisis de clustering de los municipios de la provincia de Valencia ha permitido identificar seis perfiles diferenciados a partir de variables demográficas, socioeconómicas, educativas, sanitarias, digitales y de accesibilidad. Tras comprobar una tendencia de agrupamiento clara (Hopkins = 0,832), se optó por k = 6 clústeres, apoyándose en la estabilidad de la curva de Silhouette y la suavización del codo a partir de k = 5. De los tres métodos comparados, k-medias se selecciona como solución principal al obtener la mayor silueta media (0,18) y la distribución más equilibrada entre grupos. El PCA muestra que las variables más discriminantes son la distancia al hospital, la distancia al centro educativo y el índice de envejecimiento. Por último, la variable naturaleza_contratos no determina la formación de los clústeres, aunque revela patrones complementarios relevantes como la orientación a servicios del clúster 1 (60%) o el carácter industrial del clúster 3 (33,33%).
