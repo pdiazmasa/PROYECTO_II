@@ -25,7 +25,6 @@ library(knitr)
 library(cluster)
 library(readr)
 library(factoextra)
-library(NbClust)
 library(clValid)
 library(PLSandO)
 library(aricode)
@@ -159,7 +158,6 @@ hopkins_distritos <- get_clust_tendency(
 hopkins_distritos$hopkins_stat
 ```
 El valor del estadístico de Hopkins obtenido es 0.6178. Este valor se encuentra por encima de 0.5, por lo que los datos no parecen distribuirse de forma completamente aleatoria en el espacio definido por las variables seleccionadas. Sin embargo, al no tratarse de un valor muy próximo a 1, la tendencia de agrupamiento no puede considerarse muy fuerte, sino más bien moderada. Por tanto, el resultado sugiere que puede existir cierta estructura interna en los datos, aunque esta no es especialmente marcada.
-
 
 ## Determinación del número de clústeres
 
@@ -441,7 +439,111 @@ Por tanto, se mantiene el clustering jerárquico con método Ward.D2 y *k = 3* c
 
 ## Interpretación de los resultados del clustering
 
-### Caracterización de los clústeres obtenidos
+En primer lugar, vamos a realizar un análisis PCA completo para ver qué variables utilizadas en el clustering contribuyen más a la separación de los municipios. Como las variables ya se han centrado y escalado previamente para el clustering, aplicamos el PCA sobre *matriz_clustering* con *scaling = "none"*.
+
+```{r}
+vars_clustering <- c(
+  "indice_envejecimiento",
+    "ratio_colegio",
+    "ratio_hospital",
+    "esfuerzo_alquiler",
+    "ratio_zonas_verdes")
+
+datos_interpretacion <- bind_cols(
+  distritos_cluster,
+  datos_clustering_completo)
+
+# Clúster principal seleccionado
+misclust <- distritos_cluster$cluster_jerarquico
+
+# PCA sobre la matriz utilizada en el clustering
+miPCA <- pca(
+  matriz_clustering,
+  scaling = "none")
+
+# Gráfico de varianza explicada
+pcaPlot(miPCA, type = "scree")
+```
+
+A continuación, se consulta la varianza explicada por las primeras componentes principales para decidir cuántas componentes utilizar en la interpretación.
+
+```{r}
+K <- 3
+
+knitr::kable(
+  miPCA$explVar[1:K, ],
+  digits = 2,
+  caption = "Varianza explicada por las componentes principales")
+```
+
+En principio, se revisa cuánta variabilidad explican las primeras componentes principales. Para la interpretación gráfica se seleccionan las dos primeras componentes, PC1 y PC2, ya que, aunque PC3 también explique un porcentaje considerable de variabilidad, su autovalor es < 1 y los resultados se representan mejor mediante un solo gráfico en 2 dimensiones.
+
+```{r}
+# Scores
+p1 <- pcaPlot(miPCA, type = "scores", comp = 1:2,
+              colBy = data.frame("cluster" = misclust), labels = TRUE)
+
+# Corr
+p2 <- pcaPlot(miPCA, type = "corr", comp = 1:2, colBy = "contrib", col = "hot")
+
+p1
+p2
+```
+A partir del gráfico de puntuaciones, se observa que los clústeres 1 y 3 presentan una transición a lo largo de la primera componente con una zona de superposición, mientras que el clúster 2 (que incluye únicamente el distrito r4) se identifica claramente como un valor atípico, diferenciándose del resto por su posición extrema en la segunda componente.
+
+Por otro lado, el gráfico de correlaciones permite identificar que la primera componente principal está definida mayoritariamente por el ratio de colegios y zonas verdes, mientras que la segunda componente responde principalmente al ratio de hospitales, el esfuerzo de alquiler y el índice de envejecimiento. De esta forma se explica la estructura observada: el clúster 3 se desplaza hacia una mayor dotación de servicios y áreas verdes, mientras que el valor anómalo que forma el clúster 2 se caracteriza por su alta infraestructura hospitalaria en comparación con el resto.
 
 
-### Relación de los clústeres con otras variables
+Para complementar la interpretación mediante PCA, se calcula el perfil medio de cada clúster a partir de las variables activas utilizadas en el análisis.
+
+```{r}
+mediasCluster <- datos_interpretacion %>%
+  group_by(cluster_jerarquico) %>%
+  summarise(across(all_of(vars_clustering), ~ mean(.x, na.rm = TRUE)), .groups = "drop")
+
+mediasCluster_matriz <- as.data.frame(mediasCluster)
+rownames(mediasCluster_matriz) <- paste0("c", mediasCluster_matriz$cluster_jerarquico)
+mediasCluster_matriz <- mediasCluster_matriz[, -1]
+
+knitr::kable(t(round(mediasCluster_matriz, 2)), caption = "Radiografía numérica de los clústeres")
+```
+
+También se representa gráficamente el perfil medio de los clústeres para observar de forma visual qué variables diferencian más a cada grupo.
+```{r}
+colores_plot <- c("#E41A1C", "#377EB8", "#4DAF4A")
+
+par(mar = c(8, 4, 4, 2))
+matplot(t(sqrt(mediasCluster_matriz)),
+        type = "l", 
+        ylab = "Escala raíz cuadrada",
+        xlab = "", lwd = 3, 
+        lty = 1,
+        col = colores_plot, 
+        main = "Perfil medio de los clústeres de distritos", 
+        xaxt = "n")
+
+axis(side = 1,
+     at = 1:ncol(mediasCluster_matriz), 
+     labels = colnames(mediasCluster_matriz),
+     las = 2,
+     cex.axis = 0.8)
+
+legend("topleft",
+       legend = rownames(mediasCluster_matriz), 
+       lwd = 3,
+       col = colores_plot,
+       bty = "n",
+       ncol = 1)
+```
+
+El análisis del perfil medio permite caracterizar cada clúster de distritos según sus rasgos estructurales. El clúster 3 destaca como el perfil más envejecido (índice 219,40) y con mayor presión resºidencial, registrando el esfuerzo de alquiler más alto (31,56) y el mayor ratio de colegios (0,27). Por su parte, el distrito del clúster 2 se define como un distrito joven y de servicios sanitarios, con el menor índice de envejecimiento (134,43) y un ratio de hospitales excepcionalmente elevado en comparación con los demás grupos. El clúster 1 representa un perfil intermedio, caracterizado por tener el ratio de hospitales más bajo y niveles moderados de envejecimiento (160,66) y esfuerzo de alquiler (27,80). En conjunto, las variables más discriminantes para diferenciar estos distritos son el índice de envejecimiento, el ratio de hospital y el esfuerzo de alquiler.
+
+## Conclusión 
+
+#### Comentarios
+
+Si se retoma, utilizar 3 clusters por el método de k-medias
+Supongo que modificar algo del PCA también
+Faltaría por acabar conclusiones
+
+
