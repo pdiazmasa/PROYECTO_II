@@ -589,3 +589,6 @@ Se compararon tres métodos: clustering jerárquico con Ward.D2, k-medias y PAM.
 La interpretación mediante PCA y perfiles medios muestra que las variables que más diferencian los clústeres son el índice de envejecimiento, la distancia al hospital y la distancia al centro educativo. Destacan especialmente el clúster 5 (municipios muy envejecidos), el clúster 7 (peor accesibilidad a servicios), el clúster 9 (municipios urbanos con alta formación) y el clúster 10 (mayor presión en el mercado de alquiler).
 
 Por último, la variable naturaleza_contratos, utilizada como apoyo externo, no determina la formación de los clústeres, aunque sí aporta caracterizaciones relevantes en grupos específicos como el clúster 9 (100% servicios) o el clúster 8 (mayoría agrícola).
+
+### COMENTARIOS:
+Faltaría por cambiar los clusters de 10 a 7 y modificar las interpretaciones en base a ese cambio. 
