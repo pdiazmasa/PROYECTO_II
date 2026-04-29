@@ -228,7 +228,7 @@ fviz_dend(
 
 El dendrograma muestra la estructura jerárquica obtenida mediante el método de Ward y la distancia euclídea. Al cortar el árbol en k = 10 clústeres, se obtiene una partición más detallada de los municipios en diez grupos diferenciados. Esta solución es coherente con el objetivo de clasificación granular del análisis.
 
-A partir del corte del dendrograma en diez grupos, se asigna a cada municipio su clúster correspondiente. La siguient tabla de frecuencias permite comprobar el tamaño de cada grupo y valorar si la partición obtenida está equilibrada o si uno de los clústeres concentra una mayor proporción de municipios.
+A partir del corte del dendrograma en diez grupos, se asigna a cada municipio su clúster correspondiente. La siguiente tabla de frecuencias permite comprobar el tamaño de cada grupo y valorar si la partición obtenida está equilibrada o si uno de los clústeres concentra una mayor proporción de municipios.
 
 ```{r}
 cluster_jerarquico <- cutree(
