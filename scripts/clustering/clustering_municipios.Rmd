@@ -1,6 +1,6 @@
 ---
 title: "clustering_municipios"
-author: "Emma Torres"
+author: "Grupo 1"
 date: "2026-04-24"
 output:
   pdf_document: default
