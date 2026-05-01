@@ -1,0 +1,518 @@
+---
+title: "clustering_distritos_valencia"
+author: "Grupo 1"
+date: "2026-04-24"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Preparación de datos
+
+Cargamos los paquetes necesarios.
+```{r}
+library(tidyverse)
+library(readr)
+library(cluster)
+library(factoextra)
+library(NbClust)
+library(gridExtra)
+```
+
+Cargamos el dataset final de distritos de Valencia.
+```{r}
+distritos_valencia_base <- read_csv("../../datasets/valencia/distritos_valencia_base_final.csv", show_col_types = FALSE)
+
+head(distritos_valencia_base)
+dim(distritos_valencia_base)
+```
+Ahora seleccionamos las variables activas del clustering, las cuales han sido seleccionadas tras realizar el estudio de correlación correspondiente a los datasets de distritos. Para ello, creamos el objeto datos_clustering, que contiene únicamente dichas variables activas.
+```{r}
+datos_clustering <- distritos_valencia_base %>%
+  select(
+    indice_envejecimiento,
+    ratio_colegio,
+    ratio_hospital,
+    esfuerzo_alquiler,
+    ratio_zonas_verdes)
+```
+
+Revisamos los valores faltantes en las variables activas, ya que no puede haber ningún faltante para realizar el análisis de clustering.
+```{r}
+faltantes_clustering <- datos_clustering %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(
+    cols = everything(),
+    names_to = "variable",
+    values_to = "num_faltantes") %>% arrange(desc(num_faltantes))
+
+faltantes_clustering
+```
+
+Ahora conservamos información auxiliar de los distritos para interpretar después.
+```{r}
+info_distritos <- distritos_valencia_base %>%
+  select(cod_distrito, nombre_distrito)
+```
+
+Aunque no haya faltantes, conviene crear igualmente estos objetos porque los usaremos en todo el análisis, además de realizar la comprobación de que no exista ningún valor faltante en las observaciones.
+```{r}
+filas_completas <- complete.cases(datos_clustering)
+
+datos_clustering_completo <- datos_clustering[filas_completas, ]
+
+info_distritos_completo <- info_distritos[filas_completas, ]
+
+dim(datos_clustering_completo)
+dim(info_distritos_completo)
+
+colSums(is.na(datos_clustering_completo))
+```
+Como el número de observaciones se mantiene en 19, se comprueba que no se ha eliminado ningún distrito por valores faltantes. Además, ninguna de las variables cuenta con valores faltantes.
+
+Antes de calcular distancias, debemos estandarizar los datos, ya que tenemos variables en escalas distintas. Para ello, centramos y escalamos mediante la función `scale()`.
+```{r}
+datos_clustering_scaled <- scale(datos_clustering_completo)
+
+summary(datos_clustering_scaled)
+```
+
+Finalmente, se guarda la matriz estandarizada con el nombre *matriz_clustering*, que será el objeto utilizado en los siguientes apartados para calcular distancias y aplicar los distintos métodos de clustering.
+```{r}
+matriz_clustering <- datos_clustering_scaled
+```
+
+## Elección de la medida de distancia y tendencia de agrupamiento
+
+Una vez preparada la matriz numérica estandarizada, se selecciona la medida de distancia que se utilizará para cuantificar la disimilitud entre distritos. Como las variables activas son numéricas y han sido previamente centradas y escaladas, se emplea la distancia euclídea.
+
+Esta medida resulta adecuada porque permite comparar los distritos en un espacio multidimensional donde todas las variables contribuyen en una escala común. Además, la distancia euclídea es una de las medidas más utilizadas en combinación con métodos como el clustering jerárquico con criterio de Ward, el algoritmo k-means y el método PAM.
+
+Antes de aplicar los métodos de agrupamiento, se analiza también la tendencia de agrupamiento de los datos mediante el estadístico Hopkins. El objetivo es comprobar si los distritos presentan cierta estructura interna o si, por el contrario, se distribuyen de forma aproximadamente aleatoria en el espacio definido por las variables seleccionadas.
+
+A continuación, realizamos el cálculo de la matriz de distancias euclídeas a partir de la matriz estandarizada. Esta matriz recoge la disimilitud entre cada par de distritos según las variables activas seleccionadas.
+```{r}
+dist_distritos <- dist(
+  matriz_clustering,
+  method = "euclidean")
+
+dist_distritos
+```
+
+Visualizamos dicha matriz de distancias. Con esta visualización podremos observar si existen bloques de distritos más similares entre sí. La presencia de zonas más homogéneas puede sugerir una cierta estructura agrupable en los datos.
+```{r}
+fviz_dist(
+  dist_distritos,
+  show_labels = FALSE)
+```
+La visualización de la matriz de distancias muestra diferencias apreciables entre distritos, con zonas de menor y mayor disimilitud. Se observan bloques más homogéneos que podrían corresponder a grupos de distritos con perfiles similares, lo que sugiere la existencia de cierta estructura agrupable en los datos.
+
+Ahora calculamos la tendencia de agrupamiento con el estadístico de Hopkins, el cual permite evaluar si los datos presentan tendencia de agrupamiento. Valores cercanos a 0,5 indican una distribución aproximadamente aleatoria, mientras que valores más próximos a 1 sugieren una mayor tendencia a formar clústeres.
+```{r}
+set.seed(123)
+
+hopkins_distritos <- get_clust_tendency(
+  matriz_clustering,
+  n = nrow(matriz_clustering) - 1,
+  graph = TRUE)
+
+hopkins_distritos$hopkins_stat
+```
+El valor del estadístico de Hopkins obtenido es 0,6389. Este valor se encuentra por encima de 0,5, por lo que los datos no parecen distribuirse de forma completamente aleatoria en el espacio definido por las variables seleccionadas. Sin embargo, al no tratarse de un valor muy próximo a 1, la tendencia de agrupamiento no puede considerarse muy fuerte, sino más bien moderada. Hay que tener en cuenta además que, con tan solo 19 observaciones, el estadístico de Hopkins tiende a ser más conservador y menos estable que con muestras grandes, por lo que un valor de 0,64 en este contexto ya resulta indicativo de cierta estructura interna en los datos. 
+
+## Determinación del número de clústeres
+
+Una vez comprobada la existencia de tendencia de agrupamiento en los datos, se procede a determinar el número adecuado de clústeres. Para ello se utilizan varios criterios complementarios que se muestran a continuación.
+
+En primer lugar, se utiliza el método de Silhouette, que permite evaluar la calidad de la asignación de las observaciones a los grupos; los valores más altos indican que los distritos están mejor agrupados dentro de su clúster y más separados de los demás. Simultáneamente, en segundo lugar, se aplica el método del codo mediante la suma de cuadrados intra-clúster, que analiza cómo disminuye la variabilidad interna de los grupos al aumentar el número de clústeres. El objetivo es identificar un punto a partir del cual añadir más grupos apenas mejora la solución.
+```{r}
+## Función auxiliar para aplicar WSS con hcut
+
+hcut_wss <- function(x, k, ...) {
+  if (k == 1) {
+    list(cluster = rep(1, nrow(x)))} 
+  else {
+    hcut(
+      x = x,
+      k = k,
+      hc_method = "ward.D2",
+      hc_metric = "euclidean")}}
+```
+
+```{r}
+p1 <- fviz_nbclust(
+  x = matriz_clustering,
+  FUNcluster = hcut,
+  method = "silhouette",
+  hc_method = "ward.D2",
+  k.max = 10,
+  verbose = FALSE,
+  diss = dist_distritos) +
+  labs(title = "Número de clústeres según Silhouette")
+
+p2 <- fviz_nbclust(
+  x = matriz_clustering,
+  FUNcluster = hcut_wss,
+  method = "wss",
+  hc_method = "ward.D2",
+  k.max = 10,
+  verbose = FALSE) +
+  labs(title = "Número de clústeres según WSS")
+
+grid.arrange(p1, p2, nrow = 1)
+```
+El gráfico de Silhouette alcanza su valor máximo para k = 8, sin embargo, con únicamente 19 distritos, esta solución produciría grupos de 2 o 3 observaciones en el mejor de los casos, lo que carece de interpretabilidad. Por su parte, el método del codo muestra una disminución pronunciada de la inercia hasta k = 4, y una suavización notable a partir de k = 5, punto a partir del cual añadir más grupos apenas reduce la variabilidad interna.
+
+Dado que k = 5 ofrece una silueta media elevada (≈ 0,30), se opta por esta solución. 
+
+## Comparación de métodos de clustering
+
+En este apartado se comparan distintos métodos de clustering aplicados sobre la misma matriz de datos previamente escalada. Todos los métodos se aplican con k = 5 para que la comparación sea coherente y permita valorar si las agrupaciones obtenidas son similares o si dependen del algoritmo utilizado.
+
+En primer lugar, se aplica clustering jerárquico con el método de Ward, ya que este método busca formar grupos internamente homogéneos minimizando la variabilidad dentro de los clústeres.
+
+```{r}
+clustering_jerarquico <- hclust(
+  d = dist_distritos,
+  method = "ward.D2")
+
+fviz_dend(
+  clustering_jerarquico,
+  k = 5,
+  show_labels = TRUE,
+  rect = TRUE,
+  rect_fill = FALSE,
+  rect_border = "black",
+  main = "Dendrograma del clustering jerárquico",
+  xlab = "Distritos",
+  ylab = "Altura",
+  cex = 0.6,
+  lwd = 0.6)
+```
+
+El dendrograma muestra la estructura jerárquica obtenida mediante el método de Ward y la distancia euclídea. Al cortar el árbol en k = 5 clústeres, se obtiene una partición de los distritos en cinco grupos diferenciados.
+
+A partir del corte del dendrograma, se asigna a cada distrito su clúster correspondiente. La siguiente tabla de frecuencias permite comprobar el tamaño de cada grupo y valorar si la partición obtenida está equilibrada.
+
+```{r}
+cluster_jerarquico <- cutree(
+  clustering_jerarquico,
+  k = 5)
+
+distritos_cluster <- info_distritos_completo %>%
+  mutate(cluster_jerarquico = as.factor(cluster_jerarquico))
+
+table(distritos_cluster$cluster_jerarquico)
+```
+
+La solución jerárquica genera dos clústeres de observación única (distritos 4 y 11), lo que limita su interpretabilidad en un conjunto de solo 19 observaciones.
+
+Después se aplica el método de k-medias para comparar sus resultados con los obtenidos mediante clustering jerárquico.
+
+```{r}
+set.seed(123)
+
+clustering_kmeans <- kmeans(
+  x = matriz_clustering,
+  centers = 5,
+  nstart = 25)
+
+distritos_cluster <- distritos_cluster %>%
+  mutate(cluster_kmeans = as.factor(clustering_kmeans$cluster))
+
+table(distritos_cluster$cluster_kmeans)
+```
+El método k-medias divide los 19 distritos en cinco grupos con tamaños de 1, 5, 3, 1 y 9 distritos respectivamente.
+
+En tercer lugar, se aplica el método PAM (Partitioning Around Medoids), también conocido como k-medoides. Al igual que k-medias, es un método de partición, pero en lugar de representar cada clúster mediante un centroide promedio, utiliza observaciones reales como representantes de los grupos. Esto lo hace más robusto frente a observaciones extremas y facilita la interpretación directa de los clústeres a partir de distritos concretos.
+
+```{r}
+# Clustering mediante PAM / k-medoides
+set.seed(123)
+
+clustering_pam <- pam(
+  x = matriz_clustering,
+  k = 5,
+  metric = "euclidean")
+
+# Asignación de clústeres PAM
+distritos_cluster <- distritos_cluster %>%
+  mutate(cluster_pam = as.factor(clustering_pam$clustering))
+
+# Tamaño de cada clúster en PAM
+table(distritos_cluster$cluster_pam)
+```
+
+El método PAM divide los 19 distritos en cinco grupos con tamaños de 4, 6, 1, 5 y 3 distritos respectivamente, siendo esta la distribución más equilibrada de los tres métodos comparados.
+
+Para comparar los tres métodos utilizados, se construyen tablas cruzadas entre las tres clasificaciones. Estas tablas permiten comprobar si los métodos asignan los distritos de forma similar o si la agrupación depende del algoritmo utilizado.
+```{r}
+# Comparación entre clustering jerárquico y k-medias
+tabla_jerarquico_kmeans <- table(
+  Jerarquico = distritos_cluster$cluster_jerarquico,
+  Kmeans = distritos_cluster$cluster_kmeans)
+
+tabla_jerarquico_kmeans
+
+# Comparación entre clustering jerárquico y PAM
+tabla_jerarquico_pam <- table(
+  Jerarquico = distritos_cluster$cluster_jerarquico,
+  PAM = distritos_cluster$cluster_pam)
+
+tabla_jerarquico_pam
+
+# Comparación entre k-medias y PAM
+tabla_kmeans_pam <- table(
+  Kmeans = distritos_cluster$cluster_kmeans,
+  PAM = distritos_cluster$cluster_pam)
+
+tabla_kmeans_pam
+```
+Las tablas cruzadas muestran un grado de concordancia moderado entre los tres métodos, lo que es esperable dado el reducido número de observaciones y la mayor sensibilidad de las fronteras entre grupos cuando n es pequeño. Se aprecian correspondencias parciales entre las soluciones, pero también reasignaciones puntuales que explican las diferencias en la distribución de los clústeres entre métodos.
+
+También se puede visualizar la solución obtenida mediante k-medias sobre las dos primeras dimensiones principales.
+
+```{r}
+fviz_cluster(
+  clustering_kmeans,
+  data = matriz_clustering,
+  geom = "point",
+  ellipse.type = "convex",
+  main = "Clustering k-medias")
+```
+
+De forma complementaria, se puede visualizar también la solución jerárquica.
+
+```{r}
+fviz_cluster(
+  list(
+    data = matriz_clustering,
+    cluster = distritos_cluster$cluster_jerarquico),
+  geom = "point",
+  ellipse.type = "convex",
+  main = "Clustering jerárquico")
+```
+
+Por último, se visualiza también la solución obtenida mediante PAM.
+
+```{r}
+fviz_cluster(
+  clustering_pam,
+  data = matriz_clustering,
+  geom = "point",
+  ellipse.type = "convex",
+  main = "Clustering PAM")
+```
+
+```{r}
+# Calcular objetos silhouette para cada método
+sil_jerarquico <- silhouette(
+  as.numeric(distritos_cluster$cluster_jerarquico),
+  dist_distritos)
+
+sil_kmeans <- silhouette(
+  clustering_kmeans$cluster,
+  dist_distritos)
+
+sil_pam <- silhouette(
+  clustering_pam$clustering,
+  dist_distritos)
+
+# Gráfico de silueta para los tres métodos
+colores <- biostatcolors::getbiostatColors()[1:5]
+
+par(mfrow = c(1, 3))
+
+plot(
+  sil_jerarquico,
+  col = colores,
+  border = NA,
+  main = "WARD")
+
+plot(
+  sil_kmeans,
+  col = colores,
+  border = NA,
+  main = "K-MEDIAS")
+
+plot(
+  sil_pam,
+  col = colores,
+  border = NA,
+  main = "K-MEDOIDES")
+
+par(mfrow = c(1, 1))
+```
+Tras aplicar los tres métodos con k = 5, todos obtienen una anchura media de silueta idéntica (0,28), por lo que la elección del método recae en criterios cualitativos y de distribución. Se opta por el método **PAM (k-medoides)** como solución principal. Tanto Ward como k-medias generan dos clústeres de observación única, lo que limita la interpretabilidad con tan pocas observaciones. PAM, en cambio, produce una distribución más equilibrada (4, 6, 1, 5 y 3 distritos por clúster), con un único caso singular (clúster 3, n = 1) que puede identificarse como un distrito con perfil atípico. Además, al utilizar medoides reales como representantes de cada grupo, PAM facilita la interpretación directa de los clústeres a partir de distritos concretos de Valencia.
+
+## Interpretación de los resultados
+
+En primer lugar, se realiza un análisis PCA completo para identificar qué variables utilizadas en el clustering contribuyen más a la separación de los distritos. Como las variables ya se han centrado y escalado previamente para el clustering, se aplica el PCA sobre *matriz_clustering* con *scaling = "none"*.
+
+```{r}
+vars_clustering <- c(
+  "indice_envejecimiento",
+  "ratio_colegio",
+  "ratio_hospital",
+  "esfuerzo_alquiler",
+  "ratio_zonas_verdes")
+
+datos_interpretacion <- bind_cols(
+  distritos_cluster,
+  datos_clustering_completo)
+
+# Clúster principal seleccionado: PAM
+misclust <- distritos_cluster$cluster_pam
+
+# PCA sobre la matriz utilizada en el clustering
+library(PLSandO)
+miPCA <- pca(
+  matriz_clustering,
+  scaling = "none")
+
+# Gráfico de varianza explicada
+pcaPlot(miPCA, type = "scree")
+```
+
+A continuación, se consulta la varianza explicada por las primeras componentes principales para decidir cuántas componentes utilizar en la interpretación.
+
+```{r}
+K <- 3
+
+knitr::kable(
+  miPCA$explVar[1:K, ],
+  digits = 2,
+  caption = "Varianza explicada por las primeras componentes principales")
+```
+
+El scree plot muestra que la PC1 explica el 41,9% de la variabilidad, la PC2 el 24,5% y la PC3 el 21,0%, acumulando entre las tres componentes un 87,4% de la varianza total. Dado que las tres primeras componentes superan individualmente el umbral del 20% y que la PC4 cae bruscamente hasta el 10,3%, se opta por retener tres componentes para la interpretación gráfica. Esto permite visualizar la PC1 frente a la PC2 y la PC3 frente a la PC4 para no repetir componentes, pero centrando el análisis en las tres primeras por ser las más informativas.
+
+```{r}
+p1 <- pcaPlot(
+  miPCA,
+  type = "scores",
+  comp = 1:2,
+  colBy = data.frame("cluster" = misclust),
+  labels = TRUE,
+  repel = TRUE)
+
+p2 <- pcaPlot(
+  miPCA,
+  type = "scores",
+  comp = 3:4,
+  colBy = data.frame("cluster" = misclust),
+  labels = TRUE,
+  repel = TRUE)
+
+p3 <- pcaPlot(
+  miPCA,
+  type = "corr",
+  comp = 1:2,
+  colBy = "contrib",
+  labels = TRUE,
+  repel = TRUE,
+  col = "hot")
+
+p4 <- pcaPlot(
+  miPCA,
+  type = "corr",
+  comp = 3:4,
+  colBy = "contrib",
+  labels = TRUE,
+  repel = TRUE,
+  col = "hot")
+
+p1
+p2
+p3
+p4
+```
+
+En el plano PC1-PC2 se observa que los clústeres no están completamente separados, aunque sí aparecen algunos perfiles diferenciados. El clúster 5 se sitúa hacia valores positivos de PC1, mientras que el clúster 1 aparece más desplazado hacia valores negativos de PC1 y positivos de PC2. Los clústeres 2 y 4 ocupan posiciones más centrales, con mayor solapamiento, lo que indica perfiles más intermedios. El clúster 3, formado únicamente por r4, aparece claramente aislado, por lo que puede considerarse un caso atípico. En el plano PC3-PC4 la separación es menos clara, pero ayuda a matizar diferencias que no se aprecian del todo en las dos primeras componentes, especialmente entre los clústeres centrales.
+
+Los gráficos de correlaciones indican que las variables que más explican la separación entre distritos son *esfuerzo_alquiler*, *ratio_colegio*, *ratio_hospita*l e *indice_envejecimiento*. En el plano PC1-PC2, *ratio_colegio*, *ratio_hospital* y *ratio_zonas_verdes* se orientan hacia valores negativos de PC1, mientras que *esfuerzo_alquiler* destaca principalmente en PC2 positivo. En el plano PC3-PC4, la variable más relevante es *indice_envejecimiento*, que tiene una contribución muy alta y ayuda a diferenciar los perfiles demográficos. En cambio, *ratio_zonas_verdes* apenas permite distinguir los grupos en la tabla de medias, ya que toma valores prácticamente nulos en todos los clústeres.
+
+Para complementar la interpretación mediante PCA, se calcula el perfil medio de cada clúster a partir de las variables activas utilizadas en el análisis.
+
+```{r}
+mediasCluster <- datos_interpretacion %>%
+  group_by(cluster_pam) %>%
+  summarise(
+    across(
+      all_of(vars_clustering),
+      ~ mean(.x, na.rm = TRUE)),
+    .groups = "drop")
+
+mediasCluster_matriz <- as.data.frame(mediasCluster)
+rownames(mediasCluster_matriz) <- paste0("c", mediasCluster_matriz$cluster_pam)
+mediasCluster_matriz <- mediasCluster_matriz[, -1]
+
+knitr::kable(
+  t(round(mediasCluster_matriz, 2)),
+  caption = "Perfil medio de los clústeres PAM")
+```
+
+También se representa gráficamente el perfil medio de los clústeres. Para facilitar la comparación visual entre variables con escalas muy distintas, se normaliza cada variable entre 0 y 1 antes de representarla, de forma que todas contribuyen por igual al gráfico.
+
+```{r}
+colores_plot <- c(
+  "#E41A1C", "#377EB8", "#4DAF4A", "#FF7F00", "#984EA3")
+
+medias_escaladas <- apply(
+  mediasCluster_matriz, 2,
+  function(x) (x - min(x)) / (max(x) - min(x)))
+
+par(mar = c(8, 4, 4, 2))
+
+matplot(
+  t(medias_escaladas),
+  type = "l",
+  ylab = "Valor normalizado [0-1]",
+  xlab = "",
+  lwd = 3,
+  lty = 1,
+  col = colores_plot,
+  main = "Perfil medio de los clústeres de distritos",
+  xaxt = "n")
+
+axis(
+  side = 1,
+  at = 1:ncol(mediasCluster_matriz),
+  labels = colnames(mediasCluster_matriz),
+  las = 2,
+  cex.axis = 0.8)
+
+legend(
+  "topleft",
+  legend = rownames(mediasCluster_matriz),
+  lwd = 3,
+  col = colores_plot,
+  bty = "n",
+  ncol = 1)
+```
+
+El análisis conjunto del perfil medio normalizado, los gráficos PCA y la silueta permite caracterizar cada uno de los cinco clústeres obtenidos con PAM. En la tabla de medias, las variables que más diferencian los grupos son *indice_envejecimiento*, *ratio_colegio*, *ratio_hospital* y *esfuerzo_alquiler*. En cambio, *ratio_zonas_verdes* no resulta especialmente útil para caracterizar los clústeres, ya que presenta valores muy bajos en todos ellos.
+
+c1 — envejecimiento alto, mayor ratio_colegio y mayor esfuerzo_alquiler → "Distritos envejecidos con buena dotación educativa y alta presión residencial"
+
+c2 — envejecimiento muy alto, baja dotación educativa y sanitaria, menor presión de alquiler → "Distritos muy envejecidos con perfil residencial menos tensionado"
+
+c3 — envejecimiento más bajo, mayor ratio_hospital y caso singular → "Distrito atípico con mejor dotación sanitaria relativa"
+
+c4 — envejecimiento bajo-moderado, dotación intermedia y esfuerzo de alquiler moderado → "Distritos equilibrados"
+
+c5 — envejecimiento bajo-moderado, ratio_colegio nulo y esfuerzo de alquiler elevado → "Distritos con baja dotación educativa y presión residencial"
+
+## Conclusión
+
+El análisis de clustering sobre los 19 distritos de Valencia ha permitido identificar cinco perfiles diferenciados a partir de variables demográficas, de equipamiento urbano y de mercado residencial: índice de envejecimiento, ratio de colegios, ratio de hospitales, esfuerzo de alquiler y ratio de zonas verdes. Tras preparar y escalar los datos, el estadístico de Hopkins obtuvo un valor de 0,64, que en el contexto de tan solo 19 observaciones es indicativo de una tendencia de agrupamiento moderada. Para la elección de k = 5, el gráfico de Silhouette muestra una silueta media de ≈ 0,30 con una distribución interpretable, mientras que el método del codo refleja una suavización progresiva a partir de k = 5, lo que indica un equilibrio adecuado entre calidad estadística e interpretabilidad.
+
+Se compararon tres métodos: clustering jerárquico con Ward.D2, k-medias y PAM. Se optó por **PAM (k-medoides)** como solución principal al obtener la distribución más equilibrada entre grupos (4, 6, 1, 5 y 3 distritos) con un único caso singular, frente a Ward y k-medias que producen dos clústeres de observación única y limitan la interpretabilidad.
+
+El análisis PCA retiene tres componentes que acumulan el 87,4% de la varianza. La PC1 (41,9%) está dominada por *esfuerzo_alquiler*, *ratio_colegio*, *ratio_hospital* y *ratio_zonas_verdes*, y separa principalmente el clúster 5 del resto. La PC2 (24,5%) recoge variabilidad adicional asociada principalmente a *esfuerzo_alquiler*, diferenciando el clúster 1. La PC3 (21,0%) está dominada por el *indice_envejecimiento*, que es la variable que más estructura la variabilidad residual entre distritos.
+
+En conjunto, el clustering PAM permite distinguir cinco perfiles de distritos: grupos envejecidos, grupos más equilibrados, un caso atípico y distritos con mayor presión residencial y menor dotación educativa. Aunque existe cierto solapamiento entre algunos clústeres, la solución permite interpretar diferencias relevantes entre los distritos a partir de variables demográficas, residenciales y de equipamientos.
