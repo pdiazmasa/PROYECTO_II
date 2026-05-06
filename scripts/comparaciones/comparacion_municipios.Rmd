@@ -1,0 +1,10 @@
+---
+title: "comparacion_municipios"
+author: "Grupo 1"
+date: "2026-05-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
