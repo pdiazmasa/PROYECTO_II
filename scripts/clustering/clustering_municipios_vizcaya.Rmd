@@ -458,22 +458,23 @@ knitr::kable(
 También se representa gráficamente el perfil medio de los clústeres para observar de forma visual qué variables diferencian más a cada grupo.
 ```{r}
 colores_plot <- c(
-  "#E41A1C", "#377EB8", "#4DAF4A", "#FF7F00", "#984EA3",
-  "#A65628", "#F781BF")
+  "#E41A1C", "#377EB8", "#4DAF4A", "#FF7F00", "#984EA3")
 
-tipos_linea <- c(1, 2, 3, 4, 5, 6, 1)
+medias_escaladas <- apply(
+  mediasCluster_matriz, 2,
+  function(x) (x - min(x)) / (max(x) - min(x)))
 
 par(mar = c(8, 4, 4, 2))
 
 matplot(
-  t(sqrt(mediasCluster_matriz)),
+  t(medias_escaladas),
   type = "l",
-  ylab = "Escala raíz cuadrada",
+  ylab = "Valor normalizado [0-1]",
   xlab = "",
-  lwd = 2,
-  lty = tipos_linea,
+  lwd = 3,
+  lty = 1,
   col = colores_plot,
-  main = "Perfil medio de los clústeres",
+  main = "Perfil medio de los clústeres de distritos",
   xaxt = "n")
 
 axis(
@@ -481,17 +482,15 @@ axis(
   at = 1:ncol(mediasCluster_matriz),
   labels = colnames(mediasCluster_matriz),
   las = 2,
-  cex.axis = 0.75)
+  cex.axis = 0.8)
 
 legend(
   "topleft",
   legend = rownames(mediasCluster_matriz),
-  lwd = 2,
-  lty = tipos_linea,
+  lwd = 3,
   col = colores_plot,
   bty = "n",
-  ncol = 2,
-  cex = 0.8)
+  ncol = 1)
 ```
 El análisis del perfil medio de los cinco clústeres permite caracterizar cada grupo a partir de las variables activas utilizadas en el clustering. El índice de envejecimiento es la variable que presenta mayor variabilidad entre clústeres, con el clúster 3 destacando como el más envejecido, seguido de cerca por los clústeres 2 y 4. En el extremo opuesto, el clúster 4 registra los valores más bajos de envejecimiento, apuntando a un perfil de municipios más jóvenes. El esfuerzo de alquiler y el porcentaje de hogares con 100 Mbps son las otras dos variables que más diferencian los grupos, con el clúster 2 destacando en ambas. La distancia al hospital presenta un comportamiento dispar, siendo especialmente elevada en el clúster 4. En cambio, variables como el ratio de centros de salud, el ratio de colegios o el ratio de hospital muestran valores bajos y similares en todos los grupos, contribuyendo menos a la diferenciación. En conjunto, el envejecimiento, la presión del alquiler y la conectividad digital son las dimensiones que más estructuran los perfiles municipales de Vizcaya.
 
