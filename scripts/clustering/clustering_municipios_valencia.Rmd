@@ -653,3 +653,23 @@ El análisis de clustering de los municipios de la provincia de Valencia ha perm
 Se compararon tres métodos: clustering jerárquico con Ward.D2, k-medias y PAM. El método k-medias se selecciona como solución principal por obtener la mayor anchura de silueta media (0,18) y la distribución más equilibrada de municipios entre grupos, frente al método jerárquico, que genera clústeres de tamaño muy reducido (clúster 5 con apenas 2 municipios) y presenta el clúster 1 con silueta negativa (-0,02), y PAM, que obtiene una silueta media de 0,16 con grupos también menos equilibrados.
 
 La interpretación mediante PCA muestra que las variables que más contribuyen a la diferenciación de los clústeres son la accesibilidad a servicios, especialmente la distancia al hospital y al centro educativo, junto con el índice de envejecimiento. Por último, la variable naturaleza_contratos, utilizada como apoyo externo, no determina la formación de los clústeres, aunque sí revela patrones relevantes en grupos específicos, como la orientación a servicios del clúster 1 (60%) o el carácter industrial del clúster 3 (33,33%).
+
+Finalmente, la caracterización propuesta de los clústeres obtenidos es la siguiente:
+
+c1 — Municipios jóvenes con baja accesibilidad sanitaria
+Envejecimiento bajo y ausencia de consultorio local. Presentan la mayor distancia media al hospital del conjunto, lo que los define como municipios con escasa cobertura sanitaria próxima.
+
+c2 — Municipios equilibrados
+Perfil medio en todas las variables analizadas, sin destacar de forma notable en ninguna dimensión. Representan el grupo más numeroso y heterogéneo del análisis.
+
+c3 — Municipios rurales con buena conectividad
+Envejecimiento medio con buena cobertura de internet de alta velocidad. Combinan un entorno rural con una dotación digital por encima de la media del conjunto.
+
+c4 — Municipios muy envejecidos
+Índice de envejecimiento muy elevado y ratio de colegios alto, lo que refleja una estructura demográfica envejecida con infraestructura educativa sobredimensionada respecto a la población actual.
+
+c5 — Municipios rurales envejecidos con presión residencial
+Envejecimiento alto combinado con mayor distancia al hospital y esfuerzo de alquiler por encima de la media. Municipios que acumulan desventajas tanto de accesibilidad como de tensión en el mercado residencial.
+
+c6 — Municipios urbanos con alta formación y presión de alquiler
+Esfuerzo de alquiler muy elevado, alto porcentaje de población con estudios superiores y baja distancia a servicios educativos y sanitarios. Perfil claramente urbano con mercado residencial tensionado.
