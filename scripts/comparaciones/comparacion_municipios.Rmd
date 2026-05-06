@@ -8,3 +8,475 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+
+En este apartado se realiza una comparación entre los municipios seleccionados de Vizcaya y Valencia a partir de las bases municipales finales construidas previamente, excluyendo las ciudades de Valencia y Bilbao ya que el análisis de las mismas se llevará a cabo en otro apartado. El objetivo es analizar si existen diferencias relevantes entre ambas provincias en variables demográficas, educativas, sanitarias, residenciales, digitales y económicas.
+
+Para ello, se integran ambas bases en un único conjunto de datos incorporando una variable que identifica la provincia de cada municipio. A partir de esta base conjunta, se realiza un análisis principalmente gráfico, complementado con algunos resúmenes descriptivos, con el fin de comparar la distribución de las variables y detectar patrones diferenciados entre los municipios de ambas provincias.
+
+## Preparación de los datos
+
+En primer lugar, cargamos los paquetes necesarios para leer las bases, manipular los datos y generar los gráficos comparativos.
+```{r}
+library(tidyverse)
+library(readr)
+library(gridExtra)
+```
+
+Cargamos las bases finales de municipios de Vizcaya y Valencia. Observamos que hay 39 municipios en el dataset de Vizcaya y 210 en el de Valencia. Además, comprobamos que en ambos hay 30 variables. Sin embargo, antes de realizar la comparación se eliminan las observaciones correspondientes a Bilbao y Valencia ciudad, ya que su análisis se llevará a cabo en otro apartado del proyecto.
+```{r}
+municipios_vizcaya <- read_csv("../../datasets/vizcaya-bilbao/municipios_vizcaya_base_final.csv", show_col_types = FALSE)
+
+municipios_valencia <- read_csv("../../datasets/valencia/municipios_valencia_base_final.csv", show_col_types = FALSE)
+
+head(municipios_vizcaya)
+head(municipios_valencia)
+
+dim(municipios_vizcaya)
+dim(municipios_valencia)
+```
+```{r}
+# Eliminamos Bilbao y Valencia ciudad del análisis comparativo
+municipios_vizcaya <- municipios_vizcaya %>% filter(nombre_municipio_norm != "bilbao")
+
+municipios_valencia <- municipios_valencia %>% filter(nombre_municipio_norm != "valencia")
+
+dim(municipios_vizcaya)
+dim(municipios_valencia)
+```
+
+Una vez eliminadas las ciudades de Bilbao y Valencia, añadimos una variable que identifica la provincia de cada municipio. Esto permitirá unir ambas bases en un único dataset y comparar todas las variables de forma conjunta.
+```{r}
+municipios_vizcaya <- municipios_vizcaya %>% mutate(provincia = "Vizcaya")
+
+municipios_valencia <- municipios_valencia %>% mutate(provincia = "Valencia")
+```
+
+A continuación, unimos las dos bases en un único objeto llamado municipios_comparacion. Este será el dataset principal utilizado durante todo el análisis comparativo.
+```{r}
+municipios_comparacion <- bind_rows(municipios_vizcaya, municipios_valencia)
+
+head(municipios_comparacion)
+dim(municipios_comparacion)
+```
+
+Comprobamos cuántos municipios aporta cada provincia al análisis.
+```{r}
+municipios_comparacion %>% count(provincia)
+```
+Tal y como se describe en los primeros pasos de este análisis, confirmamos que en la nueva tabla se encuentran todas las observaciones de los dos datasets iniciales (209 municipios de Valencia y 38 de Vizcaya).
+
+También revisamos que las variables disponibles sean las mismas en ambas bases.
+```{r}
+colnames(municipios_comparacion)
+```
+
+Por último, comprobamos si existen valores faltantes en la base conjunta. Esta revisión es importante porque algunos gráficos y resúmenes pueden verse afectados si alguna variable contiene valores no disponibles.
+```{r}
+faltantes_comparacion <- municipios_comparacion %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(cols = everything(), names_to = "variable", values_to = "num_faltantes") %>%
+  arrange(desc(num_faltantes))
+
+faltantes_comparacion
+```
+Efectivamente, no existe ningún valor faltante para ninguna de las variables de la tabla generada, por lo que esta comprobación sirve para confirmar que el análisis comparativo que estamos realizando puede realizarse de forma directa sobre el conjunto de municipios de Vizcaya y Valencia.
+
+## Comparación descriptiva general
+
+Antes de analizar las variables por bloques, realizamos una primera comparación general entre ambas provincias. En este apartado se revisa el número de municipios incluidos en cada base y la distribución de la población municipal, ya que el tamaño de los municipios puede influir en la interpretación del resto de variables.
+```{r}
+resumen_general <- municipios_comparacion %>%
+  group_by(provincia) %>%
+  summarise(
+    num_municipios = n(),
+    poblacion_total = sum(pob_total, na.rm = TRUE),
+    media_poblacion = mean(pob_total, na.rm = TRUE),
+    mediana_poblacion = median(pob_total, na.rm = TRUE),
+    min_poblacion = min(pob_total, na.rm = TRUE),
+    max_poblacion = max(pob_total, na.rm = TRUE),
+    .groups = "drop") %>%
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+resumen_general
+```
+La tabla anterior muestra una diferencia clara en el número de municipios analizados: Valencia incluye 209 municipios, mientras que Vizcaya cuenta con 38. Esto implica que la base de Valencia recoge una realidad municipal más amplia y heterogénea.
+
+En términos de población total, Valencia también presenta un volumen bastante más superior que Vizcaya. Sin embargo, al observar la población media y mediana por municipio, Vizcaya muestra valores más elevados. Esto indica que, aunque Valencia tiene más municipios y más población total, sus municipios tienden a ser de menor tamaño, mientras que en Vizcaya los municipios incluidos presentan, en general, un tamaño poblacional más elevado.
+
+Esto se debe a que anteriormente se ha realizado proceso de depuración previo eliminando numerosos municipios por no cumplir los criterios mínimos de conectividad a internet definidos en el proyecto, siendo el dataset de Vizcaya el más afectado tras esta eliminación. Esto explica en parte que la población media y mediana sean más elevadas para el caso de los municipios de Vizcaya, ya que se han conservado, en general, sus municipios con más habitantes.
+
+## Comparación por bloques
+
+### Comparación bloque demográfico
+
+Una vez realizada la comparación general, analizamos las variables demográficas principales. En este bloque se comparan el porcentaje de población extranjera (*pct_extranjeros*) y el índice de envejecimiento (*indice_envejecimiento*), ya que ambas variables permiten identificar diferencias en la estructura poblacional de los municipios de Vizcaya y Valencia.
+```{r}
+resumen_demografico <- municipios_comparacion %>%
+  group_by(provincia) %>%
+  summarise(
+    media_pct_extranjeros = mean(pct_extranjeros, na.rm = TRUE),
+    mediana_pct_extranjeros = median(pct_extranjeros, na.rm = TRUE),
+    media_indice_envejecimiento = mean(indice_envejecimiento, na.rm = TRUE),
+    mediana_indice_envejecimiento = median(indice_envejecimiento, na.rm = TRUE),
+    .groups = "drop") %>%
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+resumen_demografico
+```
+La tabla muestra que los municipios de Valencia presentan un porcentaje medio y mediano de población extranjera superior al de Vizcaya. En concreto, Valencia alcanza una media del 8,43% y una mediana del 7,88%, mientras que Vizcaya presenta una media del 5,89% y una mediana del 5,52%. Esto indica que, en términos generales, la presencia relativa de población extranjera es mayor en los municipios valencianos incluidos en el análisis.
+
+En cuanto al indice_envejecimiento, las diferencias entre ambas provincias son más reducidas. La media es ligeramente superior en Valencia, mientras que la mediana es más alta en Vizcaya. Esto sugiere que el envejecimiento municipal es relativamente parecido en ambos territorios.
+
+Representamos de forma conjunta el bloque demográfico para visualizar las conclusiones obtenidas tras analizar la tabla anterior. 
+```{r}
+demografico_largo <- municipios_comparacion %>%
+  select(provincia, pct_extranjeros, indice_envejecimiento) %>%
+  pivot_longer(
+    cols = c(pct_extranjeros, indice_envejecimiento),
+    names_to = "variable",
+    values_to = "valor")
+
+ggplot(demografico_largo, aes(x = provincia, y = valor, fill = provincia)) +
+  geom_boxplot(alpha = 0.7) +
+  facet_wrap(~ variable, scales = "free_y") +
+  labs(
+    title = "Comparación conjunta del bloque demográfico",
+    x = "Provincia",
+    y = "Valor") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+### Comparación bloque educativo
+
+Después de analizar las variables demográficas, se compara el nivel educativo de los municipios de ambas provincias. Para ello, se utiliza la variable *pct_estudios_sup*, que recoge el porcentaje de población con estudios superiores en cada municipio. Esta variable permite aproximar el nivel formativo de la población municipal y detectar posibles diferencias entre Vizcaya y Valencia.
+
+```{r}
+resumen_educativo <- municipios_comparacion %>%
+  group_by(provincia) %>%
+  summarise(
+    media_pct_estudios_sup = mean(pct_estudios_sup, na.rm = TRUE),
+    mediana_pct_estudios_sup = median(pct_estudios_sup, na.rm = TRUE),
+    min_pct_estudios_sup = min(pct_estudios_sup, na.rm = TRUE),
+    max_pct_estudios_sup = max(pct_estudios_sup, na.rm = TRUE),
+    .groups = "drop") %>%
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+resumen_educativo
+```
+La tabla muestra diferencias claras entre ambas provincias en el porcentaje de población con estudios superiores. Los municipios de Vizcaya presentan valores claramente superiores a los de Valencia con una diferencia entre ellos de un 10% aproximadamente.
+
+Esta diferencia indica que, en términos generales, los municipios vizcaínos incluidos en el análisis presentan un mayor nivel formativo que los municipios valencianos. Además, aunque el valor máximo es ligeramente superior en Valencia, los valores centrales son mucho más altos en Vizcaya, por lo que la diferencia no parece deberse únicamente a casos extremos, sino a una tendencia general del conjunto de municipios.
+
+Para completar la comparación, representamos la distribución de pct_estudios_sup mediante un boxplot. Este gráfico permite observar no solo los valores centrales, sino también la dispersión de los municipios dentro de cada provincia.
+```{r}
+ggplot(municipios_comparacion, aes(x = provincia, y = pct_estudios_sup, fill = provincia)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(
+    title = "Distribución del porcentaje de estudios superiores por provincia",
+    x = "Provincia",
+    y = "Porcentaje de población con estudios superiores") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+El gráfico confirma la diferencia observada en la tabla resumen. Por otro lado, en Valencia, la mayoría de municipios se concentran en valores más bajos, aunque aparecen varios valores atípicos con porcentajes elevados de estudios superiores. Esto muestra que existen algunos municipios valencianos con un perfil educativo alto, pero no representan la tendencia general de la provincia. En cambio, en Vizcaya los valores altos son más habituales dentro del conjunto de municipios analizados.
+
+### Comparación bloque de servicios y accesibilidad
+
+En este bloque se comparan las variables relacionadas con la disponibilidad de servicios educativos y sanitarios, así como con la accesibilidad a dichos servicios. Para ello se analizan los ratios de colegios (*ratio_colegios*), centros de salud (*ratio_centros_salud*) y hospitales (*ratio_hospital*), junto con las distancias al centro educativo (*distancia_centro_educativo*) y al hospital más cercano (*distancia_hospital*). Para el caso de la variable *consultorio_local*, al tratarse de una variable binaria, se calcula el porcentaje de municipios que cuentan con este servicio en cada provincia.
+```{r}
+resumen_servicios <- municipios_comparacion %>%
+  group_by(provincia) %>%
+  summarise(
+    media_ratio_colegios = mean(ratio_colegios, na.rm = TRUE),
+    mediana_ratio_colegios = median(ratio_colegios, na.rm = TRUE),
+    media_distancia_centro_educativo = mean(distancia_centro_educativo, na.rm = TRUE),
+    mediana_distancia_centro_educativo = median(distancia_centro_educativo, na.rm = TRUE),
+    media_ratio_centros_salud = mean(ratio_centros_salud, na.rm = TRUE),
+    mediana_ratio_centros_salud = median(ratio_centros_salud, na.rm = TRUE),
+    media_ratio_hospital = mean(ratio_hospital, na.rm = TRUE),
+    mediana_ratio_hospital = median(ratio_hospital, na.rm = TRUE),
+    media_distancia_hospital = mean(distancia_hospital, na.rm = TRUE),
+    mediana_distancia_hospital = median(distancia_hospital, na.rm = TRUE),
+    pct_municipios_consultorio = mean(consultorio_local == 1, na.rm = TRUE) * 100,
+    .groups = "drop") %>%
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+resumen_servicios
+```
+La tabla muestra diferencias claras entre ambas provincias en las variables de servicios y accesibilidad. En primer lugar, Valencia presenta un ratio de colegios superior al de Vizcaya, con una media de 0,50 frente a 0,11. Sin embargo, esta mayor disponibilidad de colegios no se traduce en una menor distancia, ya que las distancias muestran valores de la media y de la mediana más elevada en Valencia. Esto indica que los municipios vizcaínos incluidos en la base presentan, en general, una mayor cercanía a centros educativos.
+
+En cuanto a los servicios sanitarios, las diferencias en ratio de centros de salud son reducidas y las medianas son 0 en ambas provincias, lo que indica que muchos municipios no disponen directamente de centro de salud. Una mediana igual a 0 no indica un error en los datos, sino que más de la mitad de los municipios no cuentan con ese equipamiento de forma directa. En cambio, el porcentaje de municipios con consultorio local es mayor en Valencia, con un 70,33%, frente al 52,63% de Vizcaya. Por tanto, aunque los centros de salud no estén presentes de forma generalizada, Valencia muestra una mayor presencia de consultorios locales.
+
+Por último, la distancia al hospital también es mayor en Valencia, con una media de 10,91 km y una mediana de 8,11 km, mientras que Vizcaya presenta una media de 4,78 km y una mediana de 3,68 km. 
+
+En conjunto, Vizcaya destaca por menores distancias a servicios educativos y hospitalarios, mientras que Valencia presenta mayor presencia relativa de colegios y consultorios locales.
+
+A continuación, representamos de forma conjunta las variables del bloque manteniendo escalas independientes para cada una de ellas.
+```{r}
+servicios_largo <- municipios_comparacion %>%
+  select(
+    provincia,
+    ratio_colegios,
+    distancia_centro_educativo,
+    ratio_centros_salud,
+    ratio_hospital,
+    distancia_hospital) %>%
+  pivot_longer(
+    cols = -provincia,
+    names_to = "variable",
+    values_to = "valor")
+
+ggplot(servicios_largo, aes(x = provincia, y = valor, fill = provincia)) +
+  geom_boxplot(alpha = 0.7) +
+  facet_wrap(~ variable, scales = "free_y") +
+  labs(
+    title = "Comparación conjunta de servicios y accesibilidad por provincia",
+    x = "Provincia",
+    y = "Valor") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+Los gráficos confirman que la principal diferencia entre ambas provincias está en la accesibilidad. Los municipios de Vizcaya presentan menores distancias tanto al centro educativo como al hospital más cercano, mientras que Valencia muestra valores más altos y mayor dispersión. En cambio, los ratios sanitarios son bajos en ambas provincias, especialmente en el caso de hospitales, por lo que las diferencias más relevantes no están tanto en la existencia de dichos centros, sino en la distancia a ellos.
+
+### Comparación bloque residencial y económico
+
+En este bloque se comparan las variables relacionadas con la situación de alquileres y económica de los municipios. Para ello se analizan el precio por metro cuadrado de alquiler (*precio_m2_alquiler*), la renta media del hogar (*renta_media_hogar*) y el esfuerzo de alquiler (*esfuerzo_alquiler*). Estas variables permiten valorar si existen diferencias entre ambas provincias en términos de nivel de renta, coste de la vivienda y presión económica asociada al alquiler.
+
+```{r}
+resumen_residencial <- municipios_comparacion %>%
+  group_by(provincia) %>%
+  summarise(
+    media_precio_m2_alquiler = mean(precio_m2_alquiler, na.rm = TRUE),
+    mediana_precio_m2_alquiler = median(precio_m2_alquiler, na.rm = TRUE),
+    media_renta_media_hogar = mean(renta_media_hogar, na.rm = TRUE),
+    mediana_renta_media_hogar = median(renta_media_hogar, na.rm = TRUE),
+    media_esfuerzo_alquiler = mean(esfuerzo_alquiler, na.rm = TRUE),
+    mediana_esfuerzo_alquiler = median(esfuerzo_alquiler, na.rm = TRUE),
+    .groups = "drop") %>%
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+resumen_residencial
+```
+La tabla muestra diferencias muy claras entre ambas provincias en el bloque residencial y económico. Los municipios de Vizcaya presentan un precio medio del alquiler notablemente superior al de Valencia. Esta diferencia aparece tanto en la media como en la mediana, por lo que no parece depender únicamente de casos extremos.
+
+Al mismo tiempo, Vizcaya presenta una renta media del hogar más elevada. Sin embargo, este mayor nivel de renta no compensa completamente el mayor coste del alquiler, ya que el esfuerzo de alquiler también es claramente superior en Vizcaya. En concreto, la media del esfuerzo de alquiler alcanza el 20,33% en Vizcaya, frente al 11,64% en Valencia.
+
+En conjunto, los municipios vizcaínos incluidos en el análisis presentan mayor renta, pero también una presión residencial más elevada. Por el contrario, los municipios valencianos muestran menores niveles de renta media, pero también precios de alquiler y esfuerzo residencial más bajos.
+
+A continuación, representamos estas variables de forma conjunta mediante boxplots. Se utilizan escalas independientes porque las variables están medidas en unidades diferentes.
+```{r}
+residencial_largo <- municipios_comparacion %>%
+  select(
+    provincia,
+    precio_m2_alquiler,
+    renta_media_hogar,
+    esfuerzo_alquiler) %>%
+  pivot_longer(
+    cols = -provincia,
+    names_to = "variable",
+    values_to = "valor") %>%
+  mutate(
+    variable = recode(
+      variable,
+      "precio_m2_alquiler" = "Precio m2 alquiler",
+      "renta_media_hogar" = "Renta media hogar",
+      "esfuerzo_alquiler" = "Esfuerzo alquiler"))
+
+ggplot(residencial_largo, aes(x = provincia, y = valor, fill = provincia)) +
+  geom_boxplot(alpha = 0.7) +
+  facet_wrap(~ variable, scales = "free_y") +
+  labs(
+    title = "Comparación conjunta del bloque residencial y económico",
+    x = "Provincia",
+    y = "Valor") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+El gráfico confirma de forma visual las diferencias observadas en la tabla respecto a Vizcaya y Valencia. Además, en Valencia se observa una mayor presencia de valores atípicos en la renta media del hogar, lo que indica que algunos municipios presentan rentas elevadas respecto al conjunto provincial. Sin embargo, la tendencia general sigue siendo inferior a la de Vizcaya. En conjunto, el gráfico refuerza la idea de que Vizcaya presenta municipios con mayor nivel de renta, pero también con un mercado de alquiler más caro y una mayor presión residencial.
+
+### Comparación bloque digital
+
+En este bloque se compara la conectividad digital de los municipios de ambas provincias. Para ello se utiliza la variable *pct_hogares_100mbps*, que recoge el porcentaje de hogares con acceso a una conexión de al menos 100 Mbps. Esta variable permite analizar si existen diferencias relevantes en la cobertura digital entre los municipios de Vizcaya y Valencia.
+
+```{r}
+resumen_digital <- municipios_comparacion %>%
+  group_by(provincia) %>%
+  summarise(
+    media_pct_hogares_100mbps = mean(pct_hogares_100mbps, na.rm = TRUE),
+    mediana_pct_hogares_100mbps = median(pct_hogares_100mbps, na.rm = TRUE),
+    min_pct_hogares_100mbps = min(pct_hogares_100mbps, na.rm = TRUE),
+    max_pct_hogares_100mbps = max(pct_hogares_100mbps, na.rm = TRUE),
+    pct_municipios_mayor_90 = mean(pct_hogares_100mbps > 90, na.rm = TRUE) * 100,
+    .groups = "drop") %>%
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+resumen_digital
+```
+La tabla muestra que todos los municipios incluidos en el análisis presentan una cobertura digital superior al 90% de hogares con acceso a 100 Mbps. Esto se debe a que, durante la construcción de las bases finales, se descartaron previamente todos los municipios de Valencia y Vizcaya que no alcanzaban dicho umbral mínimo de conectividad ya que este proyecto está destinado al teletrabajo. Por tanto, los resultados de este bloque no deben interpretarse como una descripción completa de la conectividad digital provincial, sino como una comparación entre los municipios que cumplen las condiciones digitales definidas en el proyecto.
+
+A continuación, representamos la distribución de la cobertura digital mediante un boxplot.
+```{r}
+ggplot(municipios_comparacion, aes(x = provincia, y = pct_hogares_100mbps, fill = provincia)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(
+    title = "Distribución del porcentaje de hogares con acceso a 100 Mbps por provincia",
+    x = "Provincia",
+    y = "Porcentaje de hogares con acceso a 100 Mbps") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+Dentro de este conjunto ya filtrado, ambas provincias presentan valores muy elevados y relativamente similares. Valencia muestra una media y una mediana ligeramente superiores, mientras que Vizcaya mantiene también niveles altos de cobertura, con un mínimo por encima del 90%. En consecuencia, la variable *pct_hogares_100mbps* no permite diferenciar claramente entre ambas provincias en esta fase del análisis, ya que la baja conectividad fue utilizada como criterio de exclusión previo.
+
+### Comparación bloque laboral
+
+En este bloque se comparan las variables relacionadas con la distribución sectorial de los contratos en los municipios de ambas provincias. Para ello se analizan los porcentajes de contratos en agricultura, industria, construcción y servicios. Además, se analiza la variable *naturaleza_contratos*, que resume el perfil predominante de contratación de cada municipio.
+```{r}
+resumen_contratos <- municipios_comparacion %>%
+  group_by(provincia) %>%
+  summarise(
+    media_pct_agricultura = mean(pct_contratos_agricultura, na.rm = TRUE),
+    mediana_pct_agricultura = median(pct_contratos_agricultura, na.rm = TRUE),
+    media_pct_industria = mean(pct_contratos_industria, na.rm = TRUE),
+    mediana_pct_industria = median(pct_contratos_industria, na.rm = TRUE),
+    media_pct_construccion = mean(pct_contratos_construccion, na.rm = TRUE),
+    mediana_pct_construccion = median(pct_contratos_construccion, na.rm = TRUE),
+    media_pct_servicios = mean(pct_contratos_servicios, na.rm = TRUE),
+    mediana_pct_servicios = median(pct_contratos_servicios, na.rm = TRUE),
+    .groups = "drop") %>%
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+resumen_contratos
+```
+La tabla y el gráfico muestran perfiles de contratación claramente diferenciados entre ambas provincias. En Valencia existe un mayor peso relativo de la agricultura, con una media del 13,02%, frente al 1,66% de Vizcaya. 
+
+En cambio, Vizcaya presenta un perfil mucho más orientado al sector servicios y con valores superiores a los de Valencia. La industria y la construcción presentan diferencias más moderadas, aunque Valencia muestra un ligero peso industrial mayor que Vizcaya.
+
+En conjunto, Valencia presenta una estructura contractual más heterogénea, con mayor presencia de agricultura, industria y algunos valores extremos, mientras que Vizcaya muestra un perfil más concentrado en los servicios.
+
+A continuación, representamos conjuntamente los porcentajes sectoriales mediante boxplots.
+```{r}
+contratos_largo <- municipios_comparacion %>%
+  select(
+    provincia,
+    pct_contratos_agricultura,
+    pct_contratos_industria,
+    pct_contratos_construccion,
+    pct_contratos_servicios) %>%
+  pivot_longer(
+    cols = -provincia,
+    names_to = "variable",
+    values_to = "valor") %>%
+  mutate(
+    variable = recode(
+      variable,
+      "pct_contratos_agricultura" = "Agricultura",
+      "pct_contratos_industria" = "Industria",
+      "pct_contratos_construccion" = "Construcción",
+      "pct_contratos_servicios" = "Servicios"))
+
+ggplot(contratos_largo, aes(x = provincia, y = valor, fill = provincia)) +
+  geom_boxplot(alpha = 0.7) +
+  facet_wrap(~ variable, scales = "free_y") +
+  labs(
+    title = "Comparación conjunta del bloque de contratos por provincia",
+    x = "Provincia",
+    y = "Porcentaje de contratos") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+Como podemos observar, el gráfico confirma las conclusiones obtenidas anteriormente. 
+
+Por último, analizamos la variable *naturaleza_contratos*, que resume el perfil contractual predominante de cada municipio. En este caso, se utiliza una tabla que muestra cuántos municipios de cada provincia pertenecen a cada categoría contractual y qué porcentaje representan sobre el total de municipios de su provincia.
+```{r}
+naturaleza_resumen <- municipios_comparacion %>%
+  count(provincia, naturaleza_contratos) %>%
+  group_by(provincia) %>%
+  mutate(porcentaje = n / sum(n) * 100) %>% ungroup()
+
+naturaleza_resumen
+```
+La variable *naturaleza_contratos* confirma las diferencias observadas en los porcentajes sectoriales. En Valencia aparece una mayor variedad de perfiles contractuales, con presencia relevante de municipios agrícolas, industriales, de servicios y mixtos. En cambio, Vizcaya concentra una parte importante de sus municipios en las categorías de servicios y mixto sin especialización clara, mientras que la presencia agrícola es prácticamente residual.
+
+Realizamos un gráfico para visualizar la distribución de la naturaleza de los contratos por provincia.
+```{r}
+ggplot(naturaleza_resumen,
+       aes(x = provincia, y = porcentaje, fill = naturaleza_contratos)) +
+  geom_col(position = "stack", alpha = 0.85) +
+  labs(title = "Distribución de la naturaleza de los contratos por provincia",
+    x = "Provincia",
+    y = "Porcentaje de municipios",
+    fill = "Naturaleza de contratos") +
+  theme_minimal()
+```
+En conclusión, Valencia muestra una estructura contractual más diversificada, mientras que Vizcaya presenta un perfil más terciarizado y menos vinculado al sector agrícola.
+
+## Conclusión
+
+Una vez analizados los distintos bloques de variables por separado, realizamos una resumen global de la comparación entre los municipios de Valencia y Vizcaya. Para ello, se calculan las medias estandarizadas de las principales variables analizadas. Esta estandarización permite comparar variables medidas en escalas diferentes y observar en qué aspectos presenta valores relativamente más altos cada provincia. Los valores positivos indicarán que la provincia se sitúa por encima de la media conjunta de los municipios incluidos, mientras que los valores negativos indicarán que se sitúa por debajo.
+```{r}
+variables_sintesis <- municipios_comparacion %>%
+  select(
+    provincia,
+    pct_extranjeros,
+    indice_envejecimiento,
+    pct_estudios_sup,
+    ratio_colegios,
+    distancia_centro_educativo,
+    ratio_centros_salud,
+    ratio_hospital,
+    distancia_hospital,
+    precio_m2_alquiler,
+    renta_media_hogar,
+    esfuerzo_alquiler,
+    pct_hogares_100mbps,
+    pct_contratos_agricultura,
+    pct_contratos_industria,
+    pct_contratos_construccion,
+    pct_contratos_servicios)
+
+sintesis_largo <- variables_sintesis %>%
+  pivot_longer(
+    cols = -provincia,
+    names_to = "variable",
+    values_to = "valor") %>%
+  group_by(variable) %>%
+  mutate(valor_estandarizado = as.numeric(scale(valor))) %>%
+  ungroup()
+
+perfil_global <- sintesis_largo %>%
+  group_by(provincia, variable) %>%
+  summarise(
+    media_estandarizada = mean(valor_estandarizado, na.rm = TRUE),
+    .groups = "drop")
+
+perfil_global
+```
+Como podemos observar, en Vizcaya destacan especialmente *precio_m2_alquiler*, *esfuerzo_alquiler*, *renta_media_hogar*, *pct_estudios_sup* y *pct_contratos_servicios*, lo que confirma un perfil con mayor renta, mayor nivel educativo, mayor peso del sector servicios y mayor presión residencial. En cambio, Valencia presenta valores superiores en *pct_extranjeros*, *ratio_colegios*, *pct_contratos_agricultura*, *pct_contratos_industria* y *pct_contratos_construccion*, reflejando una estructura demográfica y económica más diversa.
+
+A continuación, se representa el perfil medio estandarizado de ambas provincias.
+```{r}
+ggplot(perfil_global,
+       aes(x = reorder(variable, media_estandarizada),
+           y = media_estandarizada,
+           fill = provincia)) +
+  geom_col(position = "dodge", alpha = 0.85) +
+  coord_flip() +
+  labs(title = "Perfil comparativo global de Valencia y Vizcaya",
+    x = "Variable",
+    y = "Media estandarizada",
+    fill = "Provincia") +
+  theme_minimal()
+```
+El gráfico facilita la comparación visual del perfil medio de ambas provincias, donde Vizcaya aparece claramente por encima de Valencia en las variables residenciales y económicas, especialmente en *precio_m2_alquiler*, *esfuerzo_alquiler* y *renta_media_hogar*. También destaca en *pct_estudios_sup* y en *pct_contratos_servicios*. 
+
+Por el contrario, Valencia se sitúa por encima en variables asociadas a una mayor heterogeneidad territorial, como *pct_extranjeros*, *pct_contratos_agricultura*, *pct_contratos_industria* y *ratio_colegios*. Además, en las variables de distancia, Vizcaya presenta valores negativos, lo que indica menores distancias medias a servicios educativos y hospitalarios, reforzando su mejor accesibilidad territorial dentro de los municipios analizados.
+
+
+En conclusión, el análisis comparativo permite identificar perfiles municipales diferenciados entre las provincias de Valencia y Vizcaya, excluyendo las ciudades de Valencia y Bilbao, ya que estas se analizan en otro apartado del proyecto. Todo ello teniendo en cuenta que se ha realizado el estudio con los municipios seleccionados tras la depuración relacionada con la conectividad digital, lo que condiciona los resultados obtenidos en comparación al nivel global de las provincias.
+
+Por un lado, los municipios estudiados de Valencia presentan una realidad más amplia y heterogénea, tanto por el mayor número de municipios analizados como por la mayor diversidad observada en variables demográficas, de servicios y de contratos. Valencia destaca por una mayor presencia de población extranjera, mayor peso de sectores como la agricultura, la industria y la construcción, y una estructura contractual más diversificada.
+
+Por otro lado, los municipios de Vizcaya muestran un perfil más concentrado y homogéneo. En general, presentan mayor tamaño poblacional medio, mayor porcentaje de población con estudios superiores, mayor renta media del hogar, mayor precio del alquiler y mayor esfuerzo residencial. Además, muestran una mejor accesibilidad a servicios educativos y hospitalarios, al presentar menores distancias medias.
+
+Por tanto, las principales diferencias entre Valencia y Vizcaya se encuentran en el perfil socioeconómico, residencial, educativo y sectorial de los municipios incluidos en el análisis.
