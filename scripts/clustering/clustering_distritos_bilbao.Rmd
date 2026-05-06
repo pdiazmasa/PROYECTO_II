@@ -1056,7 +1056,14 @@ El análisis de clustering ha permitido identificar tres perfiles diferenciados 
 
 Se ha optado por una solución de k = 3 clústeres utilizando el método de clustering jerárquico con Ward.D2, por ser el más robusto para identificar grupos equilibrados en este contexto, aunque el método k-medias también era válido ya que la segmentación daba exactamente el mismo resultado. En este caso se han obtenido los 3 clústeres formados por 2, 2 y 3 distritos cada uno, por lo que la distribución ha resultado equilibrada.
 
-La interpretación de los resultados mediante PCA y perfiles medios muestra que las variables más influyentes son el índice de envejecimiento, el esfuerzo de alquiler y el ratio de centros educativos. Destacan especialmente el clúster 1 (distritos envejecidos con buen acceso a centros educativos), el clúster 2 (perfil de edad intermedio con baja densidad de colegios y alquiler elevado) y el clúster 3 (zonas más jóvenes con alto esfuerzo de alquiler y carencia de infraestructura hospitalaria).
+La interpretación de los resultados mediante PCA y perfiles medios muestra que las variables más influyentes son el índice de envejecimiento, el esfuerzo de alquiler y el ratio de centros educativos. 
 
->>>>>>> bb015b1cfb220c1ef571ab8491c9f3d9ee5580e3
-Por último, el distrito de Otxarkoaga se integra en el modelo final como un clúster singular estando su perfil caracterizado por una accesibilidad a servicios excepcionalmente alta y el mayor esfuerzo de alquiler de la muestra.
+Finalmente, la caracterización propuesta de los clústeres obtenidos es la siguiente:
+
+c1 — Representa los distritos con el perfil demográfico más envejecido del estudio, con un índice de 241,39. Se caracteriza por ofrecer el mayor ratio de centros educativos (0,29) y, simultáneamente, presenta el menor esfuerzo económico para el alquiler (27,74), situándose como zonas consolidadas de servicios estables.
+
+c2 — Se define como un perfil de distritos con alto índice de envejecimiento (229,76) y que destaca por tener la oferta educativa más limitada de todas, con un ratio de colegios de apenas 0,11. Además, soporta un esfuerzo de alquiler elevado (32,82), lo que indica áreas de alta demanda residencial pero menor accesibilidad escolar.
+
+c3 — Agrupa los distritos más jóvenes de la ciudad, con el índice de envejecimiento más bajo (155,05) y una fuerte presión en el mercado de la vivienda, con un esfuerzo de alquiler de 33,70. Su rasgo más distintivo es la ausencia total de infraestructuras hospitalarias, (con un ratio de 0,00),reflejando zonas que dependen de servicios sanitarios de distritos cercanos.
+
+c4 — Corresponde al valor anómalo (Otxarkoaga), cuyos valores extremos justifican su tratamiento independiente fuera de los grupos principales. Este distrito presenta los ratios más altos de toda la muestra tanto en centros educativos (0,52) como en hospitales (0,04), y a su vez registra el esfuerzo de alquiler más costoso para el usuario (35,63), consolidándose como un entorno de servicios muy concentrados.
