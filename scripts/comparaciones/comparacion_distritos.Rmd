@@ -1,6 +1,6 @@
 ---
-title: "Untitled"
-author: "german"
+title: "comparacion_distritos"
+author: "Grupo 1"
 date: "2026-05-11"
 output: html_document
 ---
@@ -9,15 +9,394 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+En este apartado se realiza una comparación entre los municipios seleccionados de Vizcaya y Valencia a partir de las bases finales construidas previamente. El objetivo es analizar si existen diferencias relevantes entre los distritos de ambas ciudades en variables demográficas, educativas, sanitarias, residenciales y económicas.
+
+Para ello, se integran ambas bases en un único conjunto de datos incorporando una variable que identifica la ciudad de cada distrito. A partir de esta base conjunta, se realiza un análisis principalmente gráfico, complementado con algunos resúmenes descriptivos, con el fin de comparar la distribución de las variables y detectar patrones diferenciados entre los municipios de ambas provincias.
+
+## Preparación de los datos
+
+En primer lugar, cargamos los paquetes necesarios para leer las bases, manipular los datos y generar los gráficos comparativos.
+```{r}
+library(tidyverse)
+library(readr)
+library(gridExtra)
+```
+
+Cargamos las bases finales de dsitritos de Valencia y Bilbao. Observamos que hay 8 distritos en el dataset de Bilbao y 19 en el de Valencia. Además, comprobamos que en ambos hay 16 variables.
+```{r}
+distritos_bilbao <- read_csv("../../datasets/vizcaya-bilbao/distritos_bilbao_base_final.csv", show_col_types = FALSE)
+
+distritos_valencia <- read_csv("../../datasets/valencia/distritos_valencia_base_final.csv", show_col_types = FALSE)
+
+head(distritos_bilbao)
+head(distritos_valencia)
+
+dim(distritos_bilbao)
+dim(distritos_valencia)
+```
+
+añadimos una variable que identifica la ciudad a la que pertenece cada distrito. Esto permitirá unir ambas bases en un único dataset y comparar todas las variables de forma conjunta.
+```{r}
+distritos_bilbao <- distritos_bilbao %>% mutate(ciudad = "Bilbao")
+
+distritos_valencia <- distritos_valencia %>% mutate(ciudad = "Valencia")
+```
+
+A continuación, unimos las dos bases en un único objeto llamado distritos_comparacion, que será el dataset principal utilizado durante todo el análisis comparativo. Comprobamos que el número de distritos que aporta cada ciudad al dataset es el correcto y revisamos que las variables son las mismas en ambas bases.
+```{r}
+distritos_comparacion <- bind_rows(distritos_bilbao, distritos_valencia)
+
+head(distritos_comparacion)
+dim(distritos_comparacion)
+
+distritos_comparacion %>% count(ciudad)
+
+colnames(distritos_comparacion)
+
+```
+
+Tal y como se describe en los primeros pasos de este análisis, confirmamos que en la nueva tabla se encuentran todas las observaciones de los dos datasets iniciales (19 distritos de Valencia y 8 de Bilbao) y que los nombres de las variables coinciden
+
+Por último, comprobamos si existen valores faltantes en la base conjunta. Esta revisión es importante porque algunos gráficos y resúmenes pueden verse afectados si alguna variable contiene valores no disponibles.
+```{r}
+faltantes_comparacion <- distritos_comparacion %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(cols = everything(), names_to = "variable", values_to = "num_faltantes") %>%
+  arrange(desc(num_faltantes))
+
+faltantes_comparacion
+```
+
+Como no existe ningún valor faltante para ninguna de las variables de la tabla generada confirmamos que el análisis comparativo que estamos realizando puede realizarse de forma directa sobre el conjunto de distritos de Bilbao y Valencia.
+
+## Comparación descriptiva inicial
+
+Antes de analizar las variables por bloques, realizamos una primera comparación entre ambas ciudades a partir de la población de sus distritos. En este apartado se revisa la distribución de la población municipal, ya que el tamaño de los distritos puede influir en la interpretación de algunas variables, especialmente aquellas que se miden en valores absolutos.
+```{r}
+resumen_general <- distritos_comparacion %>%
+  group_by(ciudad) %>%
+  summarise(
+    num_distritos = n(),
+    poblacion_total = sum(pob_total, na.rm = TRUE),
+    media_poblacion = mean(pob_total, na.rm = TRUE),
+    mediana_poblacion = median(pob_total, na.rm = TRUE),
+    min_poblacion = min(pob_total, na.rm = TRUE),
+    max_poblacion = max(pob_total, na.rm = TRUE),
+    .groups = "drop") %>%
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+resumen_general
+```
+
+La tabla anterior muestra una diferencia clara en el número de distritos analizados, teniendo valencia una mayor cantidad de ellos, lo que probablemente se deba a que Valencia tiene más del doble de población que Bilbao.
+
+Sin embargo, al observar la población media por distrito, Bilbao muestra valores más elevados. Esto indica que, aunque Valencia tiene más distritos y más población total, sus distritos tienden a ser de menor tamaño poblacional, mientras que en Bilbao la población está más concentrada en el reducido número de distritos. También se puede observar en el mínimo de población, que en valencia es un valor muy bajo (6744), mientras que en Bilbao es un valor considerablemente más alto. Al contrario, el distrito de mayor población de valencia tiene un volumen considerablemente mayor que el más poblado de Bilbao.
+
+Estos valores probablemente se deban a que Valencia incluye como distritos algunos formados por pedanías situadas al sur o al norte del municipio y que contienen muy poca población, pero al mismo tiempo sus distritos más céntricos tienen un volumen de población muy alto. Por el contrario, en la ciudad de Bilbao toda la población se concentra en menos distritos teniendo todos ellos un mayor volumen de población.
+
+## Comparación por bloques
+
+### Comparación bloque demográfico
+
+Una vez realizada la comparación general, analizamos las variables demográficas principales. En este bloque se compara el índice de envejecimiento (*indice_envejecimiento*), medida que permite identificar diferencias en la estructura poblacional de los distritos de Bilbao y Valencia.
+```{r}
+resumen_demografico <- distritos_comparacion %>%
+  group_by(ciudad) %>%
+  summarise(
+    media_indice_envejecimiento = mean(indice_envejecimiento, na.rm = TRUE),
+    mediana_indice_envejecimiento = median(indice_envejecimiento, na.rm = TRUE),
+    min_indice_envejecimiento = min(indice_envejecimiento, na.rm = TRUE),
+    max_indice_envejecimiento = max(indice_envejecimiento, na.rm = TRUE),
+    .groups = "drop") %>%
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+resumen_demografico
+```
+
+
+Representamos de forma conjunta el bloque demográfico para visualizar las conclusiones obtenidas tras analizar la tabla anterior. 
+```{r}
+demografico_largo <- distritos_comparacion %>%
+  select(ciudad, indice_envejecimiento) %>%
+  pivot_longer(
+    cols = c(indice_envejecimiento),
+    names_to = "variable",
+    values_to = "valor")
+
+ggplot(demografico_largo, aes(x = ciudad, y = valor, fill = ciudad)) +
+  geom_boxplot(alpha = 0.7) +
+  facet_wrap(~ variable, scales = "free_y") +
+  labs(
+    title = "Comparación conjunta del bloque demográfico",
+    x = "Ciudad",
+    y = "Valor") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+A continuación representamos
 
 ```{r}
+# --- GRÁFICO 1: RANKING DE ENVEJECIMIENTO (Lollipop) ---
+# Seleccionamos los 3 más jóvenes y 3 más envejecidos de cada ciudad
+extremos_edad <- distritos_comparacion %>%
+  group_by(ciudad) %>%
+  filter(min_rank(indice_envejecimiento) <= 3 | min_rank(desc(indice_envejecimiento)) <= 3) %>%
+  ungroup()
+
+ggplot(extremos_edad, aes(x = reorder(nombre_distrito_norm, indice_envejecimiento), 
+                          y = indice_envejecimiento, 
+                          color = ciudad)) +
+  geom_segment(aes(xend = nombre_distrito_norm, yend = 0), size = 1) +
+  geom_point(size = 4) +
+  coord_flip() + # Para que los nombres se lean en horizontal
+  facet_wrap(~ciudad, scales = "free_y") +
+  scale_color_manual(values = c("Bilbao" = "#E41A1C", "Valencia" = "#377EB8")) +
+  labs(title = "Distritos más Jóvenes vs más Envejecidos",
+       subtitle = "Índice de envejecimiento (Valores bajos = más jóvenes)",
+       x = NULL, y = "Índice de Envejecimiento") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
 ```
 
-## Including Plots
+### Comparación bloque de servicios y accesibilidad
 
-You can also embed plots, for example:
+En este bloque se comparan las variables relacionadas con la disponibilidad de servicios educativos y sanitarios, así como con la accesibilidad a dichos servicios. Para ello se analizan los ratios de colegios (*ratio_colegio*) y hospitales (*ratio_hospital*), ya que no disponemos de variables de distancia en el ámbito de distritos.
+```{r}
+resumen_servicios <- distritos_comparacion %>%
+  group_by(ciudad) %>%
+  summarise(
+    media_ratio_colegio = mean(ratio_colegio, na.rm = TRUE),
+    mediana_ratio_colegio = median(ratio_colegio, na.rm = TRUE),
+    media_ratio_hospital = mean(ratio_hospital, na.rm = TRUE),
+    mediana_ratio_hospital = median(ratio_hospital, na.rm = TRUE),
+    .groups = "drop") %>%
+  mutate(across(where(is.numeric), ~ round(., 2)))
 
-```{r, echo=FALSE}
+resumen_servicios
 ```
+
+
+A continuación, representamos de forma conjunta las variables del bloque manteniendo escalas independientes para cada una de ellas.
+```{r}
+servicios_largo <- distritos_comparacion %>%
+  select(
+    ciudad,
+    ratio_colegio,
+    ratio_hospital) %>%
+  pivot_longer(
+    cols = -ciudad,
+    names_to = "variable",
+    values_to = "valor")
+
+ggplot(servicios_largo, aes(x = ciudad, y = valor, fill = ciudad)) +
+  geom_boxplot(alpha = 0.7) +
+  facet_wrap(~ variable, scales = "free_y") +
+  labs(
+    title = "Comparación conjunta de servicios y accesibilidad por ciudad",
+    x = "Ciudad",
+    y = "Valor") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+
+### Comparación bloque residencial y económico
+
+En este bloque se comparan las variables relacionadas con la situación de alquileres y económica de los municipios. Para ello se analizan el precio por metro cuadrado de alquiler (*alquiler_m2*), la renta media del hogar (*renta_media_hogar*) y el esfuerzo de alquiler (*esfuerzo_alquiler*). Estas variables permiten valorar si existen diferencias entre ambas ciudades en términos de nivel de renta, coste de la vivienda y presión económica asociada al alquiler.
+
+```{r}
+resumen_residencial <- distritos_comparacion %>%
+  group_by(ciudad) %>%
+  summarise(
+    media_alquiler_m2 = mean(alquiler_m2, na.rm = TRUE),
+    mediana_alquiler_m2 = median(alquiler_m2, na.rm = TRUE),
+    media_renta_media_hogar = mean(renta_media_hogar, na.rm = TRUE),
+    mediana_renta_media_hogar = median(renta_media_hogar, na.rm = TRUE),
+    media_esfuerzo_alquiler = mean(esfuerzo_alquiler, na.rm = TRUE),
+    mediana_esfuerzo_alquiler = median(esfuerzo_alquiler, na.rm = TRUE),
+    .groups = "drop") %>%
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+resumen_residencial
+```
+
+
+A continuación, representamos estas variables de forma conjunta mediante boxplots. Se utilizan escalas independientes porque las variables están medidas en unidades diferentes.
+```{r}
+residencial_largo <- distritos_comparacion %>%
+  select(
+    ciudad,
+    alquiler_m2,
+    renta_media_hogar,
+    esfuerzo_alquiler) %>%
+  pivot_longer(
+    cols = -ciudad,
+    names_to = "variable",
+    values_to = "valor") %>%
+  mutate(
+    variable = recode(
+      variable,
+      "alquiler_m2" = "Precio m2 alquiler",
+      "renta_media_hogar" = "Renta media hogar",
+      "esfuerzo_alquiler" = "Esfuerzo alquiler"))
+
+ggplot(residencial_largo, aes(x = ciudad, y = valor, fill = ciudad)) +
+  geom_boxplot(alpha = 0.7) +
+  facet_wrap(~ variable, scales = "free_y") +
+  labs(
+    title = "Comparación conjunta del bloque residencial y económico",
+    x = "Ciudad",
+    y = "Valor") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+
+```{r}
+ggplot(distritos_comparacion, aes(x = renta_media_hogar, 
+                                  y = alquiler_m2, 
+                                  color = esfuerzo_alquiler,
+                                  shape = ciudad)) +
+  geom_point(size = 3, alpha = 0.8) +
+  scale_color_gradient(low = "#FFEB3B", high = "#E91E63") +
+  # Etiquetas para los 3 con mayor y menor esfuerzo, el que tiene la mayor renta, la menor renta y el menor alquiler 
+  geom_text_repel(data = distritos_comparacion %>% 
+                    filter(esfuerzo_alquiler > quantile(esfuerzo_alquiler, 0.9) | 
+                           renta_media_hogar == max(renta_media_hogar) |
+                           renta_media_hogar == min(renta_media_hogar) |
+                           alquiler_m2 == min(alquiler_m2) |
+                           min_rank(esfuerzo_alquiler) <= 3),
+                  aes(label = nombre_distrito_norm), 
+                  size = 3.5, fontface = "bold", show.legend = FALSE) +
+  labs(title = "Relación Renta vs Alquiler por Distrito",
+       x = "Renta Media del Hogar (€)",
+       y = "Precio Alquiler (€/m2)",
+       color = "Esfuerzo (%)",
+       shape = "Ciudad") +
+  theme_minimal()
+
+```
+
+
+### Comparación bloque entorno y sostenibilidad
+
+En este bloque se compara el entorno de los distritos de ambas ciudades. Para ello se utiliza la variable *ratio_zonas_verdes*, la cual permite analizar la cantidad de espacios verdes en relación con la población de los distritos de cada ciudad.
+
+```{r}
+resumen_digital <- distritos_comparacion %>%
+  group_by(ciudad) %>%
+  summarise(
+    media_ratio_zonas_verdes = mean(ratio_zonas_verdes, na.rm = TRUE),
+    mediana_ratio_zonas_verdes = median(ratio_zonas_verdes, na.rm = TRUE),
+    .groups = "drop") %>%
+  mutate(across(where(is.numeric), ~ round(., 4)))
+
+resumen_digital
+```
+
+A continuación, representamos la distribución de las zonas verdes mediante un boxplot.
+```{r}
+ggplot(distritos_comparacion, aes(x = ciudad, y = ratio_zonas_verdes, fill = ciudad)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(
+    title = "Distribución del ratio de zonas verdes por ciudad",
+    x = "Ciudad",
+    y = "Ratio de Zonas Verdes") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+## Conclusión
+
+Una vez analizados los distintos bloques de variables por separado, realizamos una resumen global de la comparación entre los municipios de Valencia y Vizcaya. Para ello, se calculan las medias estandarizadas de las principales variables analizadas. Esta estandarización permite comparar variables medidas en escalas diferentes y observar en qué aspectos presenta valores relativamente más altos cada ciudad. Los valores positivos indicarán que la ciudad se sitúa por encima de la media conjunta de los distritos incluidos, mientras que los valores negativos indicarán que se sitúa por debajo.
+```{r}
+variables_sintesis <- distritos_comparacion %>%
+  select(
+    ciudad,
+    indice_envejecimiento,
+    ratio_colegio,
+    ratio_hospital,
+    alquiler_m2,
+    renta_media_hogar,
+    esfuerzo_alquiler,
+    ratio_zonas_verdes)
+
+sintesis_largo <- variables_sintesis %>%
+  pivot_longer(
+    cols = -ciudad,
+    names_to = "variable",
+    values_to = "valor") %>%
+  group_by(variable) %>%
+  mutate(valor_estandarizado = as.numeric(scale(valor))) %>%
+  ungroup()
+
+perfil_global <- sintesis_largo %>%
+  group_by(ciudad, variable) %>%
+  summarise(
+    media_estandarizada = mean(valor_estandarizado, na.rm = TRUE),
+    .groups = "drop")
+
+perfil_global
+```
+
+
+A continuación, se representa
+
+```{r, fig.width=8, fig.height=6, warning=FALSE, message=FALSE}
+# 1. Preparación limpia
+# Seleccionamos y renombramos primero para no tener líos con los nombres largos
+datos_heatmap <- distritos_comparacion %>%
+  select(ciudad, 
+         Distrito = nombre_distrito_norm, 
+         Envejecimiento = indice_envejecimiento, 
+         Renta = renta_media_hogar, 
+         Alquiler = alquiler_m2, 
+         Esfuerzo = esfuerzo_alquiler, 
+         Colegios = ratio_colegio, 
+         Sanidad = ratio_hospital, 
+         Verde = ratio_zonas_verdes) %>%
+  # PASO CLAVE: Escalar solo las columnas que son números (del 3 al 9)
+  # Así evitamos los avisos de "not numeric"
+  mutate(across(3:9, ~ as.numeric(scale(as.numeric(.))))) %>%
+  # Pasamos a formato largo
+  pivot_longer(cols = 3:9, names_to = "Variable", values_to = "Valor")
+
+# 2. Dibujar el Heatmap Divergente (Estilo compañero)
+ggplot(datos_heatmap, aes(x = Variable, y = reorder(Distrito, ciudad), fill = Valor)) +
+  geom_tile(color = "white") +
+  # Añadimos los valores (Z-score)
+  geom_text(aes(label = round(Valor, 1)), size = 3, color = "black") +
+  # ESCALA DE COLORES DIVERGENTE
+  # low = azul/gris para negativos, mid = blanco para el 0, high = rojo para positivos
+  scale_fill_gradient2(low = "#4575b4",   # Un azul grisáceo profesional
+                       mid = "white",    # El 0 exacto es blanco
+                       high = "#d73027", # Un rojo intenso
+                       midpoint = 0) +   # Crucial: el centro de la escala es el 0
+  facet_grid(ciudad ~ ., scales = "free_y", space = "free") +
+  theme_minimal() +
+  labs(title = "Análisis Comparativo de Distritos con Valores Estandarizados",
+       subtitle = "Rojo: por encima de la media | Azul: por debajo de la media | Blanco: en la media",
+       x = NULL, y = NULL, fill = "Desviación") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid = element_blank(),
+        strip.text.y = element_text(angle = 0, face = "bold"))
+
+```
+
+A continuación, se representa el perfil medio estandarizado de ambas provincias.
+```{r}
+ggplot(perfil_global,
+       aes(x = reorder(variable, media_estandarizada),
+           y = media_estandarizada,
+           fill = ciudad)) +
+  geom_col(position = "dodge", alpha = 0.85) +
+  coord_flip() +
+  labs(title = "Perfil comparativo global de Valencia y Bilbao",
+    x = "Variable",
+    y = "Media estandarizada",
+    fill = "Ciudad") +
+  theme_minimal()
+```
+
 
