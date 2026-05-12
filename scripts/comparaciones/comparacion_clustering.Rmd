@@ -1,0 +1,321 @@
+---
+title: "Comparación de Vizcaya y Valencia clustering"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(cluster)
+```
+
+Este apartado incorpora la perspectiva del clustering a la comparación entre Vizcaya y Valencia. A diferencia de la comparación variable a variable realizada en análisis anteriores, el foco está aquí en los perfiles tipológicos obtenidos mediante los análisis de agrupamiento: qué tipos de municipios y distritos existen en cada territorio y qué dimensiones los definen.
+
+Dado que los clústeres se han obtenido de forma independiente para cada territorio y escala, la comparación no se realiza a partir del número de clúster, sino a partir de las dimensiones que caracterizan cada grupo: envejecimiento, presión residencial, accesibilidad a servicios, dotación educativa, dotación sanitaria, conectividad digital y, en el caso municipal, naturaleza de los contratos como capa interpretativa secundaria.
+
+El apartado se organiza en tres bloques: calidad del clustering, comparación de perfiles municipales y comparación de perfiles de distritos.
+
+
+## Calidad del clustering
+
+```{r}
+# Variables activas
+vars_mun <- c(
+  "pct_extranjeros", "indice_envejecimiento", "pct_estudios_sup",
+  "ratio_colegios", "distancia_centro_educativo", "ratio_centros_salud",
+  "consultorio_local", "ratio_hospital", "distancia_hospital",
+  "esfuerzo_alquiler", "pct_hogares_100mbps")
+
+vars_dis <- c(
+  "indice_envejecimiento", "ratio_colegio",
+  "ratio_hospital", "esfuerzo_alquiler", "ratio_zonas_verdes")
+
+# Municipios Vizcaya
+municipios_vizcaya <- read_csv(
+  "../../datasets/vizcaya-bilbao/municipios_vizcaya_base_final.csv",
+  show_col_types = FALSE)
+datos_clustering <- municipios_vizcaya %>% select(all_of(vars_mun))
+filas_completas  <- complete.cases(datos_clustering)
+datos_cc_viz     <- datos_clustering[filas_completas, ]
+datos_scaled_viz <- scale(datos_cc_viz)
+set.seed(123)
+km_viz           <- kmeans(datos_scaled_viz, centers = 5, nstart = 25)
+cluster_viz      <- km_viz$cluster
+
+# Municipios Valencia 
+municipios_valencia <- read_csv(
+  "../../datasets/valencia/municipios_valencia_base_final.csv",
+  show_col_types = FALSE)
+datos_clustering <- municipios_valencia %>% select(all_of(vars_mun))
+filas_completas  <- complete.cases(datos_clustering)
+datos_cc_val     <- datos_clustering[filas_completas, ]
+datos_scaled_val <- scale(datos_cc_val)
+set.seed(123)
+km_val           <- kmeans(datos_scaled_val, centers = 6, nstart = 25)
+cluster_val      <- km_val$cluster
+
+#  Distritos Bilbao 
+distritos_bilbao_base <- read_csv(
+  "../../datasets/vizcaya-bilbao/distritos_bilbao_base_final.csv",
+  show_col_types = FALSE) %>%
+  filter(nombre_distrito_norm != "otxarkoaga")
+datos_clustering <- distritos_bilbao_base %>% select(all_of(vars_dis))
+filas_completas  <- complete.cases(datos_clustering)
+datos_cc_bil     <- datos_clustering[filas_completas, ]
+datos_scaled_bil <- scale(datos_cc_bil)
+dist_bil         <- dist(datos_scaled_bil, method = "euclidean")
+hc_bil           <- hclust(dist_bil, method = "ward.D2")
+cluster_bil      <- cutree(hc_bil, k = 3)
+
+# Distritos Valencia
+distritos_valencia_base <- read_csv(
+  "../../datasets/valencia/distritos_valencia_base_final.csv",
+  show_col_types = FALSE)
+datos_clustering  <- distritos_valencia_base %>% select(all_of(vars_dis))
+filas_completas   <- complete.cases(datos_clustering)
+datos_cc_dval     <- datos_clustering[filas_completas, ]
+datos_scaled_dval <- scale(datos_cc_dval)
+set.seed(123)
+pam_dval          <- pam(datos_scaled_dval, k = 5)
+cluster_dval      <- pam_dval$clustering
+
+# Siluetas 
+sil_viz  <- mean(silhouette(cluster_viz,  dist(datos_scaled_viz))[, 3])
+sil_val  <- mean(silhouette(cluster_val,  dist(datos_scaled_val))[, 3])
+sil_bil  <- mean(silhouette(cluster_bil,  dist_bil)[, 3])
+sil_dval <- mean(silhouette(cluster_dval, dist(datos_scaled_dval))[, 3])
+```
+
+```{r tabla-meta}
+tabla_meta <- tibble(
+  Análisis            = c("Municipios Vizcaya", "Municipios Valencia",
+                          "Distritos Bilbao",   "Distritos Valencia"),
+  `Nº observaciones` = c(nrow(datos_cc_viz), nrow(datos_cc_val),
+                          nrow(datos_cc_bil),  nrow(datos_cc_dval)),
+  Hopkins             = c("0.992", "0.832", "0.43", "0.64"),
+  `K elegido`         = c(5, 6, 3, 5),
+  `Método final`      = c("K-medias", "K-medias", "Ward", "PAM"),
+  `Silueta media`     = round(c(sil_viz, sil_val, sil_bil, sil_dval), 3))
+
+kable(tabla_meta,
+      caption = "Resumen metodológico de los cuatro análisis de clustering",
+      align   = "lccccc") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE) %>%
+  row_spec(1:2, background = "#EBF4FA") %>%
+  row_spec(3:4, background = "#FEF9E7")
+```
+
+```{r, fig.width=8, fig.height=4}
+datos_sil <- tibble(
+  Análisis   = factor(
+    c("Mun. Vizcaya", "Mun. Valencia", "Dist. Bilbao", "Dist. Valencia"),
+    levels = c("Mun. Vizcaya", "Mun. Valencia", "Dist. Bilbao", "Dist. Valencia")),
+  Silueta    = round(c(sil_viz, sil_val, sil_bil, sil_dval), 3),
+  Territorio = c("Vizcaya/Bilbao", "Valencia", "Vizcaya/Bilbao", "Valencia"),
+  Escala     = c("Municipios", "Municipios", "Distritos", "Distritos"))
+
+ggplot(datos_sil, aes(x = Análisis, y = Silueta, fill = Territorio)) +
+  geom_col(width = 0.6, alpha = 0.85) +
+  geom_text(aes(label = Silueta), vjust = -0.4, size = 4) +
+  facet_wrap(~Escala, scales = "free_x") +
+  scale_fill_manual(values = c("Vizcaya/Bilbao" = "#2980B9", "Valencia" = "#C0392B")) +
+  scale_y_continuous(limits = c(0, 0.38)) +
+  labs(title = "Calidad del clustering por análisis y territorio",
+       y = "Anchura de silueta media", x = NULL, fill = "Territorio") +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"),
+        strip.text = element_text(face = "bold"))
+```
+El gráfico muestra que los distritos se agrupan con mayor calidad que los municipios en ambos territorios (siluetas 0.24–0.28 frente a 0.18–0.19). Esto indica que los perfiles urbanos están algo mejor definidos que los municipales. Aun así, las siluetas son bajas-moderadas, por lo que los clústeres deben interpretarse como perfiles territoriales orientativos y no como grupos perfectamente separados.
+
+
+
+## Comparación de perfiles: municipios
+
+### Heatmap de perfiles medios
+
+```{r, fig.width=13, fig.height=5.5}
+
+etiquetas_vars <- c(
+  "% Extranjeros",
+  "Idx. Envejecimiento",
+  "% Est. Sup.",
+  "Ratio Colegios",
+  "Dist. C. Educ.",
+  "Ratio C. Salud",
+  "Consultorio",
+  "Ratio Hospital",
+  "Dist. Hospital",
+  "Esfuerzo Alquiler",
+  "% 100Mbps")
+
+perfiles_viz <- as.data.frame(datos_scaled_viz) %>%
+  mutate(cluster = paste0("VIZ-c", cluster_viz)) %>%
+  group_by(cluster) %>%
+  summarise(across(everything(), mean), .groups = "drop")
+colnames(perfiles_viz)[-1] <- etiquetas_vars
+
+perfiles_val <- as.data.frame(datos_scaled_val) %>%
+  mutate(cluster = paste0("VAL-c", cluster_val)) %>%
+  group_by(cluster) %>%
+  summarise(across(everything(), mean), .groups = "drop")
+colnames(perfiles_val)[-1] <- etiquetas_vars
+
+mat_long <- bind_rows(perfiles_viz, perfiles_val) %>%
+  pivot_longer(-cluster, names_to = "Variable", values_to = "Valor") %>%
+  mutate(
+    Territorio = ifelse(str_starts(cluster, "VIZ"), "Vizcaya", "Valencia"),
+    cluster    = factor(cluster, levels = c(
+      paste0("VIZ-c", 1:5), paste0("VAL-c", 1:6))))
+
+ggplot(mat_long, aes(x = Variable, y = cluster, fill = Valor)) +
+  geom_tile(color = "white", linewidth = 0.4) +
+  geom_text(aes(label = round(Valor, 1)), size = 2.8) +
+  scale_fill_gradient2(
+    low = "#2C7BB6", mid = "white", high = "#D7191C",
+    midpoint = 0, name = "Z-score") +
+  facet_grid(Territorio ~ ., scales = "free_y", space = "free_y") +
+  labs(title    = "Perfiles medios de clústeres — Municipios",
+       subtitle = "Valores estandarizados. Rojo = por encima de la media, azul = por debajo",
+       x = NULL, y = NULL) +
+  theme_minimal(base_size = 11) +
+  theme(axis.text.x  = element_text(angle = 35, hjust = 1, size = 9),
+        strip.text.y = element_text(face = "bold", size = 11),
+        plot.title   = element_text(face = "bold"),
+        panel.grid   = element_blank())
+```
+
+El heatmap permite comparar los perfiles municipales de Valencia y Vizcaya a partir de valores estandarizados, sin comparar directamente los números de clúster. En Valencia, la diferenciación entre grupos viene marcada sobre todo por el envejecimiento y las distancias a servicios, destacando **VAL-c5** como perfil envejecido y con peor accesibilidad educativa y hospitalaria. También aparece un valor extremo en *ratio_hospital* en **VAL-c1**.En Vizcaya, **VIZ-c2** concentra la mayor presión de alquiler, mientras que **VIZ-c3** representa un perfil más rural con mayores distancias a servicios. En conjunto, el gráfico muestra que Valencia se diferencia más por envejecimiento y accesibilidad, mientras que Vizcaya separa mejor entre presión residencial, ruralidad y dotación de servicios.
+
+### Variables más discriminantes por provincia
+
+```{r, fig.width=9, fig.height=5}
+rango_viz_n <- apply(km_viz$centers, 2, function(x) max(x) - min(x))
+rango_val_n <- apply(km_val$centers, 2, function(x) max(x) - min(x))
+rango_viz_n <- rango_viz_n / max(rango_viz_n)
+rango_val_n <- rango_val_n / max(rango_val_n)
+
+datos_disc_mun <- tibble(
+  variable   = rep(etiquetas_vars, 2),
+  rango      = c(rango_viz_n, rango_val_n),
+  territorio = rep(c("Vizcaya", "Valencia"), each = length(etiquetas_vars)))
+
+ggplot(datos_disc_mun,
+       aes(x = reorder(variable, rango), y = rango, fill = territorio)) +
+  geom_col(position = "dodge", alpha = 0.85, width = 0.7) +
+  scale_fill_manual(
+    values = c("Vizcaya" = "#2980B9", "Valencia" = "#C0392B"),
+    name   = "Provincia") +
+  coord_flip() +
+  labs(title    = "Capacidad discriminante de cada variable — Municipios",
+       subtitle = "Rango normalizado entre centroides de clústeres municipales",
+       x = NULL, y = "Rango normalizado (0–1)") +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+```
+
+El gráfico muestra que *ratio_hospital* es la variable con mayor capacidad discriminante en ambas provincias. En Vizcaya destacan más *esfuerzo_alquiler*, *pct_estudios_sup* y *pct_hogares_100mbps*, apuntando a una mayor separación por presión residencial y perfil urbano. En Valencia, *indice_envejecimiento*, *consultorio_local* y *ratio_centros_salud* tienen más peso, lo que indica que la estructura municipal se diferencia principalmente por envejecimiento y cobertura sanitaria básica. En conjunto, el gráfico confirma que las tipologías municipales no se construyen sobre exactamente las mismas variables en ambos territorios.
+
+
+## Comparación de perfiles: distritos
+
+### Heatmap de perfiles medios
+
+```{r, fig.width=10, fig.height=5}
+etiquetas_dis <- c(
+  "Idx. Envejecimiento",
+  "Ratio Colegios",
+  "Ratio Hospital",
+  "Esfuerzo Alquiler",
+  "Ratio Z. Verdes")
+
+perfiles_bil <- as.data.frame(datos_scaled_bil) %>%
+  mutate(cluster = paste0("BIL-c", cluster_bil)) %>%
+  group_by(cluster) %>%
+  summarise(across(everything(), mean), .groups = "drop")
+colnames(perfiles_bil)[-1] <- etiquetas_dis
+
+perfiles_dval <- as.data.frame(datos_scaled_dval) %>%
+  mutate(cluster = paste0("VAL-c", cluster_dval)) %>%
+  group_by(cluster) %>%
+  summarise(across(everything(), mean), .groups = "drop")
+colnames(perfiles_dval)[-1] <- etiquetas_dis
+
+mat_dis <- bind_rows(perfiles_bil, perfiles_dval) %>%
+  pivot_longer(-cluster, names_to = "Variable", values_to = "Valor") %>%
+  mutate(
+    Territorio = ifelse(str_starts(cluster, "BIL"), "Bilbao", "Valencia ciudad"),
+    cluster    = factor(cluster, levels = c(
+      paste0("BIL-c", 1:3), paste0("VAL-c", 1:5))))
+
+ggplot(mat_dis, aes(x = Variable, y = cluster, fill = Valor)) +
+  geom_tile(color = "white", linewidth = 0.5) +
+  geom_text(aes(label = round(Valor, 1)), size = 3.2) +
+  scale_fill_gradient2(
+    low = "#2C7BB6", mid = "white", high = "#D7191C",
+    midpoint = 0, name = "Z-score") +
+  facet_grid(Territorio ~ ., scales = "free_y", space = "free_y") +
+  labs(title    = "Perfiles medios de clústeres — Distritos",
+       subtitle = "Valores estandarizados. Rojo = por encima de la media, azul = por debajo",
+       x = NULL, y = NULL) +
+  theme_minimal(base_size = 11) +
+  theme(axis.text.x  = element_text(angle = 20, hjust = 1, size = 10),
+        strip.text.y = element_text(face = "bold", size = 11),
+        plot.title   = element_text(face = "bold"),
+        panel.grid   = element_blank())
+```
+
+El heatmap permite comparar los perfiles medios de los clústeres de distritos. En Valencia destaca **VAL-c3** por sus valores extremos en *ratio_hospital* y *ratio_zonas_verdes*. **VAL-c1** combina mayor esfuerzo de alquiler y ratio de colegios, el perfil más tensionado de Valencia ciudad. En Bilbao, los contrastes son menos extremos: **BIL-c2** acumula alto envejecimiento, presión de alquiler y zonas verdes, mientras que **BIL-c3** destaca por menor envejecimiento y menor dotación sanitaria. En conjunto, Valencia presenta una mayor polarización interna (cambios de color más drásticos) entre distritos, mientras que Bilbao ofrece perfiles menos diferenciados.
+
+### Variables más discriminantes por ciudad
+
+```{r, fig.width=9, fig.height=4.5}
+
+centros_bil <- as.data.frame(datos_scaled_bil) %>%
+  mutate(cluster = cluster_bil) %>%
+  group_by(cluster) %>%
+  summarise(across(everything(), mean), .groups = "drop") %>%
+  select(-cluster) %>%
+  as.matrix()
+
+rango_bil_n <- apply(centros_bil, 2, function(x) max(x) - min(x))
+rango_bil_n <- rango_bil_n / max(rango_bil_n)
+
+
+centros_dval <- pam_dval$medoids
+rango_dval_n <- apply(centros_dval, 2, function(x) max(x) - min(x))
+rango_dval_n <- rango_dval_n / max(rango_dval_n)
+
+datos_disc_dis <- tibble(
+  variable   = rep(etiquetas_dis, 2),
+  rango      = c(rango_bil_n, rango_dval_n),
+  territorio = rep(c("Bilbao", "Valencia ciudad"), each = length(etiquetas_dis)))
+
+ggplot(datos_disc_dis,
+       aes(x = reorder(variable, rango), y = rango, fill = territorio)) +
+  geom_col(position = "dodge", alpha = 0.85, width = 0.7) +
+  scale_fill_manual(
+    values = c("Bilbao" = "#2980B9", "Valencia ciudad" = "#C0392B"),
+    name   = "Ciudad") +
+  coord_flip() +
+  labs(title    = "Capacidad discriminante de cada variable — Distritos",
+       subtitle = "Rango normalizado entre centroides de clústeres de distritos",
+       x = NULL, y = "Rango normalizado (0–1)") +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+```
+
+El gráfico muestra que en Valencia, destacan sobre todo *ratio_zonas_verdes* y *ratio_hospital*, lo que indica que la diferenciación entre distritos se explica principalmente por la dotación de zonas verdes y servicios sanitarios. En Bilbao, las variables más discriminantes son *ratio_colegios*, *indice_envejecimiento* y *ratio_hospital,* mostrando que sus clústeres se separan más por estructura demográfica y dotación educativa y sanitaria. En conjunto, el gráfico confirma que las tipologías distritales no se construyen sobre las mismas dimensiones en ambas ciudades.
+
+## Conclusión
+
+En conjunto, los resultados muestran que Valencia y Bizkaia presentan lógicas territoriales distintas. En Valencia, tanto a escala municipal como distrital, los clústeres reflejan una mayor polarización entre zonas con buena dotación de servicios y zonas más envejecidas o con peor accesibilidad. En Vizcaya/Bilbao, las diferencias son menos extremas y responden más a una transición gradual entre perfiles urbanos, residenciales y rurales. Por tanto, el clustering no solo permite clasificar territorios, sino identificar qué factores explican la desigualdad interna de cada provincia y ciudad.
