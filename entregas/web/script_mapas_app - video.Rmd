@@ -402,83 +402,115 @@ ui <- navbarPage(
           " Responde estas preguntas y te diremos qu\u00E9 municipio encaja contigo."
         ),
 
+        # --- BLOQUE 1: Preguntas filtro ---
+        div(style = "font-size:12px;font-weight:700;text-transform:uppercase;
+                     letter-spacing:0.08em;color:#95a5a6;margin-bottom:10px;",
+          "Bloque 1 \u2014 Preguntas filtro"
+        ),
+
         div(class = "rec-pregunta",
-          radioButtons("p1", "1. \u00BFTienes preferencia por vivir en una zona concreta?",
+          radioButtons("p1", "1. \u00BFQu\u00E9 tipo de entorno te resulta m\u00E1s atractivo para vivir?",
             choices = c(
-              "Prefiero un clima mediterr\u00E1neo y m\u00E1s seco (tipo Valencia)"  = "med",
-              "Prefiero un entorno m\u00E1s verde y atl\u00E1ntico (tipo Vizcaya)"   = "atl",
-              "Me da igual, priorizo que el municipio encaje con mis necesidades"     = "igual"
+              "Un entorno mediterr\u00E1neo, m\u00E1s seco y con temperaturas suaves" = "med",
+              "Un entorno m\u00E1s verde, h\u00FAmedo y atl\u00E1ntico"              = "atl",
+              "No tengo una preferencia territorial clara"                           = "igual"
             ), width = "100%"
           )
         ),
 
         div(class = "rec-pregunta",
-          radioButtons("p2", "2. \u00BFQu\u00E9 ritmo de vida prefieres en tu d\u00EDa a d\u00EDa?",
+          radioButtons("p2", "2. Pensando en tu d\u00EDa a d\u00EDa, \u00BFqu\u00E9 nivel de cercan\u00EDa necesitas tener alrededor?",
             choices = c(
-              "Prefiero un entorno tranquilo, con poco movimiento y donde pueda desconectar" = "tranquilo",
-              "Busco un equilibrio: tranquilidad, pero con servicios y algo de actividad cerca" = "equilibrio",
-              "Prefiero una zona con m\u00E1s ambiente, movimiento y servicios durante el d\u00EDa" = "activo"
+              "Me gustar\u00EDa poder resolver lo esencial sin salir del propio municipio"          = "dist_1",
+              "Aceptar\u00EDa desplazamientos cortos si el lugar encaja conmigo"                    = "dist_2",
+              "No me importa desplazarme algo m\u00E1s para acceder a ciertos servicios"           = "dist_3",
+              "La distancia a los servicios no condiciona mi elecci\u00F3n"                        = "dist_4"
             ), width = "100%"
           )
         ),
 
         div(class = "rec-pregunta",
-          radioButtons("p3", "3. \u00BFDispones de coche para tus desplazamientos habituales?",
+          radioButtons("p3", "3. Pensando en tu situaci\u00F3n actual o en los pr\u00F3ximos a\u00F1os, \u00BFqu\u00E9 importancia tendr\u00EDa vivir en una zona c\u00F3moda para la educaci\u00F3n de tus hijos?",
             choices = c(
-              "S\u00ED, tengo coche y no me importa desplazarme"              = "coche_si",
-              "S\u00ED, pero prefiero no depender siempre de \u00E9l"         = "coche_pref",
-              "No, necesito tener servicios cerca o buena accesibilidad"       = "coche_no"
+              "Ser\u00EDa importante tener estos recursos en mi lugar de residencia"                       = "edu_1",
+              "Me gustar\u00EDa tenerlos relativamente cerca, aunque no ser\u00EDa imprescindible"        = "edu_2",
+              "No ser\u00EDa un aspecto que condicione mi elecci\u00F3n"                                  = "edu_3"
             ), width = "100%"
           )
         ),
 
         div(class = "rec-pregunta",
-          radioButtons("p4", "4. \u00BFTienes hijos en etapa escolar o pretendes tenerlos?",
+          radioButtons("p4", "4. Para sentirte c\u00F3modo/a en tu lugar de residencia, \u00BFqu\u00E9 nivel de tranquilidad sanitaria te gustar\u00EDa tener?",
             choices = c(
-              "S\u00ED, y para m\u00ED es fundamental que haya colegios cerca de casa" = "cole_si",
-              "S\u00ED, pero aceptar\u00EDa un desplazamiento corto"                   = "cole_pref",
-              "No, no es un factor importante para m\u00ED ahora mismo"                = "cole_no"
+              "Me dar\u00EDa tranquilidad tener hospital en mi lugar de residencia"                                              = "san_1",
+              "Me bastar\u00EDa con tener atenci\u00F3n sanitaria b\u00E1sica cerca, sin tener que desplazarme mucho para un hospital" = "san_2",
+              "Adem\u00E1s de atenci\u00F3n b\u00E1sica cerca, no me importa desplazarme algo m\u00E1s para un hospital"             = "san_3",
+              "No ser\u00EDa un aspecto decisivo para elegir municipio"                                                          = "san_4"
+            ), width = "100%"
+          )
+        ),
+
+        # --- BLOQUE 2: Preguntas perfil KNN ---
+        div(style = "font-size:12px;font-weight:700;text-transform:uppercase;
+                     letter-spacing:0.08em;color:#95a5a6;margin:24px 0 10px;",
+          "Bloque 2 \u2014 Tu perfil ideal"
+        ),
+
+        div(class = "rec-pregunta",
+          radioButtons("p5", "5. Cuando imaginas tu d\u00EDa a d\u00EDa, \u00BFqu\u00E9 tipo de ambiente encaja mejor contigo?",
+            choices = c(
+              "Un lugar muy tranquilo, con poca actividad y mucha sensaci\u00F3n de desconexi\u00F3n" = "amb_1",
+              "Un lugar tranquilo, pero con algo de vida cotidiana"                                    = "amb_2",
+              "Un entorno equilibrado, con calma y servicios cerca"                                    = "amb_3",
+              "Una zona con bastante ambiente, movimiento y opciones durante el d\u00EDa"              = "amb_4",
+              "Un entorno muy activo, con mucha vida, servicios y actividad constante"                 = "amb_5"
             ), width = "100%"
           )
         ),
 
         div(class = "rec-pregunta",
-          radioButtons("p5", "5. \u00BFQu\u00E9 requerimiento de servicios sanitarios tienes?",
+          radioButtons("p6", "6. Al elegir d\u00F3nde vivir, \u00BFqu\u00E9 equilibrio te representa mejor?",
             choices = c(
-              "Muy alto: quiero tener hospital o urgencias lo m\u00E1s cerca posible" = "san_alto",
-              "Medio: me basta con tener centro de salud o consultorio cerca"          = "san_medio",
-              "Bajo: no me importa desplazarme cuando lo necesite"                     = "san_bajo"
+              "Priorizar\u00EDa una opci\u00F3n muy asequible, aunque est\u00E9 en una zona con poco ambiente o servicios" = "alq_1",
+              "Preferir\u00EDa una zona asequible, aunque tenga que renunciar a algo de comodidad"                         = "alq_2",
+              "Buscar\u00EDa un equilibrio entre precio, comodidad y servicios"                                            = "alq_3",
+              "Aceptar\u00EDa pagar algo m\u00E1s si la zona encaja bien conmigo"                                         = "alq_4",
+              "Priorizar\u00EDa la zona que m\u00E1s me guste, aunque implique un mayor esfuerzo econ\u00F3mico"          = "alq_5"
             ), width = "100%"
           )
         ),
 
         div(class = "rec-pregunta",
-          radioButtons("p6", "6. Respecto al alquiler, \u00BFqu\u00E9 opci\u00F3n se ajusta mejor a tu situaci\u00F3n?",
+          radioButtons("p7", "7. \u00BFQu\u00E9 tipo de ambiente cotidiano encajar\u00EDa mejor contigo?",
             choices = c(
-              "Mi prioridad es pagar lo menos posible"                                                = "alq_bajo",
-              "Busco equilibrio entre precio, servicios y calidad de vida"                            = "alq_equilibrio",
-              "Estoy dispuesto/a a asumir un alquiler m\u00E1s alto si la zona encaja con lo que busco" = "alq_alto"
+              "Un entorno muy tranquilo, pausado y con arraigo local muy fuerte"               = "env_1",
+              "Un entorno tranquilo y estable, con poca variaci\u00F3n en el d\u00EDa a d\u00EDa" = "env_2",
+              "Un ambiente equilibrado, con algo de movimiento y mezcla de perfiles"           = "env_3",
+              "Un entorno din\u00E1mico, con bastante movimiento y variedad de gente"          = "env_4",
+              "Un entorno muy activo, diverso y en constante cambio"                           = "env_5"
             ), width = "100%"
           )
         ),
 
         div(class = "rec-pregunta",
-          radioButtons("p7", "7. \u00BFEn qu\u00E9 tipo de comunidad te sentir\u00EDas m\u00E1s c\u00F3modo/a?",
+          radioButtons("p8", "8. \u00BFQu\u00E9 tipo de actividad te gustar\u00EDa notar alrededor del municipio?",
             choices = c(
-              "Un entorno joven, din\u00E1mico y diverso"            = "com_joven",
-              "Un entorno m\u00E1s tranquilo, maduro y tradicional"  = "com_maduro",
-              "Me es indiferente, priorizo otros factores"            = "com_igual"
+              "Un entorno muy tranquilo, vinculado a naturaleza, campo o actividad local pausada"  = "act_1",
+              "Un entorno con cierta actividad local, pero sin demasiado movimiento"               = "act_2",
+              "Un entorno variado, sin un tipo de actividad dominante"                             = "act_3",
+              "Una zona con comercios, hosteler\u00EDa, servicios y movimiento cotidiano"          = "act_4",
+              "Una zona con presencia notable de empresas, talleres, pol\u00EDgonos o actividad productiva" = "act_5",
+              "No es relevante"                                                                    = "act_6"
             ), width = "100%"
           )
         ),
 
         div(class = "rec-pregunta",
-          radioButtons("p8", "8. \u00BFQu\u00E9 tipo de entorno prefieres a tu alrededor?",
+          radioButtons("p9", "9. Si tuvieras que describir el perfil de tus futuros vecinos, \u00BFcu\u00E1l te encajar\u00EDa mejor?",
             choices = c(
-              "Un entorno rural o agr\u00EDcola"                              = "ent_rural",
-              "Una zona con comercio, hosteler\u00EDa y servicios"            = "ent_servicios",
-              "Una zona con actividad industrial o empresarial"               = "ent_industrial",
-              "Me es indiferente"                                             = "ent_igual"
+              "Gente con oficios m\u00E1s manuales, del campo o la industria"                           = "per_1",
+              "Una mezcla de perfiles, sin que ninguno destaque especialmente"                           = "per_2",
+              "Gente con alta cualificaci\u00F3n, carreras universitarias o puestos de responsabilidad" = "per_3"
             ), width = "100%"
           )
         ),
