@@ -236,8 +236,7 @@ limpiar_centros_educativos <- function(ruta_xls) {
       # Usamos la denominación específica como nombre del centro
       nombre_centro = coalesce(
         as.character(`DENOMINACIÓN ESPECÍFICA`),
-        as.character(`DENOMINACIÓN GENÉRICA`)
-      ) |> str_squish(),
+        as.character(`DENOMINACIÓN GENÉRICA`)) |> str_squish(),
 
       # Normalizamos dirección, código postal y municipio
       direccion = as.character(DOMICILIO) |> str_squish(),
