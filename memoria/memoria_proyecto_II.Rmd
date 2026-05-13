@@ -353,7 +353,6 @@ hospitales_bizkaia_coords |>
 ```
 
 ##### Imputamos manualmente los faltantes.
-
 ```{r}
 hospitales_bizkaia_coords[2,  c("lat", "lon")] <- list(43.2969436, -2.9934568)
 hospitales_bizkaia_coords[3,  c("lat", "lon")] <- list(43.4226671, -2.7228639)
@@ -480,7 +479,7 @@ En este tercer apartado se construyen los datasets finales de distancias para Vi
 En primer lugar, se estandarizan los nombres de municipio para mejorar los cruces textuales. Después, se comprueba si cada municipio dispone de hospital o centro educativo propio; en ese caso, se asigna una distancia de 0, al encontrarse el servicio en el propio municipio. En caso contrario, se calcula la distancia euclídea desde el municipio a todos los servicios válidos de su provincia, se selecciona el más cercano y se intenta obtener la distancia real en coche mediante OSRM. Si no es posible calcular la ruta, se utiliza la distancia euclídea como valor de respaldo.Como resultado final, se obtienen dos tablas, una para Valencia y otra para Vizcaya, con las columnas municipio, distancia_centro_educativo y distancia_hospital.
 
 ##### Cargamos las librerías necesarias.
-```{r}
+```{r, eval=FALSE}
 library(tidyverse)
 library(sf)
 library(osrm)
@@ -492,7 +491,7 @@ options(
 ```
 
 ##### Fijamos las rutas de entrada (bases de datos) y de salida (datasets hechos).
-```{r}
+```{r, eval=FALSE}
 ruta_municipios_vizcaya <- "municipios_vizcaya_coords.csv"
 ruta_municipios_valencia <- "municipios_valencia_coords.csv"
 
@@ -507,7 +506,7 @@ ruta_output_distancias_valencia <- "dataset_distancias_valencia.csv"
 ```
 
 ##### Leemos los datasets.
-```{r}
+```{r, eval=FALSE}
 # Leemos los municipios, que vienen con separador ,
 leer_municipios <- function(ruta_csv) {
   read_csv(ruta_csv, show_col_types = FALSE) |>
@@ -547,7 +546,7 @@ leer_centros <- function(ruta_csv) {
 ```
 
 ##### Limpiamos y normalizamos los municipios.
-```{r}
+```{r, eval=FALSE}
 # Leemos los municipios
 municipios_vizcaya <- leer_municipios(ruta_municipios_vizcaya)
 municipios_valencia <- leer_municipios(ruta_municipios_valencia)
@@ -562,7 +561,7 @@ centros_valencia <- leer_centros(ruta_centros_valencia)
 ```
 
 ##### Definimos las funciones mismo_municipio, distancias_euclideas_km, distancia_coche_km y calcular_distancia_servicio.
-```{r}
+```{r, eval=FALSE}
 # Creamos una función para normalizar nombres de municipio
 normalizar_municipio <- function(x) {
   x |>
@@ -600,7 +599,7 @@ centros_valencia <- centros_valencia |>
 ```
 
 ##### Definimos las funciones para el cálculo de distancias.
-```{r}
+```{r, eval=FALSE}
 # Comprobamos si un municipio ya tiene un servicio propio
 # Permitimos tanto coincidencia exacta como coincidencia por inclusión
 mismo_municipio <- function(municipio_norm, vector_servicios_norm) {
@@ -687,8 +686,7 @@ calcular_distancia_final <- function(lat_mun, lon_mun, municipio_norm, servicios
 ```
 
 ##### Calculamos las distancias finales para Valencia
-
-```{r}
+```{r, eval=FALSE}
 # Calculamos la distancia a hospitales para Valencia
 dist_hospital_valencia <- map_dbl(
   seq_len(nrow(municipios_valencia)),
@@ -719,7 +717,7 @@ dataset_distancias_valencia <- municipios_valencia |>
 
 
 ##### Calculamos de las distancias para Vizcaya
-```{r}
+```{r, eval=FALSE}
 # Calculamos la distancia a hospitales para Vizcaya
 dist_hospital_vizcaya <- map_dbl(
   seq_len(nrow(municipios_vizcaya)),
@@ -749,16 +747,105 @@ dataset_distancias_vizcaya <- municipios_vizcaya |>
 ```
 
 ##### Guardamos los datasets
-```{r}
+```{r, eval=FALSE}
 # Guardamos los datasets finales de distancias
 write_csv(dataset_distancias_vizcaya, ruta_output_distancias_vizcaya)
 write_csv(dataset_distancias_valencia, ruta_output_distancias_valencia)
 ```
 
 
+### 1.1.4. Geocodificación de zonas verdes
+
+En este apartado se realiza la geocodificación de las zonas verdes de Valencia y Bilbao. Para ello, se utiliza OpenStreetMap a través de la API Overpass, una fuente gratuita y sin necesidad de clave de acceso. La consulta se realiza mediante el paquete osmdata, que permite acceder a OpenStreetMap desde R. Además, se utiliza el paquete sf para gestionar los objetos geoespaciales, como polígonos o puntos, mientras que el resto de paquetes se emplean para la manipulación y exportación de los datos. Como resultado de este proceso, se generan dos datasets con las coordenadas de las zonas verdes: "zonas_verdes_valencia_coords.csv" y "zonas_verdes_bilbao_coords.csv".
+
+##### Cargamos las librerías necesarias.
+```{r, eval=FALSE}
+library(sf)
+library(dplyr)
+library(readr)
+```
+
+##### Fijamos las rutas de entrada (bases de datos) y de salida (datasets hechos).
+```{r, eval=FALSE}
+# GeoJSON de entrada
+ruta_geojson_valencia <- "delimitacion_zonas_verdes_valencia.geojson"
+ruta_geojson_bilbao   <- "delimitacion_zonas_verdes_bilbao.geojson"
+
+# CSV de salida
+ruta_output_valencia <- "zonas_verdes_valencia_coords.csv"
+ruta_output_bilbao   <- "zonas_verdes_bilbao_coords.csv"
+```
+
+##### Definimos un mínimo del espacio verde.
+```{r, eval=FALSE}
+# Umbral mínimo de superficie en metros cuadrados
+# Sube o baja este valor según veas el resultado
+umbral_area_m2 <- 5000
+```
+
+##### Definimos una función para leer y preparar zonas verdes.
+```{r, eval=FALSE}
+cargar_zonas_verdes <- function(ruta_geojson, nombre_ciudad) {
+  
+  cat("\nCargando zonas verdes de:", nombre_ciudad, "\n")
+  
+  zonas <- st_read(ruta_geojson, quiet = TRUE)
+  
+  if (is.null(zonas) || nrow(zonas) == 0) {
+    cat("  [!] No se encontraron geometrías.\n")
+    return(NULL)}
+  
+  # Nos aseguramos de tener CRS
+  if (is.na(st_crs(zonas))) {
+    st_crs(zonas) <- 4326}
+  
+  # Pasamos a sistema métrico para calcular áreas correctamente
+  zonas_metricas <- st_transform(zonas, 3857)
+  
+  zonas <- zonas |>
+    mutate(
+      ciudad = nombre_ciudad,
+      area_m2 = as.numeric(st_area(zonas_metricas))
+    ) |>
+    filter(area_m2 >= umbral_area_m2)
+  
+  cat("  Geometrías tras filtrar por tamaño:", nrow(zonas), "\n")
+  
+  return(zonas)}
+```
+
+##### Definimos una función para obtener coordenadas representativas.
+```{r, eval=FALSE}
+calcular_puntos <- function(zonas_sf) {
+  if (is.null(zonas_sf) || nrow(zonas_sf) == 0) return(NULL)
+  
+  # Punto dentro del polígono
+  puntos <- st_point_on_surface(zonas_sf)
+  coords <- st_coordinates(puntos)
+  
+  zonas_metricas <- st_transform(zonas_sf, 3857)
+  
+  zonas_sf |>
+    st_drop_geometry() |>
+    mutate(
+      parque  = paste0("parque_", row_number()),
+      lat     = coords[, 2],
+      lon     = coords[, 1],
+      area_m2 = as.numeric(st_area(zonas_metricas))
+    ) |>
+    select(parque, lat, lon, area_m2) |>
+    filter(!is.na(lat), !is.na(lon)) |>
+    arrange(desc(area_m2))}
+```
+
+##### Cargamos los datos.
+```{r, eval=FALSE}
+zonas_valencia <- cargar_zonas_verdes(ruta_geojson_valencia, "Valencia")
+zonas_bilbao   <- cargar_zonas_verdes(ruta_geojson_bilbao, "Bilbao")
+```
 
 
-
+### 1.1.5. 
 
 
 ## 1.2. Datasets finales
