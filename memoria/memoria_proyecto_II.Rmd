@@ -1,0 +1,28 @@
+---
+title: "Memoria Proyecto II"
+author: "Grupo I A2-02"
+date: "2026-05-13"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1. Creación y AED de los datasets
+
+## 1.1. Cálculo de distancias
+
+### 1.1.1. Geocodificación de municipios (Vizcaya y Valencia)
+
+#### Cargamos las librerías necesarias que vamos a necesitar:
+
+1. Cargamos las librerías necesarias que vamos a necesitar:
+
+## 1.2. Datasets finales
+
+
+
