@@ -1,0 +1,736 @@
+---
+title: "RECOMENDADOR"
+output: html_document
+date: "2026-05-13"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Carga de datos
+
+Cargamos los dos datasets finales de municipios y añadimos la variable *provincia* para identificar si cada municipio pertenece a Valencia o Vizcaya.
+
+```{r}
+library(tidyverse)
+library(readr)
+
+valencia <- read_csv("../datasets/valencia/municipios_valencia_base_final.csv",
+                     show_col_types = FALSE) %>%
+  mutate(provincia = "Valencia")
+
+vizcaya <- read_csv("../datasets/vizcaya-bilbao/municipios_vizcaya_base_final.csv",
+                    show_col_types = FALSE) %>%
+  mutate(provincia = "Vizcaya")
+```
+
+# Discretización de variables
+
+Para poder aplicar el recomendador, primero se transforman algunas variables numéricas en categorías ordinales. En las variables de perfil se utilizan cinco niveles: muy bajo, bajo, medio, alto y muy alto. En las variables de distancia se separa el valor 0, ya que indica que el servicio se encuentra dentro del propio municipio.
+
+```{r}
+niveles_perfil <- c("muy bajo", "bajo", "medio", "alto", "muy alto")
+niveles_distancia <- c("0", "muy baja", "baja", "media", "alta", "muy alta")
+```
+
+Definimos una función para discretizar variables generales mediante quintiles. Esta función se aplicará a variables como *pob_total*, *esfuerzo_alquiler*, *indice_envejecimiento*, *pct_extranjeros* y *pct_estudios_sup*.
+
+```{r}
+discretizar_perfil <- function(x) {
+  
+  x <- as.numeric(x)
+  
+  if (sum(!is.na(x)) == 0) {
+    return(factor(rep(NA_character_, length(x)),
+                  levels = niveles_perfil,
+                  ordered = TRUE))}
+  
+  cortes <- quantile(
+    x,
+    probs = seq(0, 1, 0.2),
+    na.rm = TRUE,
+    names = FALSE)
+  
+  cortes <- unique(cortes)
+  
+  if (length(cortes) < 2) {
+    return(factor(rep("medio", length(x)),
+                  levels = niveles_perfil,
+                  ordered = TRUE))}
+  
+  etiquetas <- niveles_perfil[1:(length(cortes) - 1)]
+  
+  factor(
+    as.character(cut(
+      x,
+      breaks = cortes,
+      labels = etiquetas,
+      include.lowest = TRUE)),
+    levels = niveles_perfil,
+    ordered = TRUE)}
+```
+
+Para las variables de distancia se define una función específica. La categoría 0 se mantiene separada del resto porque significa que el servicio está en el propio municipio. Los valores positivos se dividen después en muy baja, baja, media, alta y muy alta.
+
+```{r}
+discretizar_distancia <- function(x) {
+  
+  x <- as.numeric(x)
+  resultado <- rep(NA_character_, length(x))
+  
+  resultado[!is.na(x) & x == 0] <- "0"
+  
+  positivos <- !is.na(x) & x > 0
+  
+  if (sum(positivos) > 0) {
+    
+    cortes <- quantile(
+      x[positivos],
+      probs = seq(0, 1, 0.2),
+      na.rm = TRUE,
+      names = FALSE)
+    
+    cortes <- unique(cortes)
+    
+    if (length(cortes) < 2) {
+      resultado[positivos] <- "media"} else {
+      
+      etiquetas <- niveles_distancia[-1][1:(length(cortes) - 1)]
+      
+      resultado[positivos] <- as.character(cut(
+        x[positivos],
+        breaks = cortes,
+        labels = etiquetas,
+        include.lowest = TRUE))}}
+  
+  factor(
+    resultado,
+    levels = niveles_distancia,
+    ordered = TRUE)}
+```
+
+# Clasificación de la actividad del entorno
+
+La variable *naturaleza_contratos* no se utilizará como filtro, sino como una dimensión más del perfil KNN. Para poder compararla con la respuesta del usuario, se agrupa en cinco categorías generales: agrícola/rural, rural-mixto, mixto, servicios e industrial/empresarial.
+
+```{r}
+clasificar_actividad_entorno <- function(x) {
+  
+  x <- str_to_lower(as.character(x))
+  
+  es_agro <- str_detect(x, "agr|agro")
+  es_serv <- str_detect(x, "serv")
+  es_ind <- str_detect(x, "industr|constru")
+  es_mixto <- str_detect(x, "mixto|sin especial")
+  
+  case_when(
+    is.na(x) ~ "mixto",
+    es_agro & !es_serv & !es_ind ~ "agricola_rural",
+    es_agro & (es_serv | es_ind | es_mixto) ~ "rural_mixto",
+    es_mixto ~ "mixto",
+    es_serv & !es_ind & !es_agro ~ "servicios",
+    es_ind & !es_serv & !es_agro ~ "industrial_empresarial",
+    es_serv & es_ind ~ "industrial_empresarial",
+    TRUE ~ "mixto")}
+```
+
+Creamos también una versión numérica de esos perfiles para poder incluirlos en el cálculo de la distancia KNN.
+
+```{r}
+actividad_ord <- c(
+  "agricola_rural" = 1,
+  "rural_mixto" = 2,
+  "mixto" = 3,
+  "servicios" = 4,
+  "industrial_empresarial" = 5)
+
+pasar_actividad_a_numero <- function(x) {
+  as.numeric(actividad_ord[as.character(x)])}
+```
+
+# Preparación de los datasets para el recomendador
+
+Seleccionamos las variables que se utilizarán en el perfil KNN y las variables de distancia que se utilizarán en los filtros.
+
+```{r}
+vars_perfil <- c(
+  "pob_total",
+  "esfuerzo_alquiler",
+  "indice_envejecimiento",
+  "pct_extranjeros",
+  "pct_estudios_sup")
+
+vars_distancia <- c(
+  "distancia_centro_educativo",
+  "distancia_hospital")
+```
+
+Creamos una función que prepara cada dataset: discretiza las variables numéricas, discretiza las distancias y crea la variable agrupada de actividad del entorno.
+
+```{r}
+preparar_recomendador <- function(datos) {
+  
+  datos %>%
+    mutate(
+      across(
+        all_of(vars_perfil),
+        ~ discretizar_perfil(.x),
+        .names = "{.col}_cat"),
+      across(
+        all_of(vars_distancia),
+        ~ discretizar_distancia(.x),
+        .names = "{.col}_cat"),
+      grupo_contratos = clasificar_actividad_entorno(naturaleza_contratos),
+      grupo_contratos_n = pasar_actividad_a_numero(grupo_contratos))}
+```
+
+Aplicamos la preparación por separado a Valencia y Vizcaya. Así, los quintiles se calculan dentro de cada territorio y no se ven condicionados por las diferencias generales entre ambas provincias.
+
+```{r}
+valencia_rec <- preparar_recomendador(valencia)
+vizcaya_rec <- preparar_recomendador(vizcaya)
+```
+
+# Comprobación de las categorías creadas
+
+Una vez preparadas las bases, se revisan únicamente las variables que se utilizarán posteriormente en el recomendador. En este caso, interesan sobre todo las variables categorizadas, ya que son las que se emplearán en los filtros y en el cálculo de similitud mediante KNN.
+
+```{r}
+valencia_rec %>%
+  select(
+    nombre_municipio,
+    provincia,
+    pob_total_cat,
+    esfuerzo_alquiler_cat,
+    indice_envejecimiento_cat,
+    pct_extranjeros_cat,
+    pct_estudios_sup_cat,
+    distancia_centro_educativo_cat,
+    distancia_hospital_cat,
+    grupo_contratos
+  ) %>%
+  head(10)
+```
+
+```{r}
+vizcaya_rec %>%
+  select(
+    nombre_municipio,
+    provincia,
+    pob_total_cat,
+    esfuerzo_alquiler_cat,
+    indice_envejecimiento_cat,
+    pct_extranjeros_cat,
+    pct_estudios_sup_cat,
+    distancia_centro_educativo_cat,
+    distancia_hospital_cat,
+    grupo_contratos
+  ) %>%
+  head(10)
+```
+
+También se comprueba la distribución de las categorías creadas para cada territorio. Esto permite verificar que las variables se han discretizado correctamente antes de aplicar el recomendador.
+
+```{r}
+valencia_rec %>%
+  select(
+    pob_total_cat,
+    esfuerzo_alquiler_cat,
+    indice_envejecimiento_cat,
+    pct_extranjeros_cat,
+    pct_estudios_sup_cat,
+    distancia_centro_educativo_cat,
+    distancia_hospital_cat,
+    grupo_contratos
+  ) %>%
+  summary()
+```
+
+```{r}
+vizcaya_rec %>%
+  select(
+    pob_total_cat,
+    esfuerzo_alquiler_cat,
+    indice_envejecimiento_cat,
+    pct_extranjeros_cat,
+    pct_estudios_sup_cat,
+    distancia_centro_educativo_cat,
+    distancia_hospital_cat,
+    grupo_contratos
+  ) %>%
+  summary()
+```
+
+# Guardado de las bases preparadas
+
+Una vez creadas las variables categorizadas, se guardan dos nuevos datasets preparados específicamente para el recomendador. A partir de este punto, el KNN ya no partirá de las bases originales, sino de estas bases categorizadas.
+
+```{r}
+write_csv(valencia_rec, "../datasets/valencia/municipios_valencia_recomendador.csv")
+
+write_csv(vizcaya_rec, "../datasets/vizcaya-bilbao/municipios_vizcaya_recomendador.csv")
+```
+
+# Carga de las bases del recomendador
+
+A partir de este apartado se cargan directamente los datasets preparados para el recomendador. De esta forma, los filtros y el KNN trabajan sobre las bases que ya contienen las variables categorizadas.
+
+```{r}
+valencia_rec <- read_csv(
+  "../datasets/valencia/municipios_valencia_recomendador.csv",
+  show_col_types = FALSE
+)
+
+vizcaya_rec <- read_csv(
+  "../datasets/vizcaya-bilbao/municipios_vizcaya_recomendador.csv",
+  show_col_types = FALSE
+)
+```
+
+Como comprobación rápida, se verifica que las columnas necesarias para el recomendador están disponibles en ambas bases.
+
+```{r}
+valencia_rec %>%
+  select(
+    nombre_municipio,
+    provincia,
+    pob_total_cat,
+    esfuerzo_alquiler_cat,
+    indice_envejecimiento_cat,
+    pct_extranjeros_cat,
+    pct_estudios_sup_cat,
+    distancia_centro_educativo_cat,
+    distancia_hospital_cat,
+    grupo_contratos,
+    grupo_contratos_n
+  ) %>%
+  head()
+```
+
+```{r}
+vizcaya_rec %>%
+  select(
+    nombre_municipio,
+    provincia,
+    pob_total_cat,
+    esfuerzo_alquiler_cat,
+    indice_envejecimiento_cat,
+    pct_extranjeros_cat,
+    pct_estudios_sup_cat,
+    distancia_centro_educativo_cat,
+    distancia_hospital_cat,
+    grupo_contratos,
+    grupo_contratos_n
+  ) %>%
+  head()
+```
+
+
+
+
+# Bloque 1. Filtros iniciales
+
+Las cuatro primeras preguntas funcionan como filtros. Su objetivo es reducir el conjunto de municipios candidatos antes de calcular la similitud mediante KNN.
+
+La estructura queda así:
+
+- Pregunta 1: filtro por provincia.
+- Pregunta 2: filtro general por cercanía a servicios.
+- Pregunta 3: filtro educativo.
+- Pregunta 4: filtro sanitario.
+
+## Pregunta 1. Entorno territorial
+
+Esta pregunta filtra por provincia. Si el usuario no tiene una preferencia territorial clara, se consideran conjuntamente los municipios de Valencia y Vizcaya.
+
+```{r}
+seleccionar_territorio <- function(p1) {
+  
+  if (p1 == 1) return(valencia_rec)
+  if (p1 == 2) return(vizcaya_rec)
+  if (p1 == 3) return(bind_rows(valencia_rec, vizcaya_rec))
+  
+  stop("Respuesta no válida en la pregunta 1.")}
+```
+
+## Pregunta 2. Cercanía en la rutina diaria
+
+Esta pregunta filtra simultáneamente por *distancia_centro_educativo* y *distancia_hospital*. Cuanto más exigente sea la respuesta del usuario, más restrictivo será el filtro.
+
+```{r}
+filtrar_cercania <- function(datos, p2) {
+  
+  if (p2 == 4) return(datos)
+  
+  cats_permitidas <- switch(
+    as.character(p2),
+    "1" = c("0"),
+    "2" = c("0", "muy baja", "baja"),
+    "3" = c("0", "muy baja", "baja", "media"),
+    stop("Respuesta no válida en la pregunta 2."))
+  
+  datos %>%
+    filter(
+      distancia_centro_educativo_cat %in% cats_permitidas,
+      distancia_hospital_cat %in% cats_permitidas)}
+```
+
+## Pregunta 3. Colegios cerca
+
+Esta pregunta filtra únicamente por la distancia al centro educativo, ya que se relaciona con la comodidad para organizar rutinas familiares o educativas.
+
+```{r}
+filtrar_educacion <- function(datos, p3) {
+  
+  if (p3 == 3) return(datos)
+  
+  cats_permitidas <- switch(
+    as.character(p3),
+    "1" = c("0"),
+    "2" = c("0", "muy baja", "baja", "media"),
+    stop("Respuesta no válida en la pregunta 3."))
+  
+  datos %>%
+    filter(distancia_centro_educativo_cat %in% cats_permitidas)
+}
+```
+
+## Pregunta 4. Tranquilidad sanitaria
+
+Esta pregunta combina dos criterios: disponer de atención sanitaria básica en el municipio y tener el hospital a una distancia asumible según la respuesta del usuario.
+
+Primero se crea una pequeña función auxiliar para asegurar que *consultorio_local* se interpreta correctamente como variable binaria.
+
+```{r}
+pasar_binaria <- function(x) {
+  
+  x_chr <- str_to_lower(as.character(x))
+  x_num <- suppressWarnings(as.numeric(x_chr))
+  
+  case_when(
+    x_chr %in% c("1", "si", "sí", "s", "true") ~ 1,
+    x_chr %in% c("0", "no", "false") ~ 0,
+    !is.na(x_num) ~ x_num,
+    TRUE ~ 0
+  )
+}
+```
+
+Después se aplica el filtro sanitario según la respuesta del usuario.
+
+```{r}
+filtrar_sanidad <- function(datos, p4) {
+  
+  if (p4 == 4) return(datos)
+  
+  datos <- datos %>%
+    mutate(
+      consultorio_local_num = pasar_binaria(consultorio_local),
+      ratio_centros_salud_num = replace_na(
+        suppressWarnings(as.numeric(ratio_centros_salud)),
+        0),
+      atencion_basica = consultorio_local_num == 1 | ratio_centros_salud_num > 0)
+  
+  if (p4 == 1) {
+    return(datos %>%
+             filter(distancia_hospital_cat == "0"))}
+  
+  cats_hospital <- switch(
+    as.character(p4),
+    "2" = c("0", "muy baja", "baja"),
+    "3" = c("0", "muy baja", "baja", "media"),
+    stop("Respuesta no válida en la pregunta 4."))
+  
+  datos %>%
+    filter(
+      atencion_basica == TRUE,
+      distancia_hospital_cat %in% cats_hospital)}
+```
+
+## Aplicación conjunta de los filtros
+
+Se combinan todos los filtros en una única función. Esta función recibe las respuestas de las preguntas 1 a 4 y devuelve los municipios candidatos.
+
+```{r}
+aplicar_filtros <- function(p1, p2, p3, p4) {
+  
+  datos <- seleccionar_territorio(p1) %>%
+    filtrar_cercania(p2) %>%
+    filtrar_educacion(p3) %>%
+    filtrar_sanidad(p4)
+  
+  if (nrow(datos) == 0) {
+    message("No hay municipios que cumplan todos los filtros. Prueba a relajar alguna condición.")
+    return(NULL)}
+  
+  message(paste("Municipios candidatos tras los filtros:", nrow(datos)))
+  
+  return(datos)}
+```
+
+## Comprobación de los filtros
+
+Probamos los filtros con un ejemplo para comprobar que funcionan correctamente.
+
+```{r}
+candidatos <- aplicar_filtros(
+  p1 = 1,  # Valencia
+  p2 = 3,  # acepta distancias medias
+  p3 = 2,  # recursos educativos relativamente cerca
+  p4 = 3   # sanidad básica + hospital a distancia media
+)
+
+candidatos %>%
+  select(
+    nombre_municipio,
+    provincia,
+    distancia_centro_educativo_cat,
+    distancia_hospital_cat,
+    consultorio_local,
+    ratio_centros_salud
+  ) %>%
+  head(10)
+```
+
+# Bloque 2. Perfil del usuario y KNN
+
+Una vez aplicados los filtros, las preguntas 5 a 9 se utilizan para construir el perfil del usuario. Este perfil se compara con las categorías discretizadas de cada municipio candidato.
+
+La estructura queda así:
+
+- Pregunta 5: perfil de tamaño y ritmo cotidiano, asociado a *pob_total*.
+- Pregunta 6: perfil residencial, asociado a *esfuerzo_alquiler*.
+- Pregunta 7: perfil social, asociado a *indice_envejecimiento* y *pct_extranjeros*.
+- Pregunta 8: actividad del entorno, asociada a *naturaleza_contratos*.
+- Pregunta 9: perfil formativo, asociado a *pct_estudios_sup*.
+
+## Construcción del perfil del usuario
+
+Las preguntas 5 y 6 se traducen directamente a una escala de 1 a 5. En la pregunta 7, el *indice_envejecimiento* se invierte porque un entorno más dinámico se asocia con menor envejecimiento, mientras que *pct_extranjeros* mantiene el mismo sentido de la respuesta.
+
+La pregunta 8 entra en el KNN solo si el usuario no responde “No es relevante”. La pregunta 9 utiliza valores intermedios porque sus respuestas agrupan categorías.
+
+```{r}
+construir_perfil <- function(p5, p6, p7, p8, p9) {
+  
+  if (!(p5 %in% 1:5)) stop("Respuesta no válida en la pregunta 5.")
+  if (!(p6 %in% 1:5)) stop("Respuesta no válida en la pregunta 6.")
+  if (!(p7 %in% 1:5)) stop("Respuesta no válida en la pregunta 7.")
+  if (!(p8 %in% 1:6)) stop("Respuesta no válida en la pregunta 8.")
+  if (!(p9 %in% 1:3)) stop("Respuesta no válida en la pregunta 9.")
+  
+  perfil <- c(
+    pob_total = p5,
+    esfuerzo_alquiler = p6,
+    indice_envejecimiento = 6 - p7,
+    pct_extranjeros = p7,
+    pct_estudios_sup = switch(
+      as.character(p9),
+      "1" = 1.5,
+      "2" = 3,
+      "3" = 4.5))
+  
+  if (p8 != 6) {
+    perfil <- c(perfil, grupo_contratos = p8)}
+  
+  return(perfil)}
+```
+
+## Conversión de categorías a números
+
+Para aplicar el KNN, las categorías de los municipios se pasan a valores numéricos. Las categorías faltantes se sustituyen por el valor medio para evitar que un municipio quede descartado automáticamente por falta de información en una variable concreta.
+
+```{r}
+cats_ord <- c(
+  "muy bajo" = 1,
+  "bajo" = 2,
+  "medio" = 3,
+  "alto" = 4,
+  "muy alto" = 5)
+
+pasar_a_numero <- function(x) {
+  
+  salida <- as.numeric(cats_ord[as.character(x)])
+  replace_na(salida, 3)}
+```
+
+## Cálculo de la distancia KNN
+
+Con el perfil numérico del usuario y el perfil numérico de cada municipio, se calcula la distancia euclídea. Los municipios con menor distancia son los más parecidos al perfil indicado por el usuario.
+
+La variable *naturaleza_contratos* entra en el cálculo solo si el usuario considera relevante la actividad del entorno. Si responde “No es relevante”, esa dimensión no se utiliza.
+
+```{r}
+aplicar_knn <- function(candidatos, perfil_usuario, k = 5) {
+  
+  candidatos_num <- candidatos %>%
+    mutate(
+      pob_total_n = pasar_a_numero(pob_total_cat),
+      esfuerzo_alquiler_n = pasar_a_numero(esfuerzo_alquiler_cat),
+      indice_envejecimiento_n = pasar_a_numero(indice_envejecimiento_cat),
+      pct_extranjeros_n = pasar_a_numero(pct_extranjeros_cat),
+      pct_estudios_sup_n = pasar_a_numero(pct_estudios_sup_cat),
+      grupo_contratos_n = replace_na(as.numeric(grupo_contratos_n), 3))
+  
+  columnas <- c(
+    pob_total = "pob_total_n",
+    esfuerzo_alquiler = "esfuerzo_alquiler_n",
+    indice_envejecimiento = "indice_envejecimiento_n",
+    pct_extranjeros = "pct_extranjeros_n",
+    pct_estudios_sup = "pct_estudios_sup_n",
+    grupo_contratos = "grupo_contratos_n")
+  
+  columnas_usadas <- columnas[names(perfil_usuario)]
+  
+  matriz_municipios <- candidatos_num %>%
+    select(all_of(columnas_usadas)) %>%
+    as.matrix()
+  
+  perfil_num <- as.numeric(perfil_usuario)
+  
+  filas_validas <- complete.cases(matriz_municipios)
+  
+  candidatos_num <- candidatos_num[filas_validas, ]
+  matriz_municipios <- matriz_municipios[filas_validas, , drop = FALSE]
+  
+  if (nrow(matriz_municipios) == 0) {
+    message("No hay municipios válidos para calcular el KNN después de aplicar los filtros.")
+    return(NULL)}
+  
+  diferencias <- sweep(matriz_municipios, 2, perfil_num, "-")
+  
+  candidatos_num %>%
+    mutate(
+      distancia_knn = sqrt(rowSums(diferencias^2)),
+      coincidencias_exactas = rowSums(diferencias == 0),
+      diferencia_maxima = apply(abs(diferencias), 1, max)) %>%
+    arrange(
+      distancia_knn,
+      desc(coincidencias_exactas),
+      diferencia_maxima) %>%
+    select(
+      nombre_municipio,
+      provincia,
+      naturaleza_contratos,
+      grupo_contratos,
+      pob_total_cat,
+      esfuerzo_alquiler_cat,
+      indice_envejecimiento_cat,
+      pct_extranjeros_cat,
+      pct_estudios_sup_cat,
+      distancia_centro_educativo_cat,
+      distancia_hospital_cat,
+      distancia_knn,
+      coincidencias_exactas,
+      diferencia_maxima
+    ) %>%
+    slice_head(n = k)}
+```
+
+# Función completa del recomendador
+
+Finalmente, se crea una función que recibe las nueve respuestas del usuario. Primero aplica los filtros de las preguntas 1 a 4 y después calcula el KNN con las preguntas 5 a 9.
+
+```{r}
+recomendar <- function(p1, p2, p3, p4, p5, p6, p7, p8, p9, k = 5) {
+  
+  candidatos <- aplicar_filtros(p1, p2, p3, p4)
+  
+  if (is.null(candidatos)) return(NULL)
+  
+  perfil_usuario <- construir_perfil(p5, p6, p7, p8, p9)
+  
+  aplicar_knn(candidatos, perfil_usuario, k)}
+```
+
+# Comprobación final del recomendador
+
+Probamos el recomendador completo con un perfil de ejemplo. En este primer caso, la actividad del entorno sí se tiene en cuenta dentro del KNN.
+
+```{r}
+resultado <- recomendar(
+  p1 = 1,  # Valencia
+  p2 = 3,  # acepta distancias medias
+  p3 = 2,  # recursos educativos relativamente cerca
+  p4 = 3,  # sanidad básica y hospital a distancia media
+  p5 = 2,  # ambiente tranquilo
+  p6 = 1,  # opción muy asequible
+  p7 = 2,  # entorno tranquilo y estable
+  p8 = 4,  # actividad de servicios
+  p9 = 1,  # perfil formativo bajo o medio-bajo
+  k = 5
+)
+
+resultado
+```
+
+# Comparación entre perfil del usuario y municipios recomendados
+
+Para interpretar mejor el resultado, se construye una tabla que compara el perfil del usuario con los municipios recomendados.
+
+```{r}
+etiqueta_actividad <- function(p8) {
+  
+  switch(
+    as.character(p8),
+    "1" = "agricola_rural",
+    "2" = "rural_mixto",
+    "3" = "mixto",
+    "4" = "servicios",
+    "5" = "industrial_empresarial",
+    "6" = "no relevante")}
+
+etiqueta_estudios <- function(p9) {
+  
+  switch(
+    as.character(p9),
+    "1" = "muy bajo / bajo",
+    "2" = "medio",
+    "3" = "alto / muy alto")}
+
+
+perfil_usuario <- construir_perfil(
+  p5 = 2,
+  p6 = 1,
+  p7 = 2,
+  p8 = 4,
+  p9 = 1)
+
+perfil_usuario_tabla <- tibble(
+  nombre_municipio = "-- PERFIL USUARIO --",
+  provincia = NA_character_,
+  naturaleza_contratos = NA_character_,
+  grupo_contratos = etiqueta_actividad(4),
+  pob_total_cat = niveles_perfil[perfil_usuario["pob_total"]],
+  esfuerzo_alquiler_cat = niveles_perfil[perfil_usuario["esfuerzo_alquiler"]],
+  indice_envejecimiento_cat = niveles_perfil[perfil_usuario["indice_envejecimiento"]],
+  pct_extranjeros_cat = niveles_perfil[perfil_usuario["pct_extranjeros"]],
+  pct_estudios_sup_cat = etiqueta_estudios(1),
+  distancia_centro_educativo_cat = NA_character_,
+  distancia_hospital_cat = NA_character_,
+  distancia_knn = 0,
+  coincidencias_exactas = NA_real_,
+  diferencia_maxima = NA_real_)
+
+bind_rows(perfil_usuario_tabla, resultado)
+```
+
+# Resumen de la lógica del recomendador
+
+La lógica final del recomendador queda organizada en dos fases. Primero se aplican filtros básicos para reducir los municipios candidatos. Después, sobre esos candidatos, se calcula la similitud entre el perfil del usuario y el perfil de cada municipio mediante KNN.
+
+```{r}
+tibble(
+  pregunta = paste0("P", 1:9),
+  funcion = c(
+    "Filtro por provincia",
+    "Filtro por cercanía general a servicios",
+    "Filtro por cercanía educativa",
+    "Filtro por tranquilidad sanitaria",
+    "KNN con pob_total",
+    "KNN con esfuerzo_alquiler",
+    "KNN con indice_envejecimiento y pct_extranjeros",
+    "KNN con naturaleza_contratos si es relevante",
+    "KNN con pct_estudios_sup"))
+```
