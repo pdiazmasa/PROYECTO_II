@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 ---
 title: "descripciones_pueblos"
 author: "unknown"
@@ -226,3 +227,233 @@ write_delim(datos_final, "descripciones_municipios_completo.csv", delim = ";")
 ```
 
 
+=======
+---
+title: "descripciones_pueblos"
+author: "unknown"
+date: "2026-05-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(readr)
+library(dplyr)
+library(stringr)
+```
+
+# Abrir datasets
+
+```{r}
+descripciones <- read_delim("../datasets/descripciones_municipios_solo_parrafo1.csv",delim = ";", show_col_types = FALSE)
+
+municipios_valencia <- read_csv("../datasets/valencia/municipios_valencia_base_final.csv", show_col_types = FALSE)
+
+municipios_vizcaya <- read_csv("../datasets/vizcaya-bilbao/municipios_vizcaya_base_final.csv", show_col_types = FALSE)
+```
+
+
+# Unir municipios base en un solo dataset
+
+```{r}
+municipios_base <- bind_rows(
+  municipios_valencia %>% mutate(provincia = "valencia"),
+  municipios_vizcaya %>% mutate(provincia = "vizcaya")
+)
+```
+
+
+# Crear columna con el nombre arreglado
+
+```{r}
+# Crear columna con nombre arreglado usando case_when manual
+descripciones <- descripciones %>%
+  mutate(
+    nombre_municipio_arreglado = case_when(
+      nombre_municipio == "Alcúdia,l'" ~ "l'Alcúdia",
+      nombre_municipio == "Alcúdia de Crespins,l'" ~ "l'Alcúdia de Crespins",
+      nombre_municipio == "Alqueria de la Comtessa,l'" ~ "l'Alqueria de la Comtessa",
+      nombre_municipio == "Eliana,l'" ~ "l'Eliana",
+      nombre_municipio == "Olleria,l'" ~ "l'Olleria",
+      nombre_municipio == "Ènova,l'" ~ "l'Ènova",
+      nombre_municipio == "Llosa de Ranes,la" ~ "la Llosa de Ranes",
+      nombre_municipio == "Pobla de Farnals,la" ~ "la Pobla de Farnals",
+      nombre_municipio == "Pobla de Vallbona,la" ~ "la Pobla de Vallbona",
+      nombre_municipio == "Pobla del Duc,la" ~ "la Pobla del Duc",
+      nombre_municipio == "Pobla Llarga,la" ~ "la Pobla Llarga",
+      nombre_municipio == "Puig de Santa Maria,el" ~ "el Puig de Santa Maria",
+      nombre_municipio == "Real de Gandia,el" ~ "el Real de Gandia",
+      TRUE ~ nombre_municipio
+    )
+  ) %>%
+  # Reordenar columnas
+  select(provincia, nombre_municipio, nombre_municipio_arreglado, nombre_municipio_norm, descripcion1)
+```
+
+# 4. Cruzar descripciones con los datos objetivos
+
+```{r}
+
+datos <- descripciones %>%
+  left_join(
+    municipios_base,
+    by = c("provincia", "nombre_municipio_norm")
+  )
+
+
+# Verificamos que ha funcionado
+
+datos_sin_cruce <- datos %>%
+  filter(is.na(pob_total))
+
+if (nrow(datos_sin_cruce) > 0) {
+  print(datos_sin_cruce %>% select(provincia, nombre_municipio, nombre_municipio_norm))
+  stop("Hay municipios que no se han cruzado bien. Revisa nombre_municipio_norm.")
+}
+
+```
+
+
+# Funciones para dar formato bonito a los números 
+
+```{r}
+formato_entero <- function(x) {
+  ifelse(
+    is.na(x),
+    "no disponible",
+    format(round(x, 0), big.mark = ".", decimal.mark = ",", scientific = FALSE)
+  )
+}
+
+formato_decimal <- function(x, decimales = 2) {
+  ifelse(
+    is.na(x),
+    "no disponible",
+    format(round(x, decimales), big.mark = ".", decimal.mark = ",", scientific = FALSE)
+  )
+}
+
+formato_porcentaje <- function(x, decimales = 1) {
+  ifelse(
+    is.na(x),
+    "no disponible",
+    paste0(format(round(x, decimales), big.mark = ".", decimal.mark = ",", scientific = FALSE), "%")
+  )
+}
+
+formato_euros <- function(x) {
+  ifelse(
+    is.na(x),
+    "no disponible",
+    paste0(format(round(x, 0), big.mark = ".", decimal.mark = ",", scientific = FALSE), " €")
+  )
+}
+
+formato_km <- function(x) {
+  ifelse(
+    is.na(x),
+    "no disponible",
+    paste0(format(round(x, 2), big.mark = ".", decimal.mark = ",", scientific = FALSE), " km")
+  )
+}
+
+```
+
+# Crear textos auxiliares para singular/plural y casos especiales 
+
+```{r}
+datos <- datos %>%
+  mutate(
+    texto_colegios = case_when(
+      num_colegios == 0 & distancia_centro_educativo > 0 ~ paste0(
+        "no cuenta con centro educativo propio, y el centro educativo más cercano se sitúa a ",
+        formato_km(distancia_centro_educativo)
+      ),
+      num_colegios == 0 ~ "no cuenta con centro educativo propio",
+      num_colegios == 1 ~ "cuenta con 1 centro educativo",
+      num_colegios > 1 ~ paste0("cuenta con ", formato_entero(num_colegios), " centros educativos"),
+      TRUE ~ "no hay información disponible sobre centros educativos"
+    ),
+
+    texto_centros_salud = case_when(
+      num_centros_salud == 0 ~ "no cuenta con centro de salud propio",
+      num_centros_salud == 1 ~ "cuenta con 1 centro de salud",
+      num_centros_salud > 1 ~ paste0("cuenta con ", formato_entero(num_centros_salud), " centros de salud"),
+      TRUE ~ "no hay información disponible sobre centros de salud"
+    ),
+
+    texto_consultorio = case_when(
+      consultorio_local == 1 ~ "dispone de consultorio local",
+      consultorio_local == 0 ~ "no dispone de consultorio local",
+      TRUE ~ "no hay información disponible sobre consultorio local"
+    ),
+
+    texto_hospitales = case_when(
+      num_hospitales == 0 & distancia_hospital > 0 ~ paste0(
+        "no cuenta con hospital propio, y el hospital más cercano se sitúa a ",
+        formato_km(distancia_hospital)
+      ),
+      num_hospitales == 0 ~ "no cuenta con hospital propio",
+      num_hospitales == 1 ~ "cuenta con 1 hospital",
+      num_hospitales > 1 ~ paste0("cuenta con ", formato_entero(num_hospitales), " hospitales"),
+      TRUE ~ "no hay información disponible sobre hospitales"
+    )
+  )
+
+```
+
+# 8. Crear la nueva columna 
+
+```{r}
+datos <- datos %>%
+  mutate(
+    descripcion2 = paste0(
+      "Municipio de ", formato_entero(pob_total), " habitantes, con un índice de envejecimiento de ",
+      formato_decimal(indice_envejecimiento, 1), ", un ",
+      formato_porcentaje(pct_extranjeros, 1), " de población extranjera y un ",
+      formato_porcentaje(pct_estudios_sup, 1), " de población con estudios superiores. ",
+
+      "En servicios educativos, ", texto_colegios,
+      "; el ratio educativo es de ", formato_decimal(ratio_colegios, 2), ". ",
+
+      "En sanidad, ", texto_centros_salud, ", ", texto_consultorio, " y ", texto_hospitales,
+      "; el ratio de centros de salud es de ", formato_decimal(ratio_centros_salud, 2),
+      " y el ratio hospitalario es de ", formato_decimal(ratio_hospital, 2), ". ",
+
+      "En vivienda, el alquiler medio es de ", formato_decimal(precio_m2_alquiler, 2),
+      " €/m², la renta media del hogar es de ", formato_euros(renta_media_hogar),
+      " y el esfuerzo de alquiler se sitúa en el ", formato_porcentaje(esfuerzo_alquiler, 1), ". ",
+
+      "Su actividad económica registra ", formato_entero(contratos_total),
+      " contratos y presenta un perfil principalmente ", str_to_lower(naturaleza_contratos), ". ",
+
+      "Además, el ", formato_porcentaje(pct_hogares_100mbps, 1),
+      " de los hogares dispone de conexión de al menos 100 Mbps."
+    )
+  )
+
+
+# 9. Dejar solo las columnas finales preparadas 
+
+datos_final <- datos %>%
+  select(
+    provincia,
+    nombre_municipio,
+    nombre_municipio_arreglado,
+    nombre_municipio_norm,
+    descripcion1,
+    descripcion2
+  )
+```
+
+
+
+```{r}
+write_delim(datos_final, "descripciones_municipios_completo.csv", delim = ";")
+```
+
+
+>>>>>>> fa60f2124538e36e3f9b5aa5d3885b267e31762a
