@@ -88,27 +88,27 @@ if (nrow(datos_sin_cruce) > 0) {
 ```{r}
 # Convierte números a enteros, sin decimales y con punto de miles.
 formato_entero <- function(x) {
-    format(round(x, 0), big.mark = ".", decimal.mark = ",", scientific = FALSE)
+    format(round(x, 0), big.mark = ".", decimal.mark = ",", scientific = FALSE, trim = TRUE)
 }
 
 # Redondea números con los decimales que se le indiquen (2 por defecto) y usa coma decimal.
 formato_decimal <- function(x, decimales = 2) {
-    format(round(x, decimales), big.mark = ".", decimal.mark = ",", scientific = FALSE)
+    format(round(x, decimales), big.mark = ".", decimal.mark = ",", scientific = FALSE, trim = TRUE)
 }
 
 # Añade el símbolo % y redondea.
 formato_porcentaje <- function(x, decimales = 1) {
-    paste0(format(round(x, decimales), big.mark = ".", decimal.mark = ",", scientific = FALSE), "%")
+    paste0(format(round(x, decimales), big.mark = ".", decimal.mark = ",", scientific = FALSE, trim = TRUE), "%")
 }
 
 # Redondea y añade el símbolo €.
 formato_euros <- function(x) {
-    paste0(format(round(x, 0), big.mark = ".", decimal.mark = ",", scientific = FALSE), " €")
+    paste0(format(round(x, 0), big.mark = ".", decimal.mark = ",", scientific = FALSE, trim = TRUE), " €")
 }
 
 # Redondea y añade km.
 formato_km <- function(x) {
-    paste0(format(round(x, 2), big.mark = ".", decimal.mark = ",", scientific = FALSE), " km")
+    paste0(format(round(x, 2), big.mark = ".", decimal.mark = ",", scientific = FALSE, trim = TRUE), " km")
 }
 
 ```
@@ -197,6 +197,7 @@ datos <- datos %>%
 
 
 ```{r}
+
 datos_final <- datos %>%
   select(
     provincia,
