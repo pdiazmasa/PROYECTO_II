@@ -1,0 +1,1002 @@
+---
+title: "Ciudad vs Pueblo"
+output:
+  html_document:
+    theme: null
+    self_contained: false
+runtime: shiny
+resource_files:
+- www/comparacion_ciudades_1.png
+- www/comparacion_ciudades_2.png
+- www/comparacion_ciudades_3.png
+- www/comparacion_distritos_1.png
+- www/comparacion_distritos_2.png
+- www/comparacion_distritos_4.png
+- www/comparacion_distritos_3.png
+- www/comparacion_distritos_5.png
+- www/comparacion_distritos_6.png
+- www/comparacion_distritos_7.png
+- www/comparacion_distritos_8.png
+- www/comparacion_distritos_9.png
+- www/comparacion_distritos_10.png
+- www/comparacion_distritos_11.png
+- www/comparacion_municipios_1.png
+- www/comparacion_municipios_2.png
+- www/comparacion_municipios_3.png
+- www/comparacion_municipios_4.png
+- www/comparacion_municipios_5.png
+- www/comparacion_municipios_6.png
+- www/comparacion_municipios_7.png
+- www/comparacion_municipios_8.png
+- MUNICIPIOS_5000_ETRS89.dbf
+- MUNICIPIOS_5000_ETRS89.prj
+- MUNICIPIOS_5000_ETRS89.shx
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+
+library(shiny)
+library(leaflet)
+library(plotly)
+library(dplyr)
+library(tidyr)
+library(sf)
+library(stringr)
+library(bslib)
+library(readr)
+
+addResourcePath("imgs", getwd())
+
+tags$head(tags$style(HTML("
+  body { margin: 0 !important; padding: 0 !important; }
+")))
+```
+
+```{r datos, include=FALSE}
+app_dir <- tryCatch(
+  dirname(rstudioapi::getSourceEditorContext()$path),
+  error = function(e) getwd()
+)
+
+ruta <- function(archivo) file.path(app_dir, archivo)
+
+# ---- Mapas ----
+df_vlc <- read.csv(ruta("municipios_valencia_todos_municipios.csv"),
+                   colClasses = c(cod_municipio = "character"))
+df_viz <- read.csv(ruta("municipios_vizcaya_todos_municipios.csv"),
+                   colClasses = c(cod_municipio = "character"))
+
+df_distritos_vlc <- read.csv(ruta("distritos_valencia_base_final.csv"))
+df_distritos_bil <- read.csv(ruta("distritos_bilbao_base_final.csv"))
+
+mapa_vlc_raw <- st_read(ruta("delimitacion_municipios_valencia.geojson"), quiet = TRUE) %>%
+  filter(CODPROV == "46") %>%
+  mutate(MUNIINE = as.character(MUNIINE)) %>%
+  st_transform(4326)
+
+mapa_viz_raw <- st_read(ruta("MUNICIPIOS_5000_ETRS89.shp"), quiet = TRUE) %>%
+  filter(TERRITORIO == "BIZKAIA") %>%
+  mutate(nombre_join = tolower(str_trim(NOMBRE_TOP))) %>%
+  st_transform(4326)
+
+mapa_distritos_vlc_raw <- st_read(ruta("delimitacion_distritos_valencia.geojson"), quiet = TRUE) %>%
+  filter(str_starts(as.character(INE_MUN), "46250") | INE_MUN == "46250") %>%
+  group_by(DISTRITO) %>%
+  summarise(geometry = st_union(geometry), .groups = "drop") %>%
+  rename(cod_distrito = DISTRITO) %>%
+  st_transform(4326)
+
+mapa_distritos_bil_raw <- st_read(ruta("delimitacion_distritos_bilbao.geojson"), quiet = TRUE) %>%
+  rename(cod_distrito = distrito) %>%
+  st_transform(4326)
+
+mapa_vlc <- mapa_vlc_raw %>%
+  left_join(df_vlc %>% mutate(cod_municipio = as.character(cod_municipio)),
+            by = c("MUNIINE" = "cod_municipio"))
+
+df_viz_limpio <- df_viz %>%
+  mutate(
+    nombre_join = tolower(str_trim(nombre_municipio)),
+    nombre_join = case_when(
+      str_detect(nombre_join, "karrantza")    ~ "karrantza harana / valle de carranza",
+      str_detect(nombre_join, "urduña")       ~ "urduña / orduña",
+      str_detect(nombre_join, "arrankudiaga") ~ "arrankudiaga-zollo",
+      str_detect(nombre_join, "munitibar")    ~ "munitibar-arbatzegi gerrikaitz-",
+      str_detect(nombre_join, "limitado")     ~ "limitadua / el limitado",
+      TRUE ~ nombre_join
+    )
+  )
+
+mapa_viz          <- mapa_viz_raw %>% left_join(df_viz_limpio, by = "nombre_join")
+mapa_distritos_vlc <- mapa_distritos_vlc_raw %>% left_join(df_distritos_vlc, by = "cod_distrito")
+mapa_distritos_bil <- mapa_distritos_bil_raw %>% left_join(df_distritos_bil, by = "cod_distrito")
+```
+
+```{r recomendador_data, include=FALSE}
+# ---- Bases del recomendador ----
+valencia_rec <- read_csv(ruta("municipios_valencia_recomendador.csv"), show_col_types = FALSE)
+vizcaya_rec  <- read_csv(ruta("municipios_vizcaya_recomendador.csv"),  show_col_types = FALSE)
+
+# ---- Descripciones de municipios ----
+descripciones <- read.csv(
+  ruta("descripciones_municipios.csv"),
+  sep            = ";",
+  encoding       = "UTF-8",
+  stringsAsFactors = FALSE
+)
+# nombre_municipio_arreglado coincide exactamente con lo que devuelve el recomendador
+```
+
+```{r recomendador_logica, include=FALSE}
+# =====================================================================
+# LÓGICA COMPLETA DEL RECOMENDADOR (extraída de recomendador.Rmd)
+# =====================================================================
+
+niveles_perfil   <- c("muy bajo", "bajo", "medio", "alto", "muy alto")
+niveles_distancia <- c("0", "muy baja", "baja", "media", "alta", "muy alta")
+
+discretizar_perfil <- function(x) {
+  x <- as.numeric(x)
+  if (sum(!is.na(x)) == 0)
+    return(factor(rep(NA_character_, length(x)), levels = niveles_perfil, ordered = TRUE))
+  cortes <- quantile(x, probs = seq(0, 1, 0.2), na.rm = TRUE, names = FALSE)
+  cortes <- unique(cortes)
+  if (length(cortes) < 2)
+    return(factor(rep("medio", length(x)), levels = niveles_perfil, ordered = TRUE))
+  etiquetas <- niveles_perfil[1:(length(cortes) - 1)]
+  factor(as.character(cut(x, breaks = cortes, labels = etiquetas, include.lowest = TRUE)),
+         levels = niveles_perfil, ordered = TRUE)
+}
+
+discretizar_distancia <- function(x) {
+  x <- as.numeric(x)
+  resultado <- rep(NA_character_, length(x))
+  resultado[!is.na(x) & x == 0] <- "0"
+  positivos <- !is.na(x) & x > 0
+  if (sum(positivos) > 0) {
+    cortes <- quantile(x[positivos], probs = seq(0, 1, 0.2), na.rm = TRUE, names = FALSE)
+    cortes <- unique(cortes)
+    if (length(cortes) < 2) {
+      resultado[positivos] <- "media"
+    } else {
+      etiquetas <- niveles_distancia[-1][1:(length(cortes) - 1)]
+      resultado[positivos] <- as.character(cut(x[positivos], breaks = cortes,
+                                               labels = etiquetas, include.lowest = TRUE))
+    }
+  }
+  factor(resultado, levels = niveles_distancia, ordered = TRUE)
+}
+
+clasificar_actividad_entorno <- function(x) {
+  x <- str_to_lower(as.character(x))
+  es_agro  <- str_detect(x, "agr|agro")
+  es_serv  <- str_detect(x, "serv")
+  es_ind   <- str_detect(x, "industr|constru")
+  es_mixto <- str_detect(x, "mixto|sin especial")
+  case_when(
+    is.na(x)                              ~ "mixto",
+    es_agro & !es_serv & !es_ind          ~ "agricola_rural",
+    es_agro & (es_serv | es_ind | es_mixto) ~ "rural_mixto",
+    es_mixto                              ~ "mixto",
+    es_serv & !es_ind & !es_agro          ~ "servicios",
+    es_ind  & !es_serv & !es_agro         ~ "industrial_empresarial",
+    es_serv & es_ind                      ~ "industrial_empresarial",
+    TRUE                                  ~ "mixto"
+  )
+}
+
+actividad_ord <- c(
+  "agricola_rural" = 1, "rural_mixto" = 2, "mixto" = 3,
+  "servicios" = 4, "industrial_empresarial" = 5
+)
+
+pasar_actividad_a_numero <- function(x) as.numeric(actividad_ord[as.character(x)])
+
+vars_perfil    <- c("pob_total", "esfuerzo_alquiler", "indice_envejecimiento",
+                    "pct_extranjeros", "pct_estudios_sup")
+vars_distancia <- c("distancia_centro_educativo", "distancia_hospital")
+
+preparar_recomendador <- function(datos) {
+  datos %>%
+    mutate(
+      across(all_of(vars_perfil),    ~ discretizar_perfil(.x),    .names = "{.col}_cat"),
+      across(all_of(vars_distancia), ~ discretizar_distancia(.x), .names = "{.col}_cat"),
+      grupo_contratos   = clasificar_actividad_entorno(naturaleza_contratos),
+      grupo_contratos_n = pasar_actividad_a_numero(grupo_contratos)
+    )
+}
+
+# Preparar bases con quintiles calculados por territorio
+valencia_rec_prep <- preparar_recomendador(valencia_rec)
+vizcaya_rec_prep  <- preparar_recomendador(vizcaya_rec)
+
+# ---- Filtros ----
+pasar_binaria <- function(x) {
+  x_chr <- str_to_lower(as.character(x))
+  x_num <- suppressWarnings(as.numeric(x_chr))
+  case_when(
+    x_chr %in% c("1", "si", "sí", "s", "true") ~ 1,
+    x_chr %in% c("0", "no", "false")            ~ 0,
+    !is.na(x_num)                               ~ x_num,
+    TRUE                                         ~ 0
+  )
+}
+
+seleccionar_territorio <- function(p1) {
+  if (p1 == 1) return(valencia_rec_prep)
+  if (p1 == 2) return(vizcaya_rec_prep)
+  if (p1 == 3) return(bind_rows(valencia_rec_prep, vizcaya_rec_prep))
+  stop("Respuesta no válida en p1.")
+}
+
+filtrar_cercania <- function(datos, p2) {
+  if (p2 == 4) return(datos)
+  cats <- switch(as.character(p2),
+    "1" = c("0"),
+    "2" = c("0", "muy baja", "baja"),
+    "3" = c("0", "muy baja", "baja", "media"),
+    stop("Respuesta no válida en p2."))
+  datos %>% filter(distancia_centro_educativo_cat %in% cats,
+                   distancia_hospital_cat          %in% cats)
+}
+
+filtrar_educacion <- function(datos, p3) {
+  if (p3 == 3) return(datos)
+  cats <- switch(as.character(p3),
+    "1" = c("0"),
+    "2" = c("0", "muy baja", "baja", "media"),
+    stop("Respuesta no válida en p3."))
+  datos %>% filter(distancia_centro_educativo_cat %in% cats)
+}
+
+filtrar_sanidad <- function(datos, p4) {
+  if (p4 == 4) return(datos)
+  datos <- datos %>%
+    mutate(
+      consultorio_local_num    = pasar_binaria(consultorio_local),
+      ratio_centros_salud_num  = replace_na(suppressWarnings(as.numeric(ratio_centros_salud)), 0),
+      atencion_basica          = consultorio_local_num == 1 | ratio_centros_salud_num > 0
+    )
+  if (p4 == 1) return(datos %>% filter(distancia_hospital_cat == "0"))
+  cats_hosp <- switch(as.character(p4),
+    "2" = c("0", "muy baja", "baja"),
+    "3" = c("0", "muy baja", "baja", "media"),
+    stop("Respuesta no válida en p4."))
+  datos %>% filter(atencion_basica == TRUE, distancia_hospital_cat %in% cats_hosp)
+}
+
+aplicar_filtros <- function(p1, p2, p3, p4) {
+  datos <- seleccionar_territorio(p1) %>%
+    filtrar_cercania(p2) %>%
+    filtrar_educacion(p3) %>%
+    filtrar_sanidad(p4)
+  if (nrow(datos) == 0) return(NULL)
+  datos
+}
+
+
+cats_ord <- c("muy bajo" = 1, "bajo" = 2, "medio" = 3, "alto" = 4, "muy alto" = 5)
+
+pasar_a_numero <- function(x) {
+  salida <- as.numeric(cats_ord[as.character(x)])
+  replace_na(salida, 3)
+}
+
+construir_perfil <- function(p5, p6, p7, p8, p9) {
+  perfil <- c(
+    pob_total             = p5,
+    esfuerzo_alquiler     = p6,
+    indice_envejecimiento = 6 - p7,
+    pct_extranjeros       = p7,
+    pct_estudios_sup      = switch(as.character(p9), "1" = 1.5, "2" = 3, "3" = 4.5)
+  )
+  if (p8 != 6) perfil <- c(perfil, grupo_contratos = p8)
+  perfil
+}
+
+ordenar_por_similitud <- function(candidatos, perfil_usuario, k = 5) {
+  candidatos_num <- candidatos %>%
+    mutate(
+      pob_total_n             = pasar_a_numero(pob_total_cat),
+      esfuerzo_alquiler_n     = pasar_a_numero(esfuerzo_alquiler_cat),
+      indice_envejecimiento_n = pasar_a_numero(indice_envejecimiento_cat),
+      pct_extranjeros_n       = pasar_a_numero(pct_extranjeros_cat),
+      pct_estudios_sup_n      = pasar_a_numero(pct_estudios_sup_cat),
+      grupo_contratos_n       = replace_na(as.numeric(grupo_contratos_n), 3)
+    )
+  columnas <- c(
+    pob_total             = "pob_total_n",
+    esfuerzo_alquiler     = "esfuerzo_alquiler_n",
+    indice_envejecimiento = "indice_envejecimiento_n",
+    pct_extranjeros       = "pct_extranjeros_n",
+    pct_estudios_sup      = "pct_estudios_sup_n",
+    grupo_contratos       = "grupo_contratos_n"
+  )
+  columnas_usadas   <- columnas[names(perfil_usuario)]
+  matriz_municipios <- candidatos_num %>% select(all_of(columnas_usadas)) %>% as.matrix()
+  perfil_num        <- as.numeric(perfil_usuario)
+  filas_validas     <- complete.cases(matriz_municipios)
+  candidatos_num    <- candidatos_num[filas_validas, ]
+  matriz_municipios <- matriz_municipios[filas_validas, , drop = FALSE]
+  if (nrow(matriz_municipios) == 0) return(NULL)
+  diferencias <- sweep(matriz_municipios, 2, perfil_num, "-")
+  candidatos_num %>%
+    mutate(
+      distancia_similitud      = sqrt(rowSums(diferencias^2)),
+      coincidencias_exactas = rowSums(diferencias == 0),
+      diferencia_maxima  = apply(abs(diferencias), 1, max)
+    ) %>%
+    arrange(distancia_similitud, desc(coincidencias_exactas), diferencia_maxima) %>%
+    select(nombre_municipio, provincia, distancia_similitud) %>%
+    slice_head(n = k)
+}
+
+recomendar <- function(p1, p2, p3, p4, p5, p6, p7, p8, p9, k = 5) {
+  candidatos     <- aplicar_filtros(p1, p2, p3, p4)
+  if (is.null(candidatos)) return(NULL)
+  perfil_usuario <- construir_perfil(p5, p6, p7, p8, p9)
+  ordenar_por_similitud(candidatos, perfil_usuario, k)
+}
+```
+
+```{r config, include=FALSE}
+variables_municipios <- c(
+  "Poblacion total (hab.)"                   = "pob_total",
+  "% Poblacion extranjera"                   = "pct_extranjeros",
+  "Indice de envejecimiento (>65 / <16)"     = "indice_envejecimiento",
+  "Poblacion menor de 16 anos"               = "pob_menor_16",
+  "Poblacion mayor de 65 anos"               = "pob_mayor_65",
+  "% Poblacion con estudios superiores"      = "pct_estudios_sup",
+  "N de colegios"                            = "num_colegios",
+  "Ratio colegios / 1.000 hab."              = "ratio_colegios",
+  "Distancia al colegio mas cercano (km)"    = "distancia_centro_educativo",
+  "N de centros de salud (AP)"               = "num_centros_salud",
+  "Ratio centros salud / 1.000 hab."         = "ratio_centros_salud",
+  "N de hospitales"                          = "num_hospitales",
+  "Ratio hospitales / 1.000 hab."            = "ratio_hospital",
+  "Distancia al hospital mas cercano (km)"   = "distancia_hospital",
+  "Precio alquiler (euros/m2)"               = "precio_m2_alquiler",
+  "Renta media del hogar (euros)"            = "renta_media_hogar",
+  "Esfuerzo inmobiliario (% renta en alq.)"  = "esfuerzo_alquiler",
+  "Total contratos laborales"                = "contratos_total",
+  "% Contratos en agricultura"               = "pct_contratos_agricultura",
+  "% Contratos en industria"                 = "pct_contratos_industria",
+  "% Contratos en construccion"              = "pct_contratos_construccion",
+  "% Contratos en servicios"                 = "pct_contratos_servicios",
+  "% Hogares con fibra 100 Mbps o mas"       = "pct_hogares_100mbps"
+)
+
+variables_distritos <- c(
+  "Poblacion total (hab.)"                   = "pob_total",
+  "Poblacion menor de 16 anos"               = "pob_menor_16",
+  "Poblacion mayor de 65 anos"               = "pob_mayor_65",
+  "Indice de envejecimiento (>65 / <16)"     = "indice_envejecimiento",
+  "N de colegios"                            = "num_colegios",
+  "Ratio colegios / 1.000 hab."              = "ratio_colegio",
+  "N de hospitales"                          = "num_hospitales",
+  "Ratio hospitales / 1.000 hab."            = "ratio_hospital",
+  "Precio alquiler (euros/m2)"               = "alquiler_m2",
+  "Renta media del hogar (euros)"            = "renta_media_hogar",
+  "Esfuerzo inmobiliario (% renta en alq.)"  = "esfuerzo_alquiler",
+  "N de zonas verdes"                        = "num_zonas_verdes",
+  "Ratio zonas verdes / 1.000 hab."          = "ratio_zonas_verdes"
+)
+
+vars_invertidas <- c(
+  "distancia_hospital", "distancia_centro_educativo",
+  "esfuerzo_alquiler", "indice_envejecimiento"
+)
+
+hacer_mapa <- function(mapa_sf, variable, etiqueta, col_label,
+                       dominio_compartido = NULL,
+                       lng = NULL, lat = NULL, zoom = NULL) {
+  valores <- mapa_sf[[variable]]
+  if (is.null(valores) || all(is.na(valores))) {
+    return(leaflet() %>% addProviderTiles(providers$CartoDB.Positron) %>%
+             addControl(html = "<b style='color:#c0392b'>Sin datos para esta variable</b>",
+                        position = "topright"))
+  }
+  dominio <- if (!is.null(dominio_compartido)) dominio_compartido else valores
+  pal <- if (variable %in% vars_invertidas) {
+    colorNumeric("RdYlGn", domain = dominio, na.color = "#d0d0d0", reverse = TRUE)
+  } else {
+    colorNumeric("YlOrRd", domain = dominio, na.color = "#d0d0d0")
+  }
+  etiquetas_hover <- paste0(
+    "<b>", mapa_sf[[col_label]], "</b><br>",
+    etiqueta, ": ",
+    ifelse(is.na(valores), "Sin dato", round(valores, 2))
+  ) %>% lapply(htmltools::HTML)
+  mapa <- leaflet(mapa_sf) %>%
+    addProviderTiles(providers$CartoDB.Positron) %>%
+    addPolygons(
+      fillColor = ~pal(get(variable)), color = "white", weight = 1.2,
+      opacity = 1, fillOpacity = 0.78,
+      highlightOptions = highlightOptions(weight = 2.5, color = "#333",
+                                          fillOpacity = 1, bringToFront = TRUE),
+      label = etiquetas_hover)
+  if (!is.null(lng) && !is.null(lat) && !is.null(zoom))
+    mapa <- mapa %>% setView(lng = lng, lat = lat, zoom = zoom)
+  mapa
+}
+
+hacer_leyenda_html <- function(variable, etiqueta, dominio) {
+  dominio_limpio <- dominio[!is.na(dominio)]
+  if (length(dominio_limpio) == 0) return(HTML(""))
+  pal <- if (variable %in% vars_invertidas) {
+    colorNumeric("RdYlGn", domain = dominio_limpio, reverse = TRUE)
+  } else {
+    colorNumeric("YlOrRd", domain = dominio_limpio)
+  }
+  pasos     <- seq(min(dominio_limpio), max(dominio_limpio), length.out = 7)
+  hex       <- pal(pasos)
+  labels    <- round(pasos, 1)
+  gradiente <- paste(hex, collapse = ", ")
+  HTML(paste0(
+    '<div style="display:flex;align-items:center;justify-content:center;',
+    'gap:12px;padding:10px 20px;background:#f8f9fa;border:1px solid #dee2e6;',
+    'border-radius:8px;margin:8px 0 14px;font-size:13px;color:#2c3e50;flex-wrap:wrap;">',
+    '<span style="font-weight:bold;">', etiqueta, '</span>',
+    '<span style="color:#555;">', labels[1], '</span>',
+    '<div style="width:240px;height:16px;border-radius:4px;',
+    'background:linear-gradient(to right,', gradiente, ');',
+    'border:1px solid #ccc;flex-shrink:0;"></div>',
+    '<span style="color:#555;">', labels[7], '</span>',
+    '<span style="color:#888;margin-left:6px;">',
+    '<span style="display:inline-block;width:13px;height:13px;background:#d0d0d0;',
+    'border:1px solid #bbb;border-radius:2px;vertical-align:middle;margin-right:3px;">',
+    '</span>Sin dato</span></div>'
+  ))
+}
+
+bloque_grafica <- function(src, descripcion) {
+  div(style = "margin-bottom: 28px;",
+    div(style = "background:#ffffff;border:1px solid #dee2e6;border-radius:10px;
+                 padding:12px;box-shadow:0 1px 4px rgba(0,0,0,0.06);",
+      tags$img(src = paste0("imgs/", src), width = "100%",
+               style = "border-radius:6px;display:block;"),
+      div(style = "margin-top:10px;font-size:12.5px;color:#5d6d7e;background:#f0f4f8;
+                   border-left:4px solid #2c3e50;border-radius:4px;padding:8px 12px;
+                   line-height:1.6;", descripcion)))
+}
+
+bloque_grafica_doble <- function(src1, desc1, src2, desc2) {
+  fluidRow(style = "margin-bottom:10px;",
+    column(6, div(style = "margin-bottom:28px;",
+      div(style = "background:#ffffff;border:1px solid #dee2e6;border-radius:10px;
+                   padding:12px;box-shadow:0 1px 4px rgba(0,0,0,0.06);",
+        tags$img(src = paste0("imgs/", src1), width = "100%",
+                 style = "border-radius:6px;display:block;"),
+        div(style = "margin-top:10px;font-size:12.5px;color:#5d6d7e;background:#f0f4f8;
+                     border-left:4px solid #2c3e50;border-radius:4px;padding:8px 12px;
+                     line-height:1.6;", desc1)))),
+    column(6, div(style = "margin-bottom:28px;",
+      div(style = "background:#ffffff;border:1px solid #dee2e6;border-radius:10px;
+                   padding:12px;box-shadow:0 1px 4px rgba(0,0,0,0.06);",
+        tags$img(src = paste0("imgs/", src2), width = "100%",
+                 style = "border-radius:6px;display:block;"),
+        div(style = "margin-top:10px;font-size:12.5px;color:#5d6d7e;background:#f0f4f8;
+                     border-left:4px solid #2c3e50;border-radius:4px;padding:8px 12px;
+                     line-height:1.6;", desc2)))))
+}
+
+css_responsive <- "
+* { box-sizing: border-box; }
+body, html { width: 100vw !important; max-width: 100vw !important; overflow-x: hidden; }
+  html, body { width: 100%; overflow-x: hidden; }
+  .shiny-frame { width: 100% !important; min-width: 100% !important; border: none !important; }
+  iframe { width: 100% !important; border: none !important; }
+  .container { width: 100% !important; max-width: 100% !important; }
+  .container-fluid {
+    padding-left: 12px !important; padding-right: 12px !important;
+    width: 100% !important; max-width: 100% !important;
+  }
+  .descripcion-pestana {
+    background: #f0f4f8; border-left: 4px solid #2c3e50; border-radius: 6px;
+    padding: 14px 20px; margin-bottom: 20px; color: #2c3e50; font-size: 14px;
+  }
+  .titulo-mapa { font-size:13px;font-weight:bold;text-align:center;color:#2c3e50;margin-bottom:6px; }
+  .panel-selector {
+    background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;
+    padding:16px;margin-bottom:16px;
+  }
+  .nota-leyenda { font-size:12px;color:#7f8c8d;margin-top:8px; }
+  .mapa-bloque  { margin-bottom:8px; }
+  .seccion-titulo {
+    font-size:20px;font-weight:700;color:#2c3e50;margin:32px 0 16px;
+    padding-bottom:8px;border-bottom:2px solid #dee2e6;
+  }
+  .recomendador-wrap { max-width:760px;margin:0 auto;padding:10px 16px 40px; }
+  .rec-titulo { font-size:26px;font-weight:700;color:#2c3e50;margin-bottom:4px; }
+  .rec-subtitulo { font-size:14px;color:#7f8c8d;margin-bottom:28px; }
+  .rec-bloque-label {
+    font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;
+    color:#95a5a6;margin-bottom:10px;
+  }
+  .rec-pregunta {
+    background:#ffffff;border:1px solid #dee2e6;border-radius:10px;
+    padding:18px 22px;margin-bottom:18px;box-shadow:0 1px 4px rgba(0,0,0,0.06);
+  }
+  .rec-pregunta label { font-weight:600;color:#2c3e50;font-size:14.5px; }
+  .rec-pregunta .shiny-input-radiogroup label { font-weight:400;color:#444; }
+  .btn-recomendar {
+    background-color:#2c3e50 !important;color:#fff !important;border:none !important;
+    border-radius:8px !important;padding:12px 32px !important;font-size:16px !important;
+    font-weight:600 !important;margin-top:10px;width:100%;cursor:pointer;
+  }
+  .btn-recomendar:hover { background-color:#1a252f !important; }
+  .resultado-wrap { margin-top:36px;text-align:center;animation:fadeIn 0.6s ease; }
+  @keyframes fadeIn {
+    from { opacity:0;transform:translateY(12px); }
+    to   { opacity:1;transform:translateY(0); }
+  }
+  .resultado-intro { font-size:15px;color:#7f8c8d;margin-bottom:6px; }
+  .resultado-municipio {
+    font-size:52px;font-weight:800;color:#2c3e50;
+    letter-spacing:-1px;line-height:1.1;margin-bottom:4px;
+  }
+  .resultado-provincia { font-size:17px;color:#95a5a6;margin-bottom:20px;font-style:italic; }
+  .resultado-descripcion {
+    background:#f0f4f8;border-left:4px solid #2c3e50;border-radius:8px;
+    padding:16px 22px;font-size:14px;color:#2c3e50;text-align:left;
+    max-width:640px;margin:0 auto 24px;line-height:1.75;
+  }
+  .otros-titulo {
+    font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;
+    color:#95a5a6;margin-bottom:14px;
+  }
+  .otros-grid {
+    display:grid;grid-template-columns:repeat(2,1fr);gap:12px;
+    max-width:640px;margin:0 auto;
+  }
+  .otro-municipio {
+    background:#ffffff;border:1px solid #dee2e6;border-radius:10px;
+    padding:14px 16px;text-align:left;box-shadow:0 1px 4px rgba(0,0,0,0.05);
+  }
+  .otro-nombre { font-size:17px;font-weight:700;color:#2c3e50;margin-bottom:2px; }
+  .otro-provincia { font-size:12px;color:#95a5a6;margin-bottom:8px;font-style:italic; }
+  .otro-desc { font-size:12.5px;color:#5d6d7e;line-height:1.55; }
+  .error-filtros {
+    background:#fdf2f2;border-left:4px solid #e74c3c;border-radius:8px;
+    padding:16px 20px;color:#c0392b;font-size:14px;margin-top:28px;
+    max-width:640px;margin-left:auto;margin-right:auto;
+  }
+  @media (max-width:767px) {
+    .navbar-brand { font-size:14px !important; }
+    .col-sm-3,.col-sm-4,.col-sm-6,.col-sm-9,
+    .col-md-3,.col-md-4,.col-md-6,.col-md-9 { width:100% !important;float:none !important; }
+    .descripcion-pestana { font-size:13px;padding:10px 14px; }
+    .mapa-bloque { margin-bottom:24px; }
+    .leaflet-container { height:320px !important; }
+    .panel-selector { margin-bottom:12px; }
+    h3 { font-size:18px; } h4 { font-size:15px; }
+    .resultado-municipio { font-size:38px; }
+    .otros-grid { grid-template-columns:1fr; }
+  }
+  @media (min-width:768px) and (max-width:1024px) {
+    .leaflet-container { height:420px !important; }
+  }
+"
+
+bloque_mapa <- function(titulo, output_id, height = "520px") {
+  div(class = "mapa-bloque",
+    div(class = "titulo-mapa", titulo),
+    leafletOutput(output_id, height = height, width = "100%"))
+}
+```
+
+```{r app, echo=FALSE}
+ui <- navbarPage(
+  title  = "Ciudad vs Pueblo",
+  theme  = bs_theme(bootswatch = "flatly", primary = "#2c3e50"),
+  fluid  = TRUE,
+  position = "fixed-top",
+  header = tags$head(
+    tags$meta(name = "viewport",
+              content = "width=device-width, initial-scale=1, maximum-scale=1"),
+    tags$style(HTML(css_responsive)),
+    tags$style(HTML("
+      body { padding-top: 70px !important; }
+      .navbar { width: 100vw !important; left: 0 !important; }
+      .tab-content { width: 100% !important; padding: 0 !important; }
+      .shiny-frame { width: 100vw !important; }
+      html { overflow-x: hidden; }
+    "))
+  ),
+
+  # ================================================================
+  # 1. RECOMENDADOR DE MUNICIPIOS
+  # ================================================================
+  tabPanel(
+    "Recomendador de municipios",
+    fluidPage(
+      div(class = "recomendador-wrap",
+        br(),
+        div(class = "rec-titulo", "Recomendador de municipios"),
+        div(class = "rec-subtitulo",
+          "\u00BFTeletrabajas y quieres saber d\u00F3nde vivir?",
+          " Responde estas preguntas y te diremos qu\u00E9 municipio encaja contigo."
+        ),
+
+        # --- BLOQUE 1 ---
+        div(class = "rec-bloque-label", "Bloque 1 \u2014 Preguntas filtro"),
+
+        div(class = "rec-pregunta",
+          radioButtons("p1", "1. \u00BFQu\u00E9 tipo de entorno te resulta m\u00E1s atractivo para vivir?",
+            choices = c(
+              "Un entorno mediterr\u00E1neo, m\u00E1s seco y con temperaturas suaves" = "1",
+              "Un entorno m\u00E1s verde, h\u00FAmedo y atl\u00E1ntico"              = "2",
+              "No tengo una preferencia territorial clara"                           = "3"
+            ), width = "100%")
+        ),
+
+        div(class = "rec-pregunta",
+          radioButtons("p2", "2. Pensando en tu d\u00EDa a d\u00EDa, \u00BFqu\u00E9 nivel de cercan\u00EDa necesitas tener alrededor?",
+            choices = c(
+              "Me gustar\u00EDa poder resolver lo esencial sin salir del propio municipio" = "1",
+              "Aceptar\u00EDa desplazamientos cortos si el lugar encaja conmigo"           = "2",
+              "No me importa desplazarme algo m\u00E1s para acceder a ciertos servicios"  = "3",
+              "La distancia a los servicios no condiciona mi elecci\u00F3n"               = "4"
+            ), width = "100%")
+        ),
+
+        div(class = "rec-pregunta",
+          radioButtons("p3", "3. \u00BFQu\u00E9 importancia tendr\u00EDa vivir en una zona c\u00F3moda para la educaci\u00F3n de tus hijos?",
+            choices = c(
+              "Ser\u00EDa importante tener estos recursos en mi lugar de residencia"                 = "1",
+              "Me gustar\u00EDa tenerlos relativamente cerca, aunque no ser\u00EDa imprescindible"  = "2",
+              "No ser\u00EDa un aspecto que condicione mi elecci\u00F3n"                            = "3"
+            ), width = "100%")
+        ),
+
+        div(class = "rec-pregunta",
+          radioButtons("p4", "4. \u00BFQu\u00E9 nivel de tranquilidad sanitaria te gustar\u00EDa tener?",
+            choices = c(
+              "Me dar\u00EDa tranquilidad tener hospital en mi lugar de residencia"                                                   = "1",
+              "Me bastar\u00EDa con atenci\u00F3n sanitaria b\u00E1sica cerca, sin desplazarme mucho para un hospital"              = "2",
+              "Adem\u00E1s de atenci\u00F3n b\u00E1sica cerca, no me importa desplazarme algo m\u00E1s para un hospital"           = "3",
+              "No ser\u00EDa un aspecto decisivo para elegir municipio"                                                              = "4"
+            ), width = "100%")
+        ),
+
+        # --- BLOQUE 2 ---
+        div(class = "rec-bloque-label",
+            style = "margin-top:24px;",
+            "Bloque 2 \u2014 Tu perfil ideal"),
+
+        div(class = "rec-pregunta",
+          radioButtons("p5", "5. Cuando imaginas tu d\u00EDa a d\u00EDa, \u00BFqu\u00E9 tipo de ambiente encaja mejor contigo?",
+            choices = c(
+              "Un lugar muy tranquilo, con poca actividad y mucha sensaci\u00F3n de desconexi\u00F3n" = "1",
+              "Un lugar tranquilo, pero con algo de vida cotidiana"                                    = "2",
+              "Un entorno equilibrado, con calma y servicios cerca"                                    = "3",
+              "Una zona con bastante ambiente, movimiento y opciones durante el d\u00EDa"              = "4",
+              "Un entorno muy activo, con mucha vida, servicios y actividad constante"                 = "5"
+            ), width = "100%")
+        ),
+
+        div(class = "rec-pregunta",
+          radioButtons("p6", "6. Al elegir d\u00F3nde vivir, \u00BFqu\u00E9 equilibrio te representa mejor?",
+            choices = c(
+              "Priorizar\u00EDa una opci\u00F3n muy asequible, aunque est\u00E9 en una zona con poco ambiente o servicios" = "1",
+              "Preferir\u00EDa una zona asequible, aunque tenga que renunciar a algo de comodidad"                         = "2",
+              "Buscar\u00EDa un equilibrio entre precio, comodidad y servicios"                                            = "3",
+              "Aceptar\u00EDa pagar algo m\u00E1s si la zona encaja bien conmigo"                                         = "4",
+              "Priorizar\u00EDa la zona que m\u00E1s me guste, aunque implique un mayor esfuerzo econ\u00F3mico"          = "5"
+            ), width = "100%")
+        ),
+
+        div(class = "rec-pregunta",
+          radioButtons("p7", "7. \u00BFQu\u00E9 tipo de ambiente cotidiano encajar\u00EDa mejor contigo?",
+            choices = c(
+              "Un entorno muy tranquilo, pausado y con arraigo local muy fuerte"                   = "1",
+              "Un entorno tranquilo y estable, con poca variaci\u00F3n en el d\u00EDa a d\u00EDa" = "2",
+              "Un ambiente equilibrado, con algo de movimiento y mezcla de perfiles"               = "3",
+              "Un entorno din\u00E1mico, con bastante movimiento y variedad de gente"              = "4",
+              "Un entorno muy activo, diverso y en constante cambio"                               = "5"
+            ), width = "100%")
+        ),
+
+        div(class = "rec-pregunta",
+          radioButtons("p8", "8. \u00BFQu\u00E9 tipo de actividad te gustar\u00EDa notar alrededor del municipio?",
+            choices = c(
+              "Un entorno muy tranquilo, vinculado a naturaleza, campo o actividad local pausada"          = "1",
+              "Un entorno con cierta actividad local, pero sin demasiado movimiento"                       = "2",
+              "Un entorno variado, sin un tipo de actividad dominante"                                     = "3",
+              "Una zona con comercios, hosteler\u00EDa, servicios y movimiento cotidiano"                  = "4",
+              "Una zona con presencia notable de empresas, talleres, pol\u00EDgonos o actividad productiva" = "5",
+              "No es relevante"                                                                            = "6"
+            ), width = "100%")
+        ),
+
+        div(class = "rec-pregunta",
+          radioButtons("p9", "9. Si tuvieras que describir el perfil de tus futuros vecinos, \u00BFcu\u00E1l te encajar\u00EDa mejor?",
+            choices = c(
+              "Gente con oficios m\u00E1s manuales, del campo o la industria"                           = "1",
+              "Una mezcla de perfiles, sin que ninguno destaque especialmente"                           = "2",
+              "Gente con alta cualificaci\u00F3n, carreras universitarias o puestos de responsabilidad" = "3"
+            ), width = "100%")
+        ),
+
+        actionButton("btn_recomendar",
+                     "Calcular mi municipio ideal",
+                     class = "btn-recomendar"),
+
+        uiOutput("resultado_recomendador")
+      )
+    )
+  ),
+
+  # ================================================================
+  # 2. VISUALIZACIÓN DE MUNICIPIOS
+  # ================================================================
+  tabPanel(
+    "Visualización de municipios",
+    fluidPage(
+      br(),
+      div(class = "descripcion-pestana",
+        p("Comparativa con una misma escala de los municipios de Valencia (provincia) y Vizcaya.")
+      ),
+      div(class = "panel-selector",
+        fluidRow(column(12,
+          h4("Variable a visualizar"),
+          selectInput("var_mun", label = NULL,
+                      choices = variables_municipios, selected = "renta_media_hogar",
+                      width = "100%")
+        )),
+        div(class = "nota-leyenda",
+            "Escala compartida entre los dos mapas. Toca un municipio para ver el valor exacto.")
+      ),
+      h3(textOutput("titulo_mun")),
+      uiOutput("leyenda_mun"),
+      fluidRow(
+        column(6, bloque_mapa("Provincia de Valencia", "mapa_mun_vlc")),
+        column(6, bloque_mapa("Vizcaya",               "mapa_mun_viz"))
+      )
+    )
+  ),
+
+  # ================================================================
+  # 3. VISUALIZACIÓN DE DISTRITOS
+  # ================================================================
+  tabPanel(
+    "Visualización de distritos",
+    fluidPage(
+      br(),
+      div(class = "descripcion-pestana",
+        p("Comparativa con una misma escala de los distritos de Valencia (ciudad) y Bilbao.")
+      ),
+      div(class = "panel-selector",
+        fluidRow(column(12,
+          h4("Variable a visualizar"),
+          selectInput("var_dist", label = NULL,
+                      choices = variables_distritos, selected = "renta_media_hogar",
+                      width = "100%")
+        )),
+        div(class = "nota-leyenda",
+            "Escala compartida entre los dos mapas. Toca un distrito para ver el valor exacto.")
+      ),
+      h3(textOutput("titulo_dist")),
+      uiOutput("leyenda_dist"),
+      fluidRow(
+        column(6, bloque_mapa("Valencia ciudad", "mapa_dist_vlc")),
+        column(6, bloque_mapa("Bilbao",          "mapa_dist_bil"))
+      )
+    )
+  ),
+
+  # ================================================================
+  # 4. COMPARATIVA ENTRE CIUDADES
+  # ================================================================
+  tabPanel(
+    "Comparativa entre ciudades",
+    fluidPage(
+      br(),
+      div(class = "descripcion-pestana",
+        p("Gráficas comparativas entre las ciudades de Valencia y Bilbao.")
+      ),
+      bloque_grafica_doble(
+        "comparacion_ciudades_1.png",
+        "El gráfico muestra la posición de València y Bilbao dentro de la distribución municipal de sus respectivas provincias. Bilbao se sitúa en posiciones altas en variables residenciales como precio del alquiler y esfuerzo, mientras que València destaca en diversidad demográfica y nivel formativo. En variables como el porcentaje de hogares con 100 Mbps, ambas ciudades presentan valores elevados y próximos, confirmando que la conectividad digital no diferencia especialmente a estos dos grandes núcleos urbanos.",
+        "comparacion_ciudades_2.png",
+        "El perfil estandarizado confirma las diferencias principales entre ambas ciudades. Bilbao presenta valores superiores en precio del alquiler, esfuerzo de alquiler y renta media del hogar, lo que refleja un perfil económico con mayor renta pero también con una presión residencial más elevada. València destaca más en estudios superiores y población extranjera, apuntando a una ciudad con mayor diversidad demográfica y nivel formativo. En las variables laborales, ambas se sitúan por encima de la media en contratos de servicios, aunque Bilbao muestra mayor peso industrial y València mayor presencia agrícola."
+      ),
+      bloque_grafica(
+        "comparacion_ciudades_3.png",
+        "El gráfico muestra que ambas ciudades presentan una estructura contractual claramente dominada por el sector servicios, lo que refleja un perfil económico urbano y terciarizado. Aun así, existen algunas diferencias secundarias: Bilbao presenta un mayor peso relativo de la industria, mientras que València muestra una proporción algo superior de contratos agrícolas. Sin embargo, estas diferencias no modifican la conclusión principal: en ambas ciudades el sector servicios es claramente predominante."
+      ),
+      div(class = "seccion-titulo", "Segmentando por distritos..."),
+      bloque_grafica_doble(
+        "comparacion_distritos_1.png",
+        "El gráfico de cajas confirma visualmente la brecha detectada entre ambas ciudades. La distribución de Bilbao se sitúa en niveles muy superiores, con una mediana que sobrepasa los valores de la mayor parte de los distritos valencianos. La mayor amplitud de la caja roja indica que en Bilbao existe una heterogeneidad interna más marcada en cuanto al envejecimiento de sus barrios, mientras que Valencia presenta una estructura sensiblemente más joven, a excepción de un distrito atípico que aparece como valor extremo aislado.",
+        "comparacion_distritos_2.png",
+        "El ranking muestra los tres distritos más jóvenes y más envejecidos de cada ciudad. En Bilbao, el distrito menos envejecido (Ibaiondo) ya supera el valor mínimo de Valencia, confirmando que el envejecimiento es una característica generalizada en la capital vizcaína. En Valencia la distribución es más variada, con distritos considerablemente más jóvenes en el extremo inferior del ranking."
+      ),
+      bloque_grafica_doble(
+        "comparacion_distritos_3.png",
+        "Los diagramas de caja reafirman visualmente la superioridad de Bilbao en cuanto a la dotación de servicios básicos por habitante. En educación, casi todos los distritos de Bilbao se sitúan por encima de la mediana de Valencia. En sanidad, el gráfico es aún más revelador: mientras en Bilbao la infraestructura está algo más repartida, en Valencia la mediana en cero confirma que la inmensa mayoría de los barrios carecen de hospital propio, dependiendo de unos pocos distritos donde se concentra toda la oferta sanitaria.",
+        "comparacion_distritos_4.png",
+        "El ranking de educación muestra los tres distritos con mejor y peor ratio de colegios de cada ciudad. Otxarkoaga y Uribarri lideran en Bilbao con ratios claramente superiores a los mejores distritos valencianos. En Valencia, Poblats Marítims, La Saidia y Lolivereta encabezan la lista, aunque sus valores son notablemente inferiores a los de los líderes bilbaínos, confirmando la diferencia estructural en dotación educativa entre ambas ciudades."
+      ),
+      bloque_grafica_doble(
+        "comparacion_distritos_5.png",
+        "El ranking sanitario revela una distribución muy concentrada en Valencia: Campanar, Poblats Marítims y Patraix concentran prácticamente toda la oferta hospitalaria, mientras que el resto de distritos tienen una presencia casi nula. En Bilbao la dotación está algo más repartida entre sus distritos, aunque también con diferencias notables entre los mejor y peor dotados.",
+        "comparacion_distritos_6.png",
+        "Los diagramas de cajas confirman que el mercado de alquiler en Bilbao es estructuralmente más caro: incluso sus precios más bajos igualan a los más altos de Valencia. En la renta media, aunque Bilbao tiene niveles algo superiores y más estables, Valencia presenta una desigualdad interna mucho mayor, con distritos extremadamente ricos que superan los valores de Bilbao. El gráfico de esfuerzo resume bien la situación: Bilbao mantiene a casi todos sus distritos bajo una presión residencial elevada, mientras que Valencia ofrece un escenario más asequible en general."
+      ),
+      bloque_grafica_doble(
+        "comparacion_distritos_7.png",
+        "El gráfico de dispersión cruza la renta media con el precio del alquiler, coloreando cada punto según el esfuerzo de alquiler. Los distritos de Bilbao tienden a concentrarse en la parte superior con rentas y alquileres más altos. Abando destaca como el punto más exclusivo. En el extremo opuesto, distritos valencianos como Jesús o Pobles de l'Oest muestran renta y alquiler significativamente más bajos. Los puntos más rojizos (Ibaiondo, Otxarkoaga, Poblats Marítims) son zonas críticas donde los habitantes dedican un porcentaje muy elevado de sus ingresos a la vivienda a pesar de no tener los alquileres más altos en valor absoluto.",
+        "comparacion_distritos_8.png",
+        "El boxplot confirma que Bilbao ofrece casi el doble de zonas verdes por habitante que Valencia, con una mediana claramente superior. Aunque ambas ciudades mantienen una distribución interna equilibrada y compacta, los puntos aislados revelan distritos específicos en ambas capitales que funcionan como verdaderos pulmones verdes, destacando masivamente sobre la media de sus respectivos barrios."
+      ),
+      bloque_grafica_doble(
+        "comparacion_distritos_9.png",
+        "La gráfica de piruletas demuestra la superioridad de Bilbao en infraestructura verde, situando a Otxarkoaga y Basurtu como los principales proveedores de entornos verdes de la ciudad. En Valencia, la distribución es mucho más desigual: Campanar destaca masivamente como caso excepcional, mientras que las pedanías periféricas aparecen en el extremo opuesto con ratios nulos, indicando que Valencia concentra sus mejores espacios naturales en unos pocos puntos clave.",
+        "comparacion_distritos_10.png",
+        "El mapa de calor muestra una clara polarización: Bilbao domina los valores altos en servicios y costes, mientras que Valencia tiende a valores por debajo de la media. Destacan como distritos estrella Otxarkoaga (alta dotación en colegios y zonas verdes) y Abando (riqueza y altos precios de alquiler) en Bilbao, y Campanar (líder en sanidad y parques) en Valencia. La periferia valenciana (Pobles del Sud, Nord y l'Oest) muestra carencias estructurales que no se aprecian en Bilbao, donde incluso los distritos menos favorecidos mantienen niveles de servicios más cercanos a la media municipal."
+      ),
+      bloque_grafica(
+        "comparacion_distritos_11.png",
+        "Este gráfico resume la esencia del estudio: ambas ciudades funcionan como espejos opuestos. Bilbao se consolida en el lado positivo con un modelo de altos servicios, mayor renta y gran ratio de zonas verdes, pero a cambio de precios altos y una población envejecida. Valencia ocupa el lado negativo, definiéndose como una ciudad más joven, dinámica y asequible, aunque con una infraestructura pública más ajustada. Las mayores distancias se dan en el alquiler y el envejecimiento, donde Bilbao se desmarca radicalmente. Lo más revelador es la convergencia en renta y sanidad, donde ambas ciudades ofrecen niveles muy similares pese a sus diferencias de estilo y coste."
+      )
+    )
+  ),
+
+  # ================================================================
+  # 5. COMPARATIVA ENTRE PROVINCIAS
+  # ================================================================
+  tabPanel(
+    "Comparativa entre provincias",
+    fluidPage(
+      br(),
+      div(class = "descripcion-pestana",
+        p("Gráficas comparativas entre los municipios de las provincias de Valencia y Vizcaya (excluidas las ciudades de Valencia y Bilbao).")
+      ),
+      bloque_grafica_doble(
+        "comparacion_municipios_1.png",
+        "El gráfico confirma que el envejecimiento municipal es relativamente parecido en ambas provincias, con diferencias más reducidas de lo esperado entre sus medianas. En cambio, Valencia presenta un porcentaje medio y mediano de población extranjera claramente superior al de Vizcaya (8,43% frente a 5,89%), lo que indica que la presencia relativa de población extranjera es mayor en los municipios valencianos incluidos en el análisis.",
+        "comparacion_municipios_2.png",
+        "El gráfico confirma la diferencia observada en el nivel formativo. Los municipios de Vizcaya presentan valores claramente superiores en estudios superiores, con una diferencia de aproximadamente 10 puntos porcentuales respecto a Valencia. En Valencia, la mayoría de municipios se concentran en valores más bajos, aunque aparecen varios valores atípicos con porcentajes elevados que no representan la tendencia general de la provincia."
+      ),
+      bloque_grafica_doble(
+        "comparacion_municipios_3.png",
+        "Los gráficos confirman que la principal diferencia entre ambas provincias está en la accesibilidad. Los municipios de Vizcaya presentan menores distancias tanto al centro educativo como al hospital más cercano, mientras que Valencia muestra valores más altos y mayor dispersión. En cambio, Valencia presenta un ratio de colegios superior al de Vizcaya, aunque esta mayor disponibilidad no se traduce en una menor distancia media.",
+        "comparacion_municipios_4.png",
+        "El gráfico confirma las diferencias observadas en el bloque residencial. Los municipios de Vizcaya presentan un precio del alquiler notablemente superior, una renta media más elevada y también un mayor esfuerzo de alquiler (media del 20,33% frente al 11,64% de Valencia). En Valencia se observa mayor presencia de valores atípicos en la renta media del hogar, lo que indica que algunos municipios presentan rentas elevadas respecto al conjunto provincial, aunque la tendencia general sigue siendo inferior a la de Vizcaya."
+      ),
+      bloque_grafica_doble(
+        "comparacion_municipios_5.png",
+        "Dentro del conjunto de municipios ya filtrados por conectividad mínima del 90%, ambas provincias presentan valores muy elevados y relativamente similares. Valencia muestra una media y mediana ligeramente superiores, mientras que Vizcaya mantiene también niveles altos de cobertura con un mínimo por encima del 90%. En consecuencia, esta variable no permite diferenciar claramente entre ambas provincias en esta fase del análisis, ya que la baja conectividad fue utilizada como criterio de exclusión previo.",
+        "comparacion_municipios_6.png",
+        "El gráfico confirma los perfiles de contratación diferenciados entre ambas provincias. En Valencia existe un mayor peso relativo de la agricultura (media del 13,02% frente al 1,66% de Vizcaya) y una mayor dispersión en industria y construcción. Vizcaya presenta un perfil más concentrado en los servicios con menor variabilidad. Valencia muestra también una mayor presencia de valores extremos en todas las variables sectoriales, confirmando una estructura contractual más heterogénea."
+      ),
+      bloque_grafica_doble(
+        "comparacion_municipios_7.png",
+        "La variable de naturaleza de contratos confirma las diferencias observadas en los porcentajes sectoriales. En Valencia aparece una mayor variedad de perfiles contractuales, con presencia relevante de municipios agrícolas, industriales, de servicios y mixtos. En cambio, Vizcaya concentra una parte importante de sus municipios en las categorías de servicios y mixto sin especialización clara, mientras que la presencia agrícola es prácticamente residual. En conclusión, Valencia muestra una estructura contractual más diversificada, mientras que Vizcaya presenta un perfil más terciarizado.",
+        "comparacion_municipios_8.png",
+        "El gráfico facilita la comparación visual del perfil medio de ambas provincias. Vizcaya aparece claramente por encima de Valencia en las variables residenciales y económicas, especialmente en precio del alquiler, esfuerzo de alquiler y renta media del hogar. También destaca en estudios superiores y contratos de servicios. Por el contrario, Valencia se sitúa por encima en variables asociadas a mayor heterogeneidad territorial como población extranjera, contratos agrícolas, contratos industriales y ratio de colegios. En las variables de distancia, Vizcaya presenta valores negativos, indicando menores distancias medias a servicios educativos y hospitalarios."
+      )
+    )
+  )
+)
+
+# ================================================================
+# SERVER
+# ================================================================
+server <- function(input, output, session) {
+
+  # ---- RECOMENDADOR ----
+  resultado_rec <- eventReactive(input$btn_recomendar, {
+    p1 <- as.integer(input$p1)
+    p2 <- as.integer(input$p2)
+    p3 <- as.integer(input$p3)
+    p4 <- as.integer(input$p4)
+    p5 <- as.integer(input$p5)
+    p6 <- as.integer(input$p6)
+    p7 <- as.integer(input$p7)
+    p8 <- as.integer(input$p8)
+    p9 <- as.integer(input$p9)
+    recomendar(p1, p2, p3, p4, p5, p6, p7, p8, p9, k = 5)
+  })
+
+  output$resultado_recomendador <- renderUI({
+    res <- resultado_rec()
+
+    if (is.null(res) || nrow(res) == 0) {
+      return(div(class = "error-filtros",
+        tags$b("No hemos encontrado municipios que encajen con todos tus filtros."),
+        tags$br(),
+        "Prueba a relajar alguna de las condiciones del Bloque 1, especialmente las de cercan\u00EDa o sanidad."
+      ))
+    }
+
+    # Municipio principal (el mejor)
+    principal <- res[1, ]
+
+    desc_principal <- descripciones %>%
+      filter(tolower(str_trim(provincia)) == tolower(str_trim(principal$provincia)),
+             nombre_municipio_arreglado   == principal$nombre_municipio)
+
+    desc1 <- if (nrow(desc_principal) > 0) desc_principal$descripcion1[1] else ""
+    desc2 <- if (nrow(desc_principal) > 0) desc_principal$descripcion2[1] else ""
+
+    # Otros 4 municipios
+    otros <- res[-1, ]
+
+    otros_ui <- lapply(seq_len(nrow(otros)), function(i) {
+      fila      <- otros[i, ]
+      desc_otro <- descripciones %>%
+        filter(tolower(str_trim(provincia)) == tolower(str_trim(fila$provincia)),
+               nombre_municipio_arreglado   == fila$nombre_municipio)
+      d1 <- if (nrow(desc_otro) > 0) desc_otro$descripcion1[1] else ""
+
+      div(class = "otro-municipio",
+        div(class = "otro-nombre",   fila$nombre_municipio),
+        div(class = "otro-provincia", paste0(tools::toTitleCase(fila$provincia))),
+        div(class = "otro-desc", d1)
+      )
+    })
+
+    div(class = "resultado-wrap",
+      div(class = "resultado-intro", "\u2728 Tu municipio ideal es..."),
+      div(class = "resultado-municipio", principal$nombre_municipio),
+      div(class = "resultado-provincia", tools::toTitleCase(principal$provincia)),
+      div(class = "resultado-descripcion",
+        p(desc1),
+        p(desc2)
+      ),
+      div(class = "otros-titulo", "Otros municipios que podr\u00EDan encajarte"),
+      div(class = "otros-grid", otros_ui)
+    )
+  })
+
+  # ---- MUNICIPIOS ----
+  dominio_municipios <- reactive({
+    c(mapa_vlc[[input$var_mun]], mapa_viz[[input$var_mun]])
+  })
+  output$titulo_mun <- renderText({
+    names(variables_municipios)[variables_municipios == input$var_mun]
+  })
+  output$leyenda_mun <- renderUI({
+    etiqueta <- names(variables_municipios)[variables_municipios == input$var_mun]
+    hacer_leyenda_html(input$var_mun, etiqueta, dominio_municipios())
+  })
+  output$mapa_mun_vlc <- renderLeaflet({
+    hacer_mapa(mapa_vlc, input$var_mun,
+               names(variables_municipios)[variables_municipios == input$var_mun],
+               "NOMBRE", dominio_municipios())
+  })
+  output$mapa_mun_viz <- renderLeaflet({
+    hacer_mapa(mapa_viz, input$var_mun,
+               names(variables_municipios)[variables_municipios == input$var_mun],
+               "NOMBRE_TOP", dominio_municipios())
+  })
+
+  # ---- DISTRITOS ----
+  dominio_distritos <- reactive({
+    c(mapa_distritos_vlc[[input$var_dist]], mapa_distritos_bil[[input$var_dist]])
+  })
+  output$titulo_dist <- renderText({
+    names(variables_distritos)[variables_distritos == input$var_dist]
+  })
+  output$leyenda_dist <- renderUI({
+    etiqueta <- names(variables_distritos)[variables_distritos == input$var_dist]
+    hacer_leyenda_html(input$var_dist, etiqueta, dominio_distritos())
+  })
+  output$mapa_dist_vlc <- renderLeaflet({
+    hacer_mapa(mapa_distritos_vlc, input$var_dist,
+               names(variables_distritos)[variables_distritos == input$var_dist],
+               "nombre_distrito", dominio_distritos(),
+               lng = -0.3763, lat = 39.4699, zoom = 12)
+  })
+  output$mapa_dist_bil <- renderLeaflet({
+    hacer_mapa(mapa_distritos_bil, input$var_dist,
+               names(variables_distritos)[variables_distritos == input$var_dist],
+               "nombre_distrito", dominio_distritos())
+  })
+}
+
+shinyApp(ui, server)
+```
