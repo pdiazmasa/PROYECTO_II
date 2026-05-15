@@ -518,13 +518,12 @@ leer_municipios <- function(ruta_csv) {
       lat = as.numeric(lat),
       lon = as.numeric(lon))}
 
-# Leemos los hospitales, que vienen con separador ; y decimal con coma
+# Leemos los hospitales, que vienen con separador ; y coordenadas en formato numérico
 leer_hospitales <- function(ruta_csv) {
   read_delim(
     ruta_csv,
     delim = ";",
     show_col_types = FALSE,
-    locale = locale(decimal_mark = ","),
     na = c("NA", "")) |>
     transmute(
       nombre_hospital,
