@@ -11460,9 +11460,8 @@ resultado <- recomendar(
 resultado
 ```
 
-# Comparamos el perfil del usuario y los municipios recomendados.
+##### Comparamos el perfil del usuario y los municipios recomendados.
 Para interpretar mejor el resultado, se construye una tabla que compara el perfil del usuario con los municipios recomendados.
-
 ```{r}
 etiqueta_actividad <- function(p8) {
   
