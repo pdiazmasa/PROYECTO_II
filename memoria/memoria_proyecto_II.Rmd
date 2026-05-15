@@ -9080,7 +9080,7 @@ El análisis del perfil medio permite caracterizar cada clúster de distritos se
 
 Finalmente, el distrito anómalo de Otxarkoaga presenta una configuración extrema que justifica su exclusión del agrupamiento: supera a todos los clústeres en ratio de colegio (0,52) y hospitales (0,04), además de registrar el esfuerzo de alquiler más alto de todo el estudio (35,63). En conjunto, las variables más discriminantes para diferenciar estos perfiles y detectar la anomalía son el índice de envejecimiento, el ratio de colegio y el esfuerzo de alquiler.
 
-##### Conclusión.
+##### Conclusión
 El análisis de clustering ha permitido identificar tres perfiles diferenciados de distritos en Bilbao, además de un caso singular, a partir de variables demográficas, educativas, sanitarias y de mercado de vivienda. Tras el preprocesamiento de los datos y la exclusión del distrito de Otxarkoaga como valor atípico para evitar que distorsione el análisis, se ha obtenido un estadístico de Hopkins de 0,43. Aunque este valor refleja la continuidad propia de un entorno urbano, se valida la existencia de estructuras diferenciadas lo suficiente como para seguir con el proceso.
 
 Se ha optado por una solución de k = 3 clústeres utilizando el método de clustering jerárquico con Ward.D2, por ser el más robusto para identificar grupos equilibrados en este contexto, aunque el método k-medias también era válido ya que la segmentación daba exactamente el mismo resultado. En este caso se han obtenido los 3 clústeres formados por 2, 2 y 3 distritos cada uno, por lo que la distribución ha resultado equilibrada.
@@ -9098,3 +9098,1276 @@ c3 — Agrupa los distritos más jóvenes de la ciudad, con el índice de enveje
 c4 — Corresponde al valor anómalo (Otxarkoaga), cuyos valores extremos justifican su tratamiento independiente fuera de los grupos principales. Este distrito presenta los ratios más altos de toda la muestra tanto en centros educativos (0,52) como en hospitales (0,04), y a su vez registra el esfuerzo de alquiler más costoso para el usuario (35,63), consolidándose como un entorno de servicios muy concentrados.
 
 
+# 4. Objetivo 3 - Comparación Valencia y Vizcaya
+
+El tercer objetivo consiste en generar una comparación entre Valencia y Vizcaya, ofreciendo una visión conjunta de ambos territorios y destacando semejanzas y diferencias relevantes. 
+
+## 4.1. Comparación de municipios
+
+En este apartado se realiza una comparación entre los municipios seleccionados de Vizcaya y Valencia a partir de las bases municipales finales construidas previamente, excluyendo las ciudades de Valencia y Bilbao ya que el análisis de las mismas se llevará a cabo en otro apartado. El objetivo es analizar si existen diferencias relevantes entre ambas provincias en variables demográficas, educativas, sanitarias, residenciales, digitales y económicas.
+
+Para ello, se integran ambas bases en un único conjunto de datos incorporando una variable que identifica la provincia de cada municipio. A partir de esta base conjunta, se realiza un análisis principalmente gráfico, complementado con algunos resúmenes descriptivos, con el fin de comparar la distribución de las variables y detectar patrones diferenciados entre los municipios de ambas provincias.
+
+##### PREPARACIONES INICIALES
+
+##### Cargamos los paquetes necesarios.
+```{r}
+library(tidyverse)
+library(readr)
+library(gridExtra)
+```
+
+##### Cargamos las bases finales de municipios de Vizcaya y Valencia eliminando sus capitales de provincia. 
+Observamos que hay 39 municipios en el dataset de Vizcaya y 210 en el de Valencia. Además, comprobamos que en ambos hay 30 variables. Sin embargo, antes de realizar la comparación se eliminan las observaciones correspondientes a Bilbao y Valencia ciudad, ya que su análisis se llevará a cabo en otro apartado del proyecto.
+```{r}
+municipios_vizcaya <- read_csv("municipios_vizcaya_base_final.csv", show_col_types = FALSE)
+
+municipios_valencia <- read_csv("municipios_valencia_base_final.csv", show_col_types = FALSE)
+
+head(municipios_vizcaya)
+head(municipios_valencia)
+
+dim(municipios_vizcaya)
+dim(municipios_valencia)
+```
+```{r}
+# Eliminamos Bilbao y Valencia ciudad del análisis comparativo
+municipios_vizcaya <- municipios_vizcaya %>% filter(nombre_municipio_norm != "bilbao")
+
+municipios_valencia <- municipios_valencia %>% filter(nombre_municipio_norm != "valencia")
+
+dim(municipios_vizcaya)
+dim(municipios_valencia)
+```
+
+Una vez eliminadas las ciudades de Bilbao y Valencia, añadimos una variable que identifica la provincia de cada municipio. Esto permitirá unir ambas bases en un único dataset y comparar todas las variables de forma conjunta.
+```{r}
+municipios_vizcaya <- municipios_vizcaya %>% mutate(provincia = "Vizcaya")
+
+municipios_valencia <- municipios_valencia %>% mutate(provincia = "Valencia")
+```
+
+A continuación, unimos las dos bases en un único objeto llamado municipios_comparacion. Este será el dataset principal utilizado durante todo el análisis comparativo.
+```{r}
+municipios_comparacion <- bind_rows(municipios_vizcaya, municipios_valencia)
+
+head(municipios_comparacion)
+dim(municipios_comparacion)
+```
+
+Comprobamos cuántos municipios aporta cada provincia al análisis.
+```{r}
+municipios_comparacion %>% count(provincia)
+```
+Tal y como se describe en los primeros pasos de este análisis, confirmamos que en la nueva tabla se encuentran todas las observaciones de los dos datasets iniciales (209 municipios de Valencia y 38 de Vizcaya).
+
+También revisamos que las variables disponibles sean las mismas en ambas bases.
+```{r}
+colnames(municipios_comparacion)
+```
+
+Por último, comprobamos si existen valores faltantes en la base conjunta. Esta revisión es importante porque algunos gráficos y resúmenes pueden verse afectados si alguna variable contiene valores no disponibles.
+```{r}
+faltantes_comparacion <- municipios_comparacion %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(cols = everything(), names_to = "variable", values_to = "num_faltantes") %>%
+  arrange(desc(num_faltantes))
+
+faltantes_comparacion
+```
+Efectivamente, no existe ningún valor faltante para ninguna de las variables de la tabla generada, por lo que esta comprobación sirve para confirmar que el análisis comparativo que estamos realizando puede realizarse de forma directa sobre el conjunto de municipios de Vizcaya y Valencia.
+
+##### COMPARACIÓN DESCRIPTIVA GENERAL
+Antes de analizar las variables por bloques, realizamos una primera comparación general entre ambas provincias. En este apartado se revisa el número de municipios incluidos en cada base y la distribución de la población municipal, ya que el tamaño de los municipios puede influir en la interpretación del resto de variables.
+```{r}
+resumen_general <- municipios_comparacion %>%
+  group_by(provincia) %>%
+  summarise(
+    num_municipios = n(),
+    poblacion_total = sum(pob_total, na.rm = TRUE),
+    media_poblacion = mean(pob_total, na.rm = TRUE),
+    mediana_poblacion = median(pob_total, na.rm = TRUE),
+    min_poblacion = min(pob_total, na.rm = TRUE),
+    max_poblacion = max(pob_total, na.rm = TRUE),
+    .groups = "drop") %>%
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+resumen_general
+```
+La tabla anterior muestra una diferencia clara en el número de municipios analizados: Valencia incluye 209 municipios, mientras que Vizcaya cuenta con 38. Esto implica que la base de Valencia recoge una realidad municipal más amplia y heterogénea.
+
+En términos de población total, Valencia también presenta un volumen bastante más superior que Vizcaya. Sin embargo, al observar la población media y mediana por municipio, Vizcaya muestra valores más elevados. Esto indica que, aunque Valencia tiene más municipios y más población total, sus municipios tienden a ser de menor tamaño, mientras que en Vizcaya los municipios incluidos presentan, en general, un tamaño poblacional más elevado.
+
+Esto se debe a que anteriormente se ha realizado proceso de depuración previo eliminando numerosos municipios por no cumplir los criterios mínimos de conectividad a internet definidos en el proyecto, siendo el dataset de Vizcaya el más afectado tras esta eliminación. Esto explica en parte que la población media y mediana sean más elevadas para el caso de los municipios de Vizcaya, ya que se han conservado, en general, sus municipios con más habitantes.
+
+##### COMPARACIÓN POR BLOQUES
+
+##### Comparación bloque demográfico
+Una vez realizada la comparación general, analizamos las variables demográficas principales. En este bloque se comparan el porcentaje de población extranjera (*pct_extranjeros*) y el índice de envejecimiento (*indice_envejecimiento*), ya que ambas variables permiten identificar diferencias en la estructura poblacional de los municipios de Vizcaya y Valencia.
+```{r}
+resumen_demografico <- municipios_comparacion %>%
+  group_by(provincia) %>%
+  summarise(
+    media_pct_extranjeros = mean(pct_extranjeros, na.rm = TRUE),
+    mediana_pct_extranjeros = median(pct_extranjeros, na.rm = TRUE),
+    media_indice_envejecimiento = mean(indice_envejecimiento, na.rm = TRUE),
+    mediana_indice_envejecimiento = median(indice_envejecimiento, na.rm = TRUE),
+    .groups = "drop") %>%
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+resumen_demografico
+```
+La tabla muestra que los municipios de Valencia presentan un porcentaje medio y mediano de población extranjera superior al de Vizcaya. En concreto, Valencia alcanza una media del 8,43% y una mediana del 7,88%, mientras que Vizcaya presenta una media del 5,89% y una mediana del 5,52%. Esto indica que, en términos generales, la presencia relativa de población extranjera es mayor en los municipios valencianos incluidos en el análisis.
+
+En cuanto al indice_envejecimiento, las diferencias entre ambas provincias son más reducidas. La media es ligeramente superior en Valencia, mientras que la mediana es más alta en Vizcaya. Esto sugiere que el envejecimiento municipal es relativamente parecido en ambos territorios.
+
+Representamos de forma conjunta el bloque demográfico para visualizar las conclusiones obtenidas tras analizar la tabla anterior. 
+```{r}
+demografico_largo <- municipios_comparacion %>%
+  select(provincia, pct_extranjeros, indice_envejecimiento) %>%
+  pivot_longer(
+    cols = c(pct_extranjeros, indice_envejecimiento),
+    names_to = "variable",
+    values_to = "valor")
+
+ggplot(demografico_largo, aes(x = provincia, y = valor, fill = provincia)) +
+  geom_boxplot(alpha = 0.7) +
+  facet_wrap(~ variable, scales = "free_y") +
+  labs(
+    title = "Comparación conjunta del bloque demográfico",
+    x = "Provincia",
+    y = "Valor") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+##### Comparación bloque educativo
+Después de analizar las variables demográficas, se compara el nivel educativo de los municipios de ambas provincias. Para ello, se utiliza la variable *pct_estudios_sup*, que recoge el porcentaje de población con estudios superiores en cada municipio. Esta variable permite aproximar el nivel formativo de la población municipal y detectar posibles diferencias entre Vizcaya y Valencia.
+```{r}
+resumen_educativo <- municipios_comparacion %>%
+  group_by(provincia) %>%
+  summarise(
+    media_pct_estudios_sup = mean(pct_estudios_sup, na.rm = TRUE),
+    mediana_pct_estudios_sup = median(pct_estudios_sup, na.rm = TRUE),
+    min_pct_estudios_sup = min(pct_estudios_sup, na.rm = TRUE),
+    max_pct_estudios_sup = max(pct_estudios_sup, na.rm = TRUE),
+    .groups = "drop") %>%
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+resumen_educativo
+```
+La tabla muestra diferencias claras entre ambas provincias en el porcentaje de población con estudios superiores. Los municipios de Vizcaya presentan valores claramente superiores a los de Valencia con una diferencia entre ellos de un 10% aproximadamente.
+
+Esta diferencia indica que, en términos generales, los municipios vizcaínos incluidos en el análisis presentan un mayor nivel formativo que los municipios valencianos. Además, aunque el valor máximo es ligeramente superior en Valencia, los valores centrales son mucho más altos en Vizcaya, por lo que la diferencia no parece deberse únicamente a casos extremos, sino a una tendencia general del conjunto de municipios.
+
+Para completar la comparación, representamos la distribución de pct_estudios_sup mediante un boxplot. Este gráfico permite observar no solo los valores centrales, sino también la dispersión de los municipios dentro de cada provincia.
+```{r}
+ggplot(municipios_comparacion, aes(x = provincia, y = pct_estudios_sup, fill = provincia)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(
+    title = "Distribución del porcentaje de estudios superiores por provincia",
+    x = "Provincia",
+    y = "Porcentaje de población con estudios superiores") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+El gráfico confirma la diferencia observada en la tabla resumen. Por otro lado, en Valencia, la mayoría de municipios se concentran en valores más bajos, aunque aparecen varios valores atípicos con porcentajes elevados de estudios superiores. Esto muestra que existen algunos municipios valencianos con un perfil educativo alto, pero no representan la tendencia general de la provincia. En cambio, en Vizcaya los valores altos son más habituales dentro del conjunto de municipios analizados.
+
+##### Comparación bloque de servicios y accesibilidad
+En este bloque se comparan las variables relacionadas con la disponibilidad de servicios educativos y sanitarios, así como con la accesibilidad a dichos servicios. Para ello se analizan los ratios de colegios (*ratio_colegios*), centros de salud (*ratio_centros_salud*) y hospitales (*ratio_hospital*), junto con las distancias al centro educativo (*distancia_centro_educativo*) y al hospital más cercano (*distancia_hospital*). Para el caso de la variable *consultorio_local*, al tratarse de una variable binaria, se calcula el porcentaje de municipios que cuentan con este servicio en cada provincia.
+```{r}
+resumen_servicios <- municipios_comparacion %>%
+  group_by(provincia) %>%
+  summarise(
+    media_ratio_colegios = mean(ratio_colegios, na.rm = TRUE),
+    mediana_ratio_colegios = median(ratio_colegios, na.rm = TRUE),
+    media_distancia_centro_educativo = mean(distancia_centro_educativo, na.rm = TRUE),
+    mediana_distancia_centro_educativo = median(distancia_centro_educativo, na.rm = TRUE),
+    media_ratio_centros_salud = mean(ratio_centros_salud, na.rm = TRUE),
+    mediana_ratio_centros_salud = median(ratio_centros_salud, na.rm = TRUE),
+    media_ratio_hospital = mean(ratio_hospital, na.rm = TRUE),
+    mediana_ratio_hospital = median(ratio_hospital, na.rm = TRUE),
+    media_distancia_hospital = mean(distancia_hospital, na.rm = TRUE),
+    mediana_distancia_hospital = median(distancia_hospital, na.rm = TRUE),
+    pct_municipios_consultorio = mean(consultorio_local == 1, na.rm = TRUE) * 100,
+    .groups = "drop") %>%
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+resumen_servicios
+```
+La tabla muestra diferencias claras entre ambas provincias en las variables de servicios y accesibilidad. En primer lugar, Valencia presenta un ratio de colegios superior al de Vizcaya, con una media de 0,50 frente a 0,11. Sin embargo, esta mayor disponibilidad de colegios no se traduce en una menor distancia, ya que las distancias muestran valores de la media y de la mediana más elevada en Valencia. Esto indica que los municipios vizcaínos incluidos en la base presentan, en general, una mayor cercanía a centros educativos.
+
+En cuanto a los servicios sanitarios, las diferencias en ratio de centros de salud son reducidas y las medianas son 0 en ambas provincias, lo que indica que muchos municipios no disponen directamente de centro de salud. Una mediana igual a 0 no indica un error en los datos, sino que más de la mitad de los municipios no cuentan con ese equipamiento de forma directa. En cambio, el porcentaje de municipios con consultorio local es mayor en Valencia, con un 70,33%, frente al 52,63% de Vizcaya. Por tanto, aunque los centros de salud no estén presentes de forma generalizada, Valencia muestra una mayor presencia de consultorios locales.
+
+Por último, la distancia al hospital también es mayor en Valencia, con una media de 10,91 km y una mediana de 8,11 km, mientras que Vizcaya presenta una media de 4,78 km y una mediana de 3,68 km. 
+
+En conjunto, Vizcaya destaca por menores distancias a servicios educativos y hospitalarios, mientras que Valencia presenta mayor presencia relativa de colegios y consultorios locales.
+
+A continuación, representamos de forma conjunta las variables del bloque manteniendo escalas independientes para cada una de ellas.
+```{r}
+servicios_largo <- municipios_comparacion %>%
+  select(
+    provincia,
+    ratio_colegios,
+    distancia_centro_educativo,
+    ratio_centros_salud,
+    ratio_hospital,
+    distancia_hospital) %>%
+  pivot_longer(
+    cols = -provincia,
+    names_to = "variable",
+    values_to = "valor")
+
+ggplot(servicios_largo, aes(x = provincia, y = valor, fill = provincia)) +
+  geom_boxplot(alpha = 0.7) +
+  facet_wrap(~ variable, scales = "free_y") +
+  labs(
+    title = "Comparación conjunta de servicios y accesibilidad por provincia",
+    x = "Provincia",
+    y = "Valor") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+Los gráficos confirman que la principal diferencia entre ambas provincias está en la accesibilidad. Los municipios de Vizcaya presentan menores distancias tanto al centro educativo como al hospital más cercano, mientras que Valencia muestra valores más altos y mayor dispersión. En cambio, los ratios sanitarios son bajos en ambas provincias, especialmente en el caso de hospitales, por lo que las diferencias más relevantes no están tanto en la existencia de dichos centros, sino en la distancia a ellos.
+
+##### Comparación bloque residencial y económico
+En este bloque se comparan las variables relacionadas con la situación de alquileres y económica de los municipios. Para ello se analizan el precio por metro cuadrado de alquiler (*precio_m2_alquiler*), la renta media del hogar (*renta_media_hogar*) y el esfuerzo de alquiler (*esfuerzo_alquiler*). Estas variables permiten valorar si existen diferencias entre ambas provincias en términos de nivel de renta, coste de la vivienda y presión económica asociada al alquiler.
+```{r}
+resumen_residencial <- municipios_comparacion %>%
+  group_by(provincia) %>%
+  summarise(
+    media_precio_m2_alquiler = mean(precio_m2_alquiler, na.rm = TRUE),
+    mediana_precio_m2_alquiler = median(precio_m2_alquiler, na.rm = TRUE),
+    media_renta_media_hogar = mean(renta_media_hogar, na.rm = TRUE),
+    mediana_renta_media_hogar = median(renta_media_hogar, na.rm = TRUE),
+    media_esfuerzo_alquiler = mean(esfuerzo_alquiler, na.rm = TRUE),
+    mediana_esfuerzo_alquiler = median(esfuerzo_alquiler, na.rm = TRUE),
+    .groups = "drop") %>%
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+resumen_residencial
+```
+La tabla muestra diferencias muy claras entre ambas provincias en el bloque residencial y económico. Los municipios de Vizcaya presentan un precio medio del alquiler notablemente superior al de Valencia. Esta diferencia aparece tanto en la media como en la mediana, por lo que no parece depender únicamente de casos extremos.
+
+Al mismo tiempo, Vizcaya presenta una renta media del hogar más elevada. Sin embargo, este mayor nivel de renta no compensa completamente el mayor coste del alquiler, ya que el esfuerzo de alquiler también es claramente superior en Vizcaya. En concreto, la media del esfuerzo de alquiler alcanza el 20,33% en Vizcaya, frente al 11,64% en Valencia.
+
+En conjunto, los municipios vizcaínos incluidos en el análisis presentan mayor renta, pero también una presión residencial más elevada. Por el contrario, los municipios valencianos muestran menores niveles de renta media, pero también precios de alquiler y esfuerzo residencial más bajos.
+
+A continuación, representamos estas variables de forma conjunta mediante boxplots. Se utilizan escalas independientes porque las variables están medidas en unidades diferentes.
+```{r}
+residencial_largo <- municipios_comparacion %>%
+  select(
+    provincia,
+    precio_m2_alquiler,
+    renta_media_hogar,
+    esfuerzo_alquiler) %>%
+  pivot_longer(
+    cols = -provincia,
+    names_to = "variable",
+    values_to = "valor") %>%
+  mutate(
+    variable = recode(
+      variable,
+      "precio_m2_alquiler" = "Precio m2 alquiler",
+      "renta_media_hogar" = "Renta media hogar",
+      "esfuerzo_alquiler" = "Esfuerzo alquiler"))
+
+ggplot(residencial_largo, aes(x = provincia, y = valor, fill = provincia)) +
+  geom_boxplot(alpha = 0.7) +
+  facet_wrap(~ variable, scales = "free_y") +
+  labs(
+    title = "Comparación conjunta del bloque residencial y económico",
+    x = "Provincia",
+    y = "Valor") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+El gráfico confirma de forma visual las diferencias observadas en la tabla respecto a Vizcaya y Valencia. Además, en Valencia se observa una mayor presencia de valores atípicos en la renta media del hogar, lo que indica que algunos municipios presentan rentas elevadas respecto al conjunto provincial. Sin embargo, la tendencia general sigue siendo inferior a la de Vizcaya. En conjunto, el gráfico refuerza la idea de que Vizcaya presenta municipios con mayor nivel de renta, pero también con un mercado de alquiler más caro y una mayor presión residencial.
+
+##### Comparación bloque digital
+En este bloque se compara la conectividad digital de los municipios de ambas provincias. Para ello se utiliza la variable *pct_hogares_100mbps*, que recoge el porcentaje de hogares con acceso a una conexión de al menos 100 Mbps. Esta variable permite analizar si existen diferencias relevantes en la cobertura digital entre los municipios de Vizcaya y Valencia.
+
+```{r}
+resumen_digital <- municipios_comparacion %>%
+  group_by(provincia) %>%
+  summarise(
+    media_pct_hogares_100mbps = mean(pct_hogares_100mbps, na.rm = TRUE),
+    mediana_pct_hogares_100mbps = median(pct_hogares_100mbps, na.rm = TRUE),
+    min_pct_hogares_100mbps = min(pct_hogares_100mbps, na.rm = TRUE),
+    max_pct_hogares_100mbps = max(pct_hogares_100mbps, na.rm = TRUE),
+    pct_municipios_mayor_90 = mean(pct_hogares_100mbps > 90, na.rm = TRUE) * 100,
+    .groups = "drop") %>%
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+resumen_digital
+```
+La tabla muestra que todos los municipios incluidos en el análisis presentan una cobertura digital superior al 90% de hogares con acceso a 100 Mbps. Esto se debe a que, durante la construcción de las bases finales, se descartaron previamente todos los municipios de Valencia y Vizcaya que no alcanzaban dicho umbral mínimo de conectividad ya que este proyecto está destinado al teletrabajo. Por tanto, los resultados de este bloque no deben interpretarse como una descripción completa de la conectividad digital provincial, sino como una comparación entre los municipios que cumplen las condiciones digitales definidas en el proyecto.
+
+A continuación, representamos la distribución de la cobertura digital mediante un boxplot.
+```{r}
+ggplot(municipios_comparacion, aes(x = provincia, y = pct_hogares_100mbps, fill = provincia)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(
+    title = "Distribución del porcentaje de hogares con acceso a 100 Mbps por provincia",
+    x = "Provincia",
+    y = "Porcentaje de hogares con acceso a 100 Mbps") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+Dentro de este conjunto ya filtrado, ambas provincias presentan valores muy elevados y relativamente similares. Valencia muestra una media y una mediana ligeramente superiores, mientras que Vizcaya mantiene también niveles altos de cobertura, con un mínimo por encima del 90%. En consecuencia, la variable *pct_hogares_100mbps* no permite diferenciar claramente entre ambas provincias en esta fase del análisis, ya que la baja conectividad fue utilizada como criterio de exclusión previo.
+
+##### Comparación bloque laboral
+En este bloque se comparan las variables relacionadas con la distribución sectorial de los contratos en los municipios de ambas provincias. Para ello se analizan los porcentajes de contratos en agricultura, industria, construcción y servicios. Además, se analiza la variable *naturaleza_contratos*, que resume el perfil predominante de contratación de cada municipio.
+```{r}
+resumen_contratos <- municipios_comparacion %>%
+  group_by(provincia) %>%
+  summarise(
+    media_pct_agricultura = mean(pct_contratos_agricultura, na.rm = TRUE),
+    mediana_pct_agricultura = median(pct_contratos_agricultura, na.rm = TRUE),
+    media_pct_industria = mean(pct_contratos_industria, na.rm = TRUE),
+    mediana_pct_industria = median(pct_contratos_industria, na.rm = TRUE),
+    media_pct_construccion = mean(pct_contratos_construccion, na.rm = TRUE),
+    mediana_pct_construccion = median(pct_contratos_construccion, na.rm = TRUE),
+    media_pct_servicios = mean(pct_contratos_servicios, na.rm = TRUE),
+    mediana_pct_servicios = median(pct_contratos_servicios, na.rm = TRUE),
+    .groups = "drop") %>%
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+resumen_contratos
+```
+La tabla y el gráfico muestran perfiles de contratación claramente diferenciados entre ambas provincias. En Valencia existe un mayor peso relativo de la agricultura, con una media del 13,02%, frente al 1,66% de Vizcaya. 
+
+En cambio, Vizcaya presenta un perfil mucho más orientado al sector servicios y con valores superiores a los de Valencia. La industria y la construcción presentan diferencias más moderadas, aunque Valencia muestra un ligero peso industrial mayor que Vizcaya.
+
+En conjunto, Valencia presenta una estructura contractual más heterogénea, con mayor presencia de agricultura, industria y algunos valores extremos, mientras que Vizcaya muestra un perfil más concentrado en los servicios.
+
+A continuación, representamos conjuntamente los porcentajes sectoriales mediante boxplots.
+```{r}
+contratos_largo <- municipios_comparacion %>%
+  select(
+    provincia,
+    pct_contratos_agricultura,
+    pct_contratos_industria,
+    pct_contratos_construccion,
+    pct_contratos_servicios) %>%
+  pivot_longer(
+    cols = -provincia,
+    names_to = "variable",
+    values_to = "valor") %>%
+  mutate(
+    variable = recode(
+      variable,
+      "pct_contratos_agricultura" = "Agricultura",
+      "pct_contratos_industria" = "Industria",
+      "pct_contratos_construccion" = "Construcción",
+      "pct_contratos_servicios" = "Servicios"))
+
+ggplot(contratos_largo, aes(x = provincia, y = valor, fill = provincia)) +
+  geom_boxplot(alpha = 0.7) +
+  facet_wrap(~ variable, scales = "free_y") +
+  labs(
+    title = "Comparación conjunta del bloque de contratos por provincia",
+    x = "Provincia",
+    y = "Porcentaje de contratos") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+Como podemos observar, el gráfico confirma las conclusiones obtenidas anteriormente. 
+
+Por último, analizamos la variable *naturaleza_contratos*, que resume el perfil contractual predominante de cada municipio. En este caso, se utiliza una tabla que muestra cuántos municipios de cada provincia pertenecen a cada categoría contractual y qué porcentaje representan sobre el total de municipios de su provincia.
+```{r}
+naturaleza_resumen <- municipios_comparacion %>%
+  count(provincia, naturaleza_contratos) %>%
+  group_by(provincia) %>%
+  mutate(porcentaje = n / sum(n) * 100) %>% ungroup()
+
+naturaleza_resumen
+```
+La variable *naturaleza_contratos* confirma las diferencias observadas en los porcentajes sectoriales. En Valencia aparece una mayor variedad de perfiles contractuales, con presencia relevante de municipios agrícolas, industriales, de servicios y mixtos. En cambio, Vizcaya concentra una parte importante de sus municipios en las categorías de servicios y mixto sin especialización clara, mientras que la presencia agrícola es prácticamente residual.
+
+Realizamos un gráfico para visualizar la distribución de la naturaleza de los contratos por provincia.
+```{r}
+ggplot(naturaleza_resumen,
+       aes(x = provincia, y = porcentaje, fill = naturaleza_contratos)) +
+  geom_col(position = "stack", alpha = 0.85) +
+  labs(title = "Distribución de la naturaleza de los contratos por provincia",
+    x = "Provincia",
+    y = "Porcentaje de municipios",
+    fill = "Naturaleza de contratos") +
+  theme_minimal()
+```
+En conclusión, Valencia muestra una estructura contractual más diversificada, mientras que Vizcaya presenta un perfil más terciarizado y menos vinculado al sector agrícola.
+
+##### Conclusión
+Una vez analizados los distintos bloques de variables por separado, realizamos una resumen global de la comparación entre los municipios de Valencia y Vizcaya. Para ello, se calculan las medias estandarizadas de las principales variables analizadas. Esta estandarización permite comparar variables medidas en escalas diferentes y observar en qué aspectos presenta valores relativamente más altos cada provincia. Los valores positivos indicarán que la provincia se sitúa por encima de la media conjunta de los municipios incluidos, mientras que los valores negativos indicarán que se sitúa por debajo.
+```{r}
+variables_sintesis <- municipios_comparacion %>%
+  select(
+    provincia,
+    pct_extranjeros,
+    indice_envejecimiento,
+    pct_estudios_sup,
+    ratio_colegios,
+    distancia_centro_educativo,
+    ratio_centros_salud,
+    ratio_hospital,
+    distancia_hospital,
+    precio_m2_alquiler,
+    renta_media_hogar,
+    esfuerzo_alquiler,
+    pct_hogares_100mbps,
+    pct_contratos_agricultura,
+    pct_contratos_industria,
+    pct_contratos_construccion,
+    pct_contratos_servicios)
+
+sintesis_largo <- variables_sintesis %>%
+  pivot_longer(
+    cols = -provincia,
+    names_to = "variable",
+    values_to = "valor") %>%
+  group_by(variable) %>%
+  mutate(valor_estandarizado = as.numeric(scale(valor))) %>%
+  ungroup()
+
+perfil_global <- sintesis_largo %>%
+  group_by(provincia, variable) %>%
+  summarise(
+    media_estandarizada = mean(valor_estandarizado, na.rm = TRUE),
+    .groups = "drop")
+
+perfil_global
+```
+Como podemos observar, en Vizcaya destacan especialmente *precio_m2_alquiler*, *esfuerzo_alquiler*, *renta_media_hogar*, *pct_estudios_sup* y *pct_contratos_servicios*, lo que confirma un perfil con mayor renta, mayor nivel educativo, mayor peso del sector servicios y mayor presión residencial. En cambio, Valencia presenta valores superiores en *pct_extranjeros*, *ratio_colegios*, *pct_contratos_agricultura*, *pct_contratos_industria* y *pct_contratos_construccion*, reflejando una estructura demográfica y económica más diversa.
+
+A continuación, se representa el perfil medio estandarizado de ambas provincias.
+```{r}
+ggplot(perfil_global,
+       aes(x = reorder(variable, media_estandarizada),
+           y = media_estandarizada,
+           fill = provincia)) +
+  geom_col(position = "dodge", alpha = 0.85) +
+  coord_flip() +
+  labs(title = "Perfil comparativo global de Valencia y Vizcaya",
+    x = "Variable",
+    y = "Media estandarizada",
+    fill = "Provincia") +
+  theme_minimal()
+```
+El gráfico facilita la comparación visual del perfil medio de ambas provincias, donde Vizcaya aparece claramente por encima de Valencia en las variables residenciales y económicas, especialmente en *precio_m2_alquiler*, *esfuerzo_alquiler* y *renta_media_hogar*. También destaca en *pct_estudios_sup* y en *pct_contratos_servicios*. 
+
+Por el contrario, Valencia se sitúa por encima en variables asociadas a una mayor heterogeneidad territorial, como *pct_extranjeros*, *pct_contratos_agricultura*, *pct_contratos_industria* y *ratio_colegios*. Además, en las variables de distancia, Vizcaya presenta valores negativos, lo que indica menores distancias medias a servicios educativos y hospitalarios, reforzando su mejor accesibilidad territorial dentro de los municipios analizados.
+
+
+En conclusión, el análisis comparativo permite identificar perfiles municipales diferenciados entre las provincias de Valencia y Vizcaya, excluyendo las ciudades de Valencia y Bilbao, ya que estas se analizan en otro apartado del proyecto. Todo ello teniendo en cuenta que se ha realizado el estudio con los municipios seleccionados tras la depuración relacionada con la conectividad digital, lo que condiciona los resultados obtenidos en comparación al nivel global de las provincias.
+
+Por un lado, los municipios estudiados de Valencia presentan una realidad más amplia y heterogénea, tanto por el mayor número de municipios analizados como por la mayor diversidad observada en variables demográficas, de servicios y de contratos. Valencia destaca por una mayor presencia de población extranjera, mayor peso de sectores como la agricultura, la industria y la construcción, y una estructura contractual más diversificada.
+
+Por otro lado, los municipios de Vizcaya muestran un perfil más concentrado y homogéneo. En general, presentan mayor tamaño poblacional medio, mayor porcentaje de población con estudios superiores, mayor renta media del hogar, mayor precio del alquiler y mayor esfuerzo residencial. Además, muestran una mejor accesibilidad a servicios educativos y hospitalarios, al presentar menores distancias medias.
+
+Por tanto, las principales diferencias entre Valencia y Vizcaya se encuentran en el perfil socioeconómico, residencial, educativo y sectorial de los municipios incluidos en el análisis.
+
+
+## 4.2. Comparación de distritos
+
+En este apartado se realiza una comparación entre los distritos de Bilbao y Valencia a partir de las bases finales construidas previamente. El objetivo es analizar si existen diferencias relevantes entre los distritos de ambas ciudades en variables demográficas, educativas, sanitarias, residenciales y económicas.
+
+Para ello, se integran ambas bases en un único conjunto de datos incorporando una variable que identifica la ciudad de cada distrito. A partir de esta base conjunta, se realiza un análisis principalmente gráfico, complementado con algunos resúmenes descriptivos, con el fin de comparar la distribución de las variables y detectar patrones diferenciados entre los municipios de ambas provincias.
+
+##### PREPARACIONES INICIALES
+
+##### Cargamos los paquetes necesarios.
+```{r}
+library(tidyverse)
+library(readr)
+library(gridExtra)
+library(ggrepel)
+```
+
+##### Cargamos las bases finales de distritos de Valencia y Bilbao. 
+Observamos que hay 8 distritos en el dataset de Bilbao y 19 en el de Valencia. Además, comprobamos que en ambos hay 16 variables.
+```{r}
+distritos_bilbao <- read_csv("distritos_bilbao_base_final.csv", show_col_types = FALSE)
+
+distritos_valencia <- read_csv("distritos_valencia_base_final.csv", show_col_types = FALSE)
+
+head(distritos_bilbao)
+head(distritos_valencia)
+
+dim(distritos_bilbao)
+dim(distritos_valencia)
+```
+
+Añadimos una variable que identifica la ciudad a la que pertenece cada distrito. Esto permitirá unir ambas bases en un único dataset y comparar todas las variables de forma conjunta.
+```{r}
+distritos_bilbao <- distritos_bilbao %>% mutate(ciudad = "Bilbao")
+
+distritos_valencia <- distritos_valencia %>% mutate(ciudad = "Valencia")
+```
+
+A continuación, unimos las dos bases en un único objeto llamado distritos_comparacion, que será el dataset principal utilizado durante todo el análisis comparativo. Comprobamos que el número de distritos que aporta cada ciudad al dataset es el correcto y revisamos que las variables son las mismas en ambas bases.
+```{r}
+distritos_comparacion <- bind_rows(distritos_bilbao, distritos_valencia)
+
+head(distritos_comparacion)
+dim(distritos_comparacion)
+
+distritos_comparacion %>% count(ciudad)
+
+colnames(distritos_comparacion)
+```
+
+Tal y como se describe en los primeros pasos de este análisis, confirmamos que en la nueva tabla se encuentran todas las observaciones de los dos datasets iniciales (19 distritos de Valencia y 8 de Bilbao) y que los nombres de las variables coinciden
+
+Por último, comprobamos si existen valores faltantes en la base conjunta. Esta revisión es importante porque algunos gráficos y resúmenes pueden verse afectados si alguna variable contiene valores no disponibles.
+```{r}
+faltantes_comparacion <- distritos_comparacion %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(cols = everything(), names_to = "variable", values_to = "num_faltantes") %>%
+  arrange(desc(num_faltantes))
+
+faltantes_comparacion
+```
+
+Como no existe ningún valor faltante para ninguna de las variables de la tabla generada confirmamos que el análisis comparativo que estamos realizando puede realizarse de forma directa sobre el conjunto de distritos de Bilbao y Valencia.
+
+##### COMPARACIÓN DESCRIPTIVA GENERAL
+Antes de analizar las variables por bloques, realizamos una primera comparación entre ambas ciudades a partir de la población de sus distritos. En este apartado se revisa la distribución de la población municipal, ya que el tamaño de los distritos puede influir en la interpretación de algunas variables, especialmente aquellas que se miden en valores absolutos.
+```{r}
+resumen_general <- distritos_comparacion %>%
+  group_by(ciudad) %>%
+  summarise(
+    num_distritos = n(),
+    poblacion_total = sum(pob_total, na.rm = TRUE),
+    media_poblacion = mean(pob_total, na.rm = TRUE),
+    mediana_poblacion = median(pob_total, na.rm = TRUE),
+    min_poblacion = min(pob_total, na.rm = TRUE),
+    max_poblacion = max(pob_total, na.rm = TRUE),
+    .groups = "drop") %>%
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+resumen_general
+```
+
+La tabla anterior muestra una diferencia clara en el número de distritos analizados, teniendo valencia una mayor cantidad de ellos, lo que probablemente se deba a que Valencia tiene más del doble de población que Bilbao.
+
+Sin embargo, al observar la población media por distrito, Bilbao muestra valores más elevados. Esto indica que, aunque Valencia tiene más distritos y más población total, sus distritos tienden a ser de menor tamaño poblacional, mientras que en Bilbao la población está más concentrada en el reducido número de distritos. También se puede observar en el mínimo de población, que en valencia es un valor muy bajo (6744), mientras que en Bilbao es un valor considerablemente más alto. Al contrario, el distrito de mayor población de valencia tiene un volumen considerablemente mayor que el más poblado de Bilbao.
+
+Estos valores probablemente se deban a que Valencia incluye como distritos algunos formados por pedanías situadas al sur o al norte del municipio y que contienen muy poca población, pero al mismo tiempo sus distritos más céntricos tienen un volumen de población muy alto. Por el contrario, en la ciudad de Bilbao toda la población se concentra en menos distritos teniendo todos ellos un mayor volumen de población.
+
+##### COMPARACIÓN POR BLOQUES
+
+##### Comparación bloque demográfico
+Una vez realizada la comparación general, analizamos las variables demográficas principales. En este bloque se compara el índice de envejecimiento (*indice_envejecimiento*), medida que permite identificar diferencias en la estructura poblacional de los distritos de Bilbao y Valencia.
+```{r}
+resumen_demografico <- distritos_comparacion %>%
+  group_by(ciudad) %>%
+  summarise(
+    media_indice_envejecimiento = mean(indice_envejecimiento, na.rm = TRUE),
+    mediana_indice_envejecimiento = median(indice_envejecimiento, na.rm = TRUE),
+    min_indice_envejecimiento = min(indice_envejecimiento, na.rm = TRUE),
+    max_indice_envejecimiento = max(indice_envejecimiento, na.rm = TRUE),
+    .groups = "drop") %>%
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+resumen_demografico
+```
+
+La tabla de resumen demográfico muestra una diferencia notable en el índice de envejecimiento entre ambas capitales. Bilbao presenta una media de 211,31 y una mediana de 217,56, cifras que superan por mucho los valores de Valencia, que registra una media de 159,59 y una mediana de 155,42. Esta brecha de más de 50 puntos indica que, a nivel de distritos, Bilbao tiene una estructura poblacional mucho más envejecida que la de Valencia.
+
+Un detalle clave es observar los valores extremos. El distrito menos envejecido de Bilbao (126,64) ya tiene un valor superior al mínimo de Valencia (117,00), y el máximo bilbaíno alcanza los 256,25, frente a los 238,19 de la capital valenciana. Esto confirma que el envejecimiento es una característica generalizada en Bilbao, mientras que Valencia mantiene un perfil demográfico mucho más joven en todo su núcleo urbano.
+
+Representamos de forma conjunta el bloque demográfico para visualizar las conclusiones obtenidas tras analizar la tabla anterior. 
+```{r}
+demografico_largo <- distritos_comparacion %>%
+  select(ciudad, indice_envejecimiento) %>%
+  pivot_longer(
+    cols = c(indice_envejecimiento),
+    names_to = "variable",
+    values_to = "valor")
+
+ggplot(demografico_largo, aes(x = ciudad, y = valor, fill = ciudad)) +
+  geom_boxplot(alpha = 0.7) +
+  facet_wrap(~ variable, scales = "free_y") +
+  labs(
+    title = "Comparación conjunta del bloque demográfico",
+    x = "Ciudad",
+    y = "Valor") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+El gráfico de cajas confirma visualmente la brecha detectada en la tabla resumen. Se observa claramente que la distribución de Bilbao se sitúa en niveles muy superiores, con una mediana que sobrepasa los valores de la mayor parte de los distritos valencianos. Además, la mayor amplitud de la caja roja indica que en Bilbao existe una heterogeneidad interna más marcada en cuanto a la edad de sus barrios, mientras que Valencia presenta una estructura sensiblemente más joven, a excepción de un distrito atípico que aparece como un valor extremo aislado. 
+
+A continuación representamos los tres distritos de cada ciudad con la población más joven y los tres con la más envejecida.
+```{r}
+extremos_edad <- distritos_comparacion %>%
+  group_by(ciudad) %>%
+  filter(min_rank(indice_envejecimiento) <= 3 | min_rank(desc(indice_envejecimiento)) <= 3) %>%
+  ungroup()
+
+ggplot(extremos_edad, aes(x = reorder(nombre_distrito_norm, indice_envejecimiento), 
+                          y = indice_envejecimiento, 
+                          color = ciudad)) +
+  geom_segment(aes(xend = nombre_distrito_norm, yend = 0), size = 1) +
+  geom_point(size = 4) +
+  coord_flip() + # Para que los nombres se lean en horizontal
+  facet_wrap(~ciudad, scales = "free_y") +
+  scale_color_manual(values = c("Bilbao" = "#E41A1C", "Valencia" = "#377EB8")) +
+  labs(title = "Ranking Distritos más Jóvenes y más Envejecidos",
+       x = NULL, y = "Índice de Envejecimiento") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+```
+
+##### Comparación bloque de servicios y accesibilidad
+En este bloque se comparan las variables relacionadas con la disponibilidad de servicios educativos y sanitarios, así como con la accesibilidad a dichos servicios. Para ello se analizan los ratios de colegios (*ratio_colegio*) y hospitales (*ratio_hospital*), ya que no disponemos de variables de distancia en el ámbito de distritos.
+```{r}
+resumen_servicios <- distritos_comparacion %>%
+  group_by(ciudad) %>%
+  summarise(
+    media_ratio_colegio = mean(ratio_colegio, na.rm = TRUE),
+    mediana_ratio_colegio = median(ratio_colegio, na.rm = TRUE),
+    media_ratio_hospital = mean(ratio_hospital, na.rm = TRUE),
+    mediana_ratio_hospital = median(ratio_hospital, na.rm = TRUE),
+    .groups = "drop") %>%
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+resumen_servicios
+```
+
+La tabla refleja una ventaja clara de Bilbao en la dotación de servicios públicos por habitante en comparación con Valencia. En el ámbito educativo, Bilbao presenta una media y mediana de ratio de colegios significativamente superior, llegando a duplicar el valor de Valencia (0,12 en ambos indicadores). Esto sugiere que la red escolar en Bilbao está mucho mejor repartida entre su población que en el caso valenciano.
+
+En cuanto a los servicios hospitalarios, se repite la tendencia de una mayor cobertura en la capital vizcaína. Mientras que en Bilbao la mediana es de 0,02 (indicando que la mayoría de sus distritos cuentan con presencia hospitalaria), en Valencia la mediana cae a 0,00. Este valor de cero no es un error, sino que confirma que más de la mitad de los distritos de Valencia no disponen de un hospital, lo que obliga a desplazarse a distritos cercanos para acceder a servicios sanitarios de este nivel.
+
+A continuación, representamos de forma conjunta las variables del bloque manteniendo escalas independientes para cada una de ellas.
+```{r}
+servicios_largo <- distritos_comparacion %>%
+  select(
+    ciudad,
+    ratio_colegio,
+    ratio_hospital) %>%
+  pivot_longer(
+    cols = -ciudad,
+    names_to = "variable",
+    values_to = "valor")
+
+ggplot(servicios_largo, aes(x = ciudad, y = valor, fill = ciudad)) +
+  geom_boxplot(alpha = 0.7) +
+  facet_wrap(~ variable, scales = "free_y") +
+  labs(
+    title = "Comparación conjunta de servicios y accesibilidad por ciudad",
+    x = "Ciudad",
+    y = "Valor") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+Estos diagramas de caja reafirman visualmente la superioridad de Bilbao en cuanto a la dotación de servicios básicos por habitante.
+
+En educación, se observa que casi todos los distritos de Bilbao se sitúan por encima de la mediana de Valencia, cuya red escolar es mucho más limitada. En sanidad, el gráfico es aún más revelador, ya que mientras en Bilbao la infraestructura está algo más repartida por el territorio, en Valencia la mediana en cero confirma que la inmensa mayoría de los barrios carecen de hospital propio, dependiendo de unos pocos distritos donde se concentra toda la oferta sanitaria, de los cuales se destacan en la gráfica dos valores anómalos.
+
+A continuación se comparan los distritos con mejor y peor acceso a servicios sanitarios y educativos de cada ciudad, tanto con el ratio de colegios como con el de hospitales.
+```{r}
+# Filtramos Top 3 y Bottom 3 por ciudad para Educación
+extremos_colegios <- distritos_comparacion %>%
+  group_by(ciudad) %>%
+  filter(min_rank(ratio_colegio) <= 3 | min_rank(desc(ratio_colegio)) <= 3) %>%
+  ungroup()
+
+ggplot(extremos_colegios, aes(x = reorder(nombre_distrito_norm, ratio_colegio), 
+                              y = ratio_colegio, 
+                              color = ciudad)) +
+  geom_segment(aes(xend = nombre_distrito_norm, yend = 0), size = 1.2) +
+  geom_point(size = 4) +
+  coord_flip() +
+  facet_wrap(~ciudad, scales = "free_y") +
+  scale_color_manual(values = c("Bilbao" = "#E41A1C", "Valencia" = "#377EB8")) +
+  theme_minimal() +
+  labs(title = "Ranking Educación: Mejores y Peores Ratios",
+       x = NULL, y = "Ratio Colegios") +
+  theme(legend.position = "none")
+```
+```{r}
+extremos_sanidad <- distritos_comparacion %>%
+  group_by(ciudad) %>%
+  filter(min_rank(ratio_hospital) <= 3 | min_rank(desc(ratio_hospital)) <= 3) %>%
+  ungroup()
+
+ggplot(extremos_sanidad, aes(x = reorder(nombre_distrito_norm, ratio_hospital), 
+                             y = ratio_hospital, 
+                             color = ciudad)) +
+  geom_segment(aes(xend = nombre_distrito_norm, yend = 0), size = 1.2) +
+  geom_point(size = 4) +
+  coord_flip() +
+  facet_wrap(~ciudad, scales = "free_y") +
+  scale_color_manual(values = c("Bilbao" = "#E41A1C", "Valencia" = "#377EB8")) +
+  theme_minimal() +
+  labs(title = "Ranking Sanidad: Ratio Hospitales por Distrito",
+       x = NULL, y = "Ratio Hospitales") +
+  theme(legend.position = "none")
+```
+En un principio las gráficas pretenden representar únicamente los tres distritos con ratio más alto y bajo, pero al haber una gran cantidad de distritos sin hospitales en valencia se representan todos aquellos que dependan no tengan hospital y dependan de otros ubicados en distritos cercanos. 
+
+El gráfico de educación muestra un liderazgo claro de Otxarkoaga en Bilbao, que casi duplica el ratio del mejor distrito valenciano (Poblats Marítims). Llama la atención que en Bilbao todos los distritos analizados tienen cobertura, mientras que en Valencia aparecen distritos sin ningún tipo de oferta educativa en las pedanías, obligando a los residentes a desplazarse a otras zonas sí o sí.
+
+La infraestructura hospitalaria está muy concentrada en ambas ciudades. El valor en el ratio de hospitales que más destaca de las dos ciudades es el de Campanar, que sirve como principal proovedor de servicios sanitarios de Valencia. En Bilbao, el servicio está algo más repartido entre Otxarkoaga, Abando y Basurto, aunque en ambas capitales la realidad es que si no vives en unos pocos distritos específicos, lo normal es que el ratio hospitalario sea nulo.
+
+##### Comparación bloque residencial y económico
+En este bloque se comparan las variables relacionadas con la situación de alquileres y económica de los municipios. Para ello se analizan el precio por metro cuadrado de alquiler (*alquiler_m2*), la renta media del hogar (*renta_media_hogar*) y el esfuerzo de alquiler (*esfuerzo_alquiler*). Estas variables permiten valorar si existen diferencias entre ambas ciudades en términos de nivel de renta, coste de la vivienda y presión económica asociada al alquiler.
+```{r}
+resumen_residencial <- distritos_comparacion %>%
+  group_by(ciudad) %>%
+  summarise(
+    media_alquiler_m2 = mean(alquiler_m2, na.rm = TRUE),
+    mediana_alquiler_m2 = median(alquiler_m2, na.rm = TRUE),
+    media_renta_media_hogar = mean(renta_media_hogar, na.rm = TRUE),
+    mediana_renta_media_hogar = median(renta_media_hogar, na.rm = TRUE),
+    media_esfuerzo_alquiler = mean(esfuerzo_alquiler, na.rm = TRUE),
+    mediana_esfuerzo_alquiler = median(esfuerzo_alquiler, na.rm = TRUE),
+    .groups = "drop") %>%
+  mutate(across(where(is.numeric), ~ round(., 2)))
+
+resumen_residencial
+```
+
+La tabla refleja una realidad económica distinta para los distritos de ambas ciudades en el ámbito residencial. En primer lugar, Bilbao presenta un precio medio del alquiler de 12,78 €/m², superando los 10,73 €/m² de Valencia. Esta diferencia se mantiene constante al observar las medianas, lo que confirma que el mercado inmobiliario de Bilbao es, en términos generales, más costoso que el valenciano.
+
+En cuanto a la capacidad económica, la renta media por hogar es superior en Bilbao respecto a Valencia. Sin embargo, es fundamental observar la mediana de la renta: en este punto ambas ciudades están prácticamente empatadas en torno a los 36.500 €, lo que indica que aunque Bilbao tenga rentas medias más altas por la influencia de distritos muy ricos, el hogar típico en ambas ciudades dispone de unos ingresos  similares.
+
+Esta combinación de alquileres más caros con rentas medianas casi idénticas explica el esfuerzo de alquiler. En Bilbao, el esfuerzo medio alcanza el 31,49%, mientras que en Valencia se mantiene en un 27,43%. En conclusión, mientras que en Valencia los ingresos y el coste de la vivienda guardan un equilibrio más saludable, en Bilbao la presión residencial es notablemente superior, obligando a los hogares a realizar un sacrificio financiero mayor para la vivienda.
+
+A continuación, representamos estas variables de forma conjunta mediante boxplots. Se utilizan escalas independientes porque las variables están medidas en unidades diferentes.
+```{r}
+residencial_largo <- distritos_comparacion %>%
+  select(
+    ciudad,
+    alquiler_m2,
+    renta_media_hogar,
+    esfuerzo_alquiler) %>%
+  pivot_longer(
+    cols = -ciudad,
+    names_to = "variable",
+    values_to = "valor") %>%
+  mutate(
+    variable = recode(
+      variable,
+      "alquiler_m2" = "Precio m2 alquiler",
+      "renta_media_hogar" = "Renta media hogar",
+      "esfuerzo_alquiler" = "Esfuerzo alquiler"))
+
+ggplot(residencial_largo, aes(x = ciudad, y = valor, fill = ciudad)) +
+  geom_boxplot(alpha = 0.7) +
+  facet_wrap(~ variable, scales = "free_y") +
+  labs(
+    title = "Comparación conjunta del bloque residencial y económico",
+    x = "Ciudad",
+    y = "Valor") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+Los diagramas de cajas confirman que el mercado de alquiler en Bilbao es estructuralmente más caro, ya que incluso sus precios más bajos igualan a los más altos de Valencia. Sin embargo, en la renta media se observa que aunque Bilbao tiene niveles algo superiores y más estables, Valencia presenta una desigualdad interna mucho mayor. Sus "bigotes" son más largos y tiene valores atípicos muy altos, lo que indica que en Valencia conviven barrios de rentas y alquiler más bajos con distritos extremadamente ricos que superan los valores de Bilbao (excepto por otro valor atípico en Bilbao que probablemente sea el mismo para los gráficos de alquiler y renta).
+
+El gráfico de esfuerzo es el que mejor resume la situación: Bilbao mantiene a casi todos sus distritos bajo una presión residencial elevada, mientras que Valencia ofrece un escenario más desahogado y asequible. En definitiva, Bilbao es una ciudad de costes altos y homogéneos, mientras que Valencia es más barata en general, pero con mucha más diferencia económica entre sus barrios.
+
+En el siguiente gráfico de dispersión cruzamos la renta media de los hogares y el precio del alquiler por metro cuadrado. El objetivo es identificar la naturaleza de cada distrito más allá de cuál sea su esfuerzo de alquiler (representado además mediante una escala de colores). De este modo, no solo vemos dónde es más caro vivir, sino en qué medida ese precio es proporcional a lo que ganan sus vecinos. Se destacan con etiquetas los casos más extremos de ambas ciudades.
+
+```{r}
+ggplot(distritos_comparacion, aes(x = renta_media_hogar, 
+                                  y = alquiler_m2, 
+                                  color = esfuerzo_alquiler,
+                                  shape = ciudad)) +
+  geom_point(size = 3, alpha = 0.8) +
+  scale_color_gradient(low = "#FFEB3B", high = "#E91E63") +
+  # Etiquetas para los 3 con mayor y menor esfuerzo, el que tiene la mayor renta, la menor renta y el menor alquiler 
+  geom_text_repel(data = distritos_comparacion %>% 
+                    filter(esfuerzo_alquiler > quantile(esfuerzo_alquiler, 0.9) | 
+                           renta_media_hogar == max(renta_media_hogar) |
+                           renta_media_hogar == min(renta_media_hogar) |
+                           alquiler_m2 == min(alquiler_m2) |
+                           min_rank(esfuerzo_alquiler) <= 3),
+                  aes(label = nombre_distrito_norm), 
+                  size = 3.5, fontface = "bold", show.legend = FALSE) +
+  labs(title = "Relación Renta vs Alquiler por Distrito",
+       x = "Renta Media del Hogar (€)",
+       y = "Precio Alquiler (€/m2)",
+       color = "Esfuerzo (%)",
+       shape = "Ciudad") +
+  theme_minimal()
+
+```
+Observando el gráfico la primera clara es la diferencia de en el posicionamiento de los puntos entre ciudades. Mientras que los distritos de Bilbao (círculos) tienden a concentrarse en la parte superior con rentas y alquileres generalmente más altos, Valencia (triángulos) muestra una dispersión mucho mayor. El distrito de Abando en Bilbao se desmarca como el punto más exclusivo, liderando tanto en ingresos como en precio. Por el contrario, en la parte baja de la tabla encontramos una zona de vivienda asequible dominada por distritos valencianos como Jesús o Pobles de l’Oest, donde tanto la renta como el alquiler son significativamente más bajos que la media.
+
+Lo más interesante aparece al observar el color de los puntos, que revela dónde está el verdadero estrés financiero. Los puntos más rojizos, como Ibaiondo, Otxarkoaga o Poblats Marítims, son zonas críticas: aunque no tienen los alquileres más altos en valor absoluto, sus habitantes deben dedicar un porcentaje muy elevado de sus ingresos a la vivienda. En el lado opuesto está El Pla del Real en Valencia, ya que aunque es un distrito de alquiler caro, aparece en un color amarillento. Esto indica que, gracias a su altísimo nivel de renta, el esfuerzo que realizan sus vecinos para pagar el alquiler es mucho menor y más sostenible que en barrios teóricamente más humildes.
+
+##### Comparación bloque entorno y sostenibilidad
+En este bloque se compara el entorno de los distritos de ambas ciudades. Para ello se utiliza la variable *ratio_zonas_verdes*, la cual permite analizar la cantidad de espacios verdes en relación con la población de los distritos de cada ciudad.
+```{r}
+resumen_digital <- distritos_comparacion %>%
+  group_by(ciudad) %>%
+  summarise(
+    media_ratio_zonas_verdes = mean(ratio_zonas_verdes, na.rm = TRUE),
+    mediana_ratio_zonas_verdes = median(ratio_zonas_verdes, na.rm = TRUE),
+    .groups = "drop") %>%
+  mutate(across(where(is.numeric), ~ round(., 4)))
+
+resumen_digital
+```
+
+A partir de la tabla podemos ver cómo Bilbao duplica en promedio la dotación de zonas verdes de Valencia, consolidándose como una ciudad con una infraestructura natural mucho más robusta por habitante. Mientras que en Bilbao la diferencia entre media y mediana indica que la existencia de grandes parques en distritos específicos eleva el promedio general, Valencia muestra una distribución totalmente equitativa y constante en todo su tejido urbano, aunque con una oferta de espacios naturales más limitada.
+
+A continuación, representamos la distribución de las zonas verdes mediante un boxplot.
+```{r}
+ggplot(distritos_comparacion, aes(x = ciudad, y = ratio_zonas_verdes, fill = ciudad)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(
+    title = "Distribución del ratio de zonas verdes por ciudad",
+    x = "Ciudad",
+    y = "Ratio de Zonas Verdes") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+El boxplot confirma visualmente que Bilbao ofrece casi el doble de zonas verdes por habitante que Valencia, con una mediana claramente superior. Aunque ambas ciudades mantienen una distribución interna muy equilibrada y compacta, los puntos aislados revelan distritos específicos en ambas capitales que funcionan como verdaderos pulmones verdes, destacando masivamente sobre la media de sus respectivos barrios.
+
+La siguiente gráfica identifica los 3 distritos con mayor y menor disponibilidad de espacios verdes por habitante.
+```{r}
+extremos_zonas_verdes <- distritos_comparacion %>%
+  group_by(ciudad) %>%
+  filter(min_rank(ratio_zonas_verdes) <= 3 | min_rank(desc(ratio_zonas_verdes)) <= 3) %>%
+  ungroup()
+
+ggplot(extremos_zonas_verdes, aes(x = reorder(nombre_distrito_norm, ratio_zonas_verdes), 
+                                  y = ratio_zonas_verdes, 
+                                  color = ciudad)) +
+  geom_segment(aes(xend = nombre_distrito_norm, yend = 0), size = 1.2, alpha = 0.6) +
+  geom_point(size = 3.5) +
+  coord_flip() + 
+  facet_wrap(~ciudad, scales = "free_y") + # Separamos Valencia y Bilbao
+  scale_color_manual(values = c("Bilbao" = "#E41A1C", "Valencia" = "#377EB8")) +
+  theme_minimal() +
+  labs(title = "Ranking de Espacios Verdes por Distrito",
+       x = NULL, 
+       y = "Ratio de Zonas Verdes") +
+  theme(legend.position = "none",
+        axis.text.y = element_text(size = 9))
+```
+Esta gráfica de piruletas demuestra gráficamente la superioridad de Bilbao en infraestructura verde, situando a Otxarkoaga y Basurto como los principales proovedores de entornos verdes de la ciudad. En Valencia, la distribución es mucho más desigual, ya que mientras que Campanar destaca masivamente como un caso excepcional, las pedanías periféricas aparecen en el extremo opuesto con ratios nulos. Esto indica que, aunque Bilbao tiene más verde en general, Valencia concentra sus mejores espacios naturales en unos pocos puntos clave, dejando a los distritos de la periferia con un acceso muy limitado a zonas ajardinadas.
+
+##### ANÁLISIS GENERALES
+Una vez analizados los distintos bloques de variables por separado, realizamos una resumen global de la comparación entre los municipios de Valencia y Vizcaya. 
+
+##### Medias estandarizadas
+Esta estandarización permite comparar variables medidas en escalas diferentes y observar en qué aspectos presenta valores relativamente más altos cada ciudad. Los valores positivos indicarán que la ciudad se sitúa por encima de la media conjunta de los distritos incluidos, mientras que los valores negativos indicarán que se sitúa por debajo.
+```{r}
+variables_sintesis <- distritos_comparacion %>%
+  select(
+    ciudad,
+    indice_envejecimiento,
+    ratio_colegio,
+    ratio_hospital,
+    alquiler_m2,
+    renta_media_hogar,
+    esfuerzo_alquiler,
+    ratio_zonas_verdes)
+
+sintesis_largo <- variables_sintesis %>%
+  pivot_longer(
+    cols = -ciudad,
+    names_to = "variable",
+    values_to = "valor") %>%
+  group_by(variable) %>%
+  mutate(valor_estandarizado = as.numeric(scale(valor))) %>%
+  ungroup()
+
+perfil_global <- sintesis_largo %>%
+  group_by(ciudad, variable) %>%
+  summarise(
+    media_estandarizada = mean(valor_estandarizado, na.rm = TRUE),
+    .groups = "drop")
+
+perfil_global
+```
+Bilbao presenta un perfil de ciudad con valores altos en servicios (colegios, hospitales y zonas verdes), pero esto se traduce en un alquiler y un envejecimiento muy por encima de la media. Es una ciudad con gran calidad de equipamientos, pero más cara y con una población más madura.
+
+Valencia, por el contrario, se posiciona como una ciudad más asequible y joven, con valores de alquiler y edad notablemente por debajo del promedio. El punto débil es que sus ratios de servicios también son negativos, lo que indica que tiene menos dotación pública por habitante que la media. Ambas coinciden casi por completo en renta y sanidad, donde apenas se separan del valor medio.
+
+##### Mapa de calor de distritos con valores estandarizados
+A continuación, se representan mediante un heatmap todos los valores de cada uno de los distritos en las variables representadas anteriormente por bloques.
+```{r, fig.width=8, fig.height=6, warning=FALSE, message=FALSE}
+
+# Preparación de los datos estandarizados
+datos_heatmap <- distritos_comparacion %>%
+  select(ciudad, 
+         Distrito = nombre_distrito_norm, 
+         Envejecimiento = indice_envejecimiento, 
+         Renta = renta_media_hogar, 
+         Alquiler = alquiler_m2, 
+         Esfuerzo = esfuerzo_alquiler, 
+         Colegios = ratio_colegio, 
+         Sanidad = ratio_hospital, 
+         Verde = ratio_zonas_verdes) %>%
+  mutate(across(3:9, ~ as.numeric(scale(as.numeric(.))))) %>%
+  pivot_longer(cols = 3:9, names_to = "Variable", values_to = "Valor")
+
+# Dibujar el Heatmap
+
+ggplot(datos_heatmap, aes(x = Variable, y = reorder(Distrito, ciudad), fill = Valor)) +
+  geom_tile(color = "white") +
+  # Añadimos los valores estandarizados
+  geom_text(aes(label = round(Valor, 1)), size = 3, color = "black") +
+  # low = azul/gris para negativos, mid = blanco para el 0, high = rojo para positivos
+  scale_fill_gradient2(low = "#4575b4",  
+                       mid = "white",    
+                       high = "#d73027",
+                       midpoint = 0) +   # Crucial: el centro de la escala es el 0
+  facet_grid(ciudad ~ ., scales = "free_y", space = "free") +
+  theme_minimal() +
+  labs(title = "Análisis Comparativo de Distritos con Valores Estandarizados",
+       x = NULL, y = NULL, fill = "Desviación") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid = element_blank(),
+        strip.text.y = element_text(angle = 0, face = "bold"))
+
+```
+El mapa de calor muestra una clara polarización, ya que Bilbao domina los valores altos en servicios y costes, mientras que Valencia tiende a valores por debajo de la media. Mientras Bilbao ofrece un perfil más equilibrado de alta calidad y alto coste en casi todos sus barrios, Valencia funciona mediante puntos muy concretos donde se concentran los servicios y la riqueza.
+
+En el aspecto económico, Bilbao sufre una presión residencial generalizada, con un esfuerzo de alquiler alto en casi todo su mapa. Valencia, en cambio, presenta una mayor desigualdad, ya que aunque es más barata en general, tiene distritos como El Pla del Real que superan el valor de renta de los barrios más ricos de Bilbao, evidenciando una fuerte segmentación social.
+
+El gráfico permite identificar distritos "estrella". Por ejemplo, en Bilbao destaca Otxarkoaga por su altísima dotación en colegios y zonas verdes, al mismo tiempo que Abando destaca por su riqueza y sus altos precios de alquiler. Por otro lado, en Valencia el gran referente es Campanar, líder absoluto en sanidad y parques. Estos barrios rompen la tónica de sus ciudades, ofreciendo equipamientos muy por encima de su entorno inmediato.
+
+Por último, se observa una periferia valenciana (Pobles del Sud, Nord y l'Oest) con carencias estructurales, reflejadas en un bloque azul de valores negativos. Esta desigualdad no se aprecia en Bilbao, donde incluso los distritos menos favorecidos mantienen niveles de servicios y calidad urbana mucho más cercanos a la media municipal.
+
+##### Perfil estandarizado global de Valencia y Bilbao
+A continuación, se representa el perfil medio estandarizado de ambas provincias.
+```{r}
+ggplot(perfil_global,
+       aes(x = reorder(variable, media_estandarizada),
+           y = media_estandarizada,
+           fill = ciudad)) +
+  geom_col(position = "dodge", alpha = 0.85) +
+  coord_flip() +
+  labs(title = "Perfil comparativo global de Valencia y Bilbao",
+    x = "Variable",
+    y = "Media estandarizada",
+    fill = "Ciudad") +
+  theme_minimal()
+```
+Este gráfico resume la esencia del estudio: ambas ciudades funcionan como espejos opuestos. Bilbao se consolida en el lado positivo con un modelo de altos servicios, mayor renta y gran ratio de zonas verdes, pero a cambio de precios altos y una población envejecida. Valencia ocupa el lado negativo, definiéndose como una ciudad más joven, dinámica y asequible, aunque con una infraestructura pública más ajustada.
+
+Las mayores distancias se dan en el alquiler y el envejecimiento, donde Bilbao se desmarca radicalmente. Esta diferencia de coste se traduce en una mejor calidad urbana, aunque penaliza el bolsillo de los ciudadanos. La barra del esfuerzo confirma que vivir en Bilbao exige un sacrificio financiero mayor que en la capital valenciana.
+
+Lo más revelador es la convergencia en renta y sanidad, donde las barras de ambas ciudades casi desaparecen al acercarse al cero. Esto demuestra que, pese a sus diferencias de estilo y coste, ambas capitales ofrecen niveles de ingresos y acceso a hospitales muy similares. La elección entre una u otra depende, por tanto, de priorizar el equipamiento de servicios consolidado que ofrece Bilbao o la accesibilidad económica y juventud que posee Valencia.
+
+##### Conclusión
+En conclusión, el análisis comparativo por distritos permite identificar perfiles urbanos diferenciados entre las ciudades de Valencia y Bilbao que el análisis con valores globales de las dos ciudades suele pasar por alto, revelando las verdaderas disparidades que existen dentro de cada ciudad.
+
+Los distritos de Valencia presentan una realidad de contrastes. Es una ciudad donde el mercado de la vivienda es relativamente amable para el residente medio, pero donde la accesibilidad a servicios públicos es irregular. El análisis de dispersión y el heatmap confirman que Valencia es una ciudad de extremos, con barrios de una exclusividad máxima que conviven con zonas más periféricas que quedan por debajo de la media en prácticamente todas las métricas de bienestar analizadas.
+
+Por otro lado, los distritos de Bilbao muestran un perfil de estabilidad y calidad. La ciudad presenta una red de servicios mucho más densa y repartida, minimizando las carencias en los barrios más humildes. Sin embargo, esta solidez urbana conlleva un inconveniente económico, ya que aunque su renta es elevada, se ve erosionada por un mercado de alquiler muy tensionado que hace necesario un gran esfuerzo por parte de los vecinos para financiar la vivienda, sumado a un alto índice de envejecimiento que plantea desafíos futuros para la ciudad.
+
+Por tanto, las principales diferencias entre los distritos de Valencia y Bilbao no residen solo en la capacidad económica, sino en la gestión del espacio y los servicios. Valencia destaca por su juventud, potencial de crecimiento y accesibilidad a servicios, mientras que Bilbao sobresale por su cohesión urbana y la excelencia de sus servicios, a pesar del alto coste que esto supone para su envejecida población.
+
+
+## 4.3. Comparación de las ciudades de Valencia y Bilbao
+
+En este apartado se realiza una comparación gráfica entre las ciudades de Valencia y Bilbao a partir de las bases municipales finales construidas previamente. El objetivo es analizar las diferencias entre ambas capitales en variables demográficas, educativas, sanitarias, residenciales, digitales, económicas y laborales.
+
+Para ello, se integran las bases municipales de Valencia y Vizcaya en un único conjunto de datos y se seleccionan las observaciones correspondientes a Valencia y Bilbao. A partir de esta base, se elaboran tablas comparativas y gráficos estandarizados que permiten interpretar la posición relativa de ambas ciudades dentro del conjunto de municipios analizados, así como comparar su estructura sectorial de contratos.
+
+##### PREPARACIONES INICIALES
+
+##### Cargamos los paquetes necesarios.
+```{r}
+library(tidyverse)
+library(readr)
+library(scales)
+library(knitr)
+```
+
+##### Cargamos las bases finales de municipios de Valencia y Vizcaya.
+En primer lugar, cargamos las bases municipales finales de Valencia y Vizcaya y extraemos las observaciones correspondientes a las ciudades de Valencia y Bilbao.
+```{r}
+municipios_valencia <- read_csv("municipios_valencia_base_final.csv", show_col_types = FALSE)
+municipios_vizcaya <- read_csv("municipios_vizcaya_base_final.csv", show_col_types = FALSE)
+
+base_total <- bind_rows(
+  municipios_valencia %>% mutate(provincia = "Valencia"),
+  municipios_vizcaya %>% mutate(provincia = "Vizcaya"))
+
+ciudades <- base_total %>%
+  filter(nombre_municipio_norm %in% c("valencia", "bilbao")) %>%
+  mutate(ciudad = recode(nombre_municipio_norm,
+                         "valencia" = "Valencia",
+                         "bilbao" = "Bilbao"))
+
+ciudades %>%
+  select(ciudad, pob_total, pct_extranjeros, indice_envejecimiento,
+         pct_estudios_sup, precio_m2_alquiler, renta_media_hogar,
+         esfuerzo_alquiler, pct_hogares_100mbps)
+```
+
+##### Seleccionamos las variables utilizadas en la comparación.
+Para comparar las ciudades de Valencia y Bilbao se han seleccionado variables representativas de distintas dimensiones urbanas. Estas variables permiten analizar diferencias demográficas, educativas, sanitarias, residenciales, laborales y digitales entre ambas ciudades.
+
+La comparación no se basa únicamente en valores absolutos, ya que Valencia tiene una población mucho mayor que Bilbao. Por ello, además de variables absolutas como la población total o el número de equipamientos, se incluyen ratios y porcentajes que permiten realizar una comparación más equilibrada entre ambas ciudades.
+```{r}
+indicadores <- tribble(
+  ~Dimensión, ~variable, ~Indicador,
+  "Demográfico", "pob_total", "Población total",
+  "Demográfico", "pct_extranjeros", "% población extranjera",
+  "Demográfico", "indice_envejecimiento", "Índice de envejecimiento",
+  "Educativo", "pct_estudios_sup", "% estudios superiores",
+  "Educativo", "num_colegios", "Nº colegios",
+  "Educativo", "ratio_colegios", "Ratio colegios",
+  "Sanitario", "num_centros_salud", "Nº centros salud",
+  "Sanitario", "ratio_centros_salud", "Ratio centros salud",
+  "Sanitario", "num_hospitales", "Nº hospitales",
+  "Sanitario", "ratio_hospital", "Ratio hospitales",
+  "Residencial / económico", "precio_m2_alquiler", "Precio m² alquiler",
+  "Residencial / económico", "renta_media_hogar", "Renta media hogar",
+  "Residencial / económico", "esfuerzo_alquiler", "Esfuerzo alquiler",
+  "Laboral", "pct_contratos_agricultura", "% contratos agricultura",
+  "Laboral", "pct_contratos_industria", "% contratos industria",
+  "Laboral", "pct_contratos_construccion", "% contratos construcción",
+  "Laboral", "pct_contratos_servicios", "% contratos servicios",
+  "Digital", "pct_hogares_100mbps", "% hogares 100 Mbps")
+
+tabla_ciudades <- base_total %>%
+  filter(nombre_municipio_norm %in% c("valencia", "bilbao")) %>%
+  mutate(ciudad = recode(nombre_municipio_norm,
+                         "valencia" = "València",
+                         "bilbao" = "Bilbao")) %>%
+  select(ciudad, all_of(indicadores$variable)) %>%
+  pivot_longer(-ciudad, names_to = "variable", values_to = "valor") %>%
+  left_join(indicadores, by = "variable") %>%
+  mutate(valor = round(valor, 2)) %>%
+  select(Dimensión, Indicador, ciudad, valor) %>%
+  pivot_wider(names_from = ciudad, values_from = valor)
+
+kable(
+  tabla_ciudades,
+  caption = "**Comparación de indicadores entre Valencia y Bilbao**")
+```
+
+A continuación, se exponen las conclusiones obtenidas de la tabla anterior ordenadas por bloques.
+
+##### COMPARACIÓN POR BLOQUES
+
+##### Comparación bloque demográfico
+Desde el punto de vista demográfico, Valencia presenta un tamaño poblacional claramente superior al de Bilbao. La ciudad de Valencia cuenta con 792.492 habitantes, frente a los 344.127 de Bilbao. Por tanto, Valencia tiene más del doble de población, lo que explica que en muchas variables absolutas, como número de colegios, centros de salud u hospitales, sus valores sean mayores.
+
+También se observa que Valencia tiene un mayor porcentaje de población extranjera, con un 14,43% frente al 10,00% de Bilbao. Esto indica una mayor diversidad demográfica en Valencia.
+
+En cambio, Bilbao presenta un índice de envejecimiento más elevado, con 203,90 frente a 157,44 en Valencia. Esto significa que Bilbao tiene una estructura demográfica más envejecida, con mayor peso de la población mayor respecto a la población menor de 16 años.
+
+##### Comparación bloque educativo
+En la dimensión educativa, Valencia destaca por un mayor porcentaje de población con estudios superiores, con un 43,18% frente al 32,68% de Bilbao. Esto apunta a un perfil formativo más elevado en Valencia.
+
+En cuanto al número de colegios, Valencia también presenta un valor absoluto superior, con 181 colegios frente a los 100 de Bilbao. Sin embargo, cuando se analiza la ratio de colegios en relación con la población, Bilbao presenta un valor mayor: 0,291 frente a 0,228. Esto significa que, aunque Valencia tiene más colegios en total, Bilbao tiene más colegios en proporción a su población.
+
+##### Comparación bloque sanitario
+En la dimensión sanitaria ocurre algo parecido. Valencia tiene más centros de salud y hospitales en términos absolutos: 33 centros de salud frente a 21 en Bilbao, y 14 hospitales frente a 10. Esto se explica principalmente por su mayor tamaño poblacional.
+
+Sin embargo, Bilbao presenta mejores ratios sanitarias. Su ratio de centros de salud es de 0,061 frente a 0,042 en Valencia, y su ratio de hospitales es de 0,029 frente a 0,018. Por tanto, Bilbao tiene menos equipamientos en total, pero una mayor dotación sanitaria relativa respecto a su población.
+
+##### Comparación bloque residencial y económico
+La diferencia más clara aparece en el ámbito residencial. Bilbao tiene un precio del alquiler por metro cuadrado mucho más alto, con 11,80 frente a 6,96 en Valencia. Además, también presenta una renta media del hogar superior, con 40.886 frente a 37.596.
+
+Aun así, la mayor renta de Bilbao no compensa completamente el mayor precio del alquiler, ya que su esfuerzo de alquiler también es bastante más elevado: 27,71 frente a 17,77. Esto indica que Bilbao presenta una mayor presión residencial que Valencia.
+
+##### Comparación bloque laboral
+Ambas ciudades presentan una estructura laboral claramente dominada por el sector servicios. En Valencia, los contratos en servicios representan el 84,81%, mientras que en Bilbao alcanzan el 87,75%. Por tanto, las dos ciudades tienen un perfil económico urbano y terciarizado.
+
+La diferencia principal está en los sectores secundarios. Bilbao tiene un mayor peso de contratos industriales, con un 9,12% frente al 3,23% de Valencia. En cambio, Valencia presenta un mayor peso de contratos agrícolas, con un 7,99% frente al 0,12% de Bilbao. Aun así, en ambas ciudades el sector dominante es claramente el de servicios.
+
+##### Comparación bloque digital
+En la dimensión digital, ambas ciudades presentan una cobertura muy elevada de hogares con acceso a 100 Mbps. Valencia alcanza un 99,98%, mientras que Bilbao registra un 99,34%. La diferencia entre ambas es muy reducida, por lo que esta variable no actúa como un elemento especialmente diferenciador entre las dos ciudades.
+
+En este sentido, tanto Valencia como Bilbao presentan un perfil propio de grandes núcleos urbanos consolidados, con una conectividad digital prácticamente generalizada. Por tanto, aunque Valencia muestra un valor ligeramente superior, puede afirmarse que ambas ciudades se encuentran en una situación muy favorable desde el punto de vista de la infraestructura digital, por lo que son de gran relevancia para nuestro estudio.
+
+##### COMPARACIÓN RESPECTO AL CONJUNTO TOTAL DE MUNICIPIOS
+
+##### Posición de Valencia y Bilbao dentro de la distribución del conjunto
+Para complementar la comparación directa entre Valencia y Bilbao, se representa la posición de ambas ciudades dentro de la distribución del conjunto total de municipios analizados. Esta gráfica permite comprobar si los valores observados en cada ciudad son habituales o si, por el contrario, se sitúan en posiciones altas o bajas respecto al resto de municipios de Valencia y Vizcaya.
+
+A diferencia de la tabla inicial, que muestra los valores reales de ambas ciudades, esta representación utiliza valores estandarizados. Por tanto, permite comparar variables con unidades distintas, como porcentajes, ratios, precios o índices.
+```{r}
+# Etiquetas más legibles para las variables
+etiquetas_vars <- c(
+  pct_extranjeros = "% población extranjera",
+  indice_envejecimiento = "Índice de envejecimiento",
+  pct_estudios_sup = "% estudios superiores",
+  ratio_colegios = "Ratio de colegios",
+  ratio_centros_salud = "Ratio centros de salud",
+  ratio_hospital = "Ratio de hospitales",
+  precio_m2_alquiler = "Precio m² alquiler",
+  renta_media_hogar = "Renta media hogar",
+  esfuerzo_alquiler = "Esfuerzo alquiler",
+  pct_hogares_100mbps = "% hogares 100 Mbps",
+  pct_contratos_agricultura = "% contratos agricultura",
+  pct_contratos_industria = "% contratos industria",
+  pct_contratos_construccion = "% contratos construcción",
+  pct_contratos_servicios = "% contratos servicios")
+
+# Base estandarizada con todos los municipios
+base_z_larga <- base_total %>%
+  mutate(across(all_of(names(etiquetas_vars)), ~ as.numeric(scale(.x)))) %>%
+  select(nombre_municipio_norm, all_of(names(etiquetas_vars))) %>%
+  pivot_longer(
+    cols = -nombre_municipio_norm,
+    names_to = "variable",
+    values_to = "valor_z"
+  ) %>%
+  mutate(variable = recode(variable, !!!etiquetas_vars))
+
+# Puntos destacados para Valencia y Bilbao
+ciudades_z <- base_z_larga %>%
+  filter(nombre_municipio_norm %in% c("valencia", "bilbao")) %>%
+  mutate(ciudad = recode(nombre_municipio_norm,
+                         "valencia" = "València",
+                         "bilbao" = "Bilbao"))
+
+ggplot(base_z_larga, aes(x = valor_z, y = variable)) +
+  geom_boxplot(fill = "grey85", color = "grey40", outlier.alpha = 0.25) +
+  geom_point(
+    data = ciudades_z,
+    aes(color = ciudad),
+    size = 3) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
+  labs(
+    title = "Posición de Valencia y Bilbao dentro del conjunto de municipios",
+    subtitle = "Distribución estandarizada de cada variable en los municipios de Valencia y Vizcaya",
+    x = "Valor estandarizado",
+    y = NULL,
+    color = "Ciudad") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold"),
+    legend.position = "bottom")
+```
+El gráfico muestra que Valencia y Bilbao presentan perfiles urbanos diferenciados dentro del conjunto de municipios analizados. En general, ambas ciudades se sitúan por encima de la media en varias variables asociadas a entornos urbanos consolidados, aunque no siempre ocupan posiciones extremas dentro de la distribución.
+
+Bilbao destaca especialmente en las variables residenciales y económicas. En *precio_m2_alquiler* y *esfuerzo_alquiler* aparece claramente por encima de la mayor parte de municipios, lo que confirma que la presión residencial en Bilbao es elevada no solo respecto a Valencia, sino también en relación con el conjunto municipal. Además, también presenta una *renta_media_hogar* superior a la media.
+
+Valencia, por su parte, destaca sobre todo en *pct_estudios_sup* y *pct_extranjeros*. Esto refuerza la idea de una ciudad con mayor presencia de población con estudios superiores y con una mayor diversidad demográfica. En estas variables, Valencia se sitúa en una posición alta dentro de la distribución general.
+
+En cambio, en variables como *pct_hogares_100mbps*, ambas ciudades presentan valores elevados y relativamente próximos. Por tanto, la conectividad digital no aparece como una diferencia importante entre Valencia y Bilbao, sino como un rasgo común de grandes núcleos urbanos.
+
+##### Perfil comparativo estandarizado de Valencia y Bilbao
+Una vez analizada la posición de ambas ciudades dentro de la distribución municipal, se representa un perfil comparativo estandarizado. Este gráfico resume de forma conjunta en qué variables destaca más cada ciudad respecto a la media del conjunto de municipios.
+
+Los valores positivos indican que la ciudad se sitúa por encima de la media municipal, mientras que los valores negativos indican que se sitúa por debajo. De esta forma, el gráfico permite identificar de manera rápida las principales diferencias entre Valencia y Bilbao.
+```{r}
+# Variables para comparar
+vars_perfil <- c(
+  "pct_extranjeros",
+  "indice_envejecimiento",
+  "pct_estudios_sup",
+  "ratio_colegios",
+  "ratio_centros_salud",
+  "ratio_hospital",
+  "precio_m2_alquiler",
+  "renta_media_hogar",
+  "esfuerzo_alquiler",
+  "pct_hogares_100mbps",
+  "pct_contratos_agricultura",
+  "pct_contratos_industria",
+  "pct_contratos_construccion",
+  "pct_contratos_servicios")
+
+# Estandarizar respecto al conjunto total de municipios
+base_total_z <- base_total %>%
+  mutate(across(all_of(vars_perfil), ~ as.numeric(scale(.x))))
+
+# Extraer València y Bilbao
+perfil_ciudades <- base_total_z %>%
+  filter(nombre_municipio_norm %in% c("valencia", "bilbao")) %>%
+  mutate(ciudad = recode(nombre_municipio_norm,
+                         "valencia" = "València",
+                         "bilbao" = "Bilbao")) %>%
+  select(ciudad, all_of(vars_perfil)) %>%
+  pivot_longer(
+    cols = -ciudad,
+    names_to = "variable",
+    values_to = "valor_estandarizado")
+
+# Gráfico
+ggplot(perfil_ciudades,
+       aes(x = reorder(variable, valor_estandarizado),
+           y = valor_estandarizado,
+           fill = ciudad)) +
+  geom_col(position = "dodge", alpha = 0.85) +
+  coord_flip() +
+  labs(
+    title = "Perfil estandarizado de València y Bilbao",
+    subtitle = "Valores respecto a la media del conjunto de municipios de Valencia y Vizcaya",
+    x = "Variable",
+    y = "Valor estandarizado",
+    fill = "Ciudad") +
+  theme_minimal()
+```
+El perfil estandarizado confirma las diferencias principales observadas en la comparación. Bilbao presenta valores superiores en *precio_m2_alquiler*, *esfuerzo_alquiler* y *renta_media_hogar*, lo que refleja un perfil económico con mayor renta media, pero también con una presión residencial más elevada.
+
+Valencia destaca más en *pct_estudios_sup* y *pct_extranjeros*, lo que apunta a una ciudad con mayor peso de población formada y mayor diversidad demográfica. También presenta valores positivos en *pct_hogares_100mbps*, aunque esta variable no diferencia de forma clara a ambas ciudades, ya que Bilbao también muestra una conectividad elevada.
+
+En las variables laborales, ambas ciudades se sitúan por encima de la media en *pct_contratos_servicios*, confirmando una estructura económica claramente terciarizada. No obstante, Bilbao muestra un peso relativo mayor de la industria, mientras que Valencia presenta valores relativamente superiores en agricultura y construcción.
+
+En conjunto, el perfil estandarizado resume bien la comparación: Valencia destaca por diversidad y formación, mientras que Bilbao destaca por renta, envejecimiento y presión residencial.
+
+#### COMPARACIÓN DE LA ESTRUCTURA DE CONTRATOS POR SECTOR
+Para completar la comparación laboral, se representa la distribución porcentual de los contratos por sector en ambas ciudades. Este gráfico permite observar con mayor detalle la composición interna del mercado laboral de Valencia y Bilbao.
+```{r}
+contratos_ciudades <- ciudades %>%
+  select(
+    ciudad,
+    pct_contratos_agricultura,
+    pct_contratos_industria,
+    pct_contratos_construccion,
+    pct_contratos_servicios
+  ) %>%
+  pivot_longer(
+    cols = -ciudad,
+    names_to = "sector",
+    values_to = "porcentaje"
+  ) %>%
+  mutate(
+    sector = recode(
+      sector,
+      "pct_contratos_agricultura" = "Agricultura",
+      "pct_contratos_industria" = "Industria",
+      "pct_contratos_construccion" = "Construcción",
+      "pct_contratos_servicios" = "Servicios"),
+    sector = factor(sector, levels = c("Agricultura", "Industria", "Construcción", "Servicios")))
+
+ggplot(contratos_ciudades, aes(x = ciudad, y = porcentaje, fill = sector)) +
+  geom_col(width = 0.7) +
+  scale_y_continuous(labels = label_percent(scale = 1)) +
+  labs(
+    title = "Estructura sectorial de los contratos",
+    subtitle = "Comparación entre Valencia y Bilbao",
+    x = NULL,
+    y = "Porcentaje de contratos",
+    fill = "Sector") +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(size = 11, face = "bold"),
+    plot.title = element_text(face = "bold"))
+```
+El gráfico muestra que ambas ciudades presentan una estructura contractual claramente dominada por el sector servicios. Tanto en Valencia como en Bilbao, este sector concentra la gran mayoría de los contratos, lo que refleja un perfil económico urbano y terciarizado.
+
+Aun así, existen algunas diferencias secundarias. Bilbao presenta un mayor peso relativo de la industria, mientras que Valencia muestra una proporción algo superior de contratos agrícolas. Sin embargo, estas diferencias no modifican la conclusión principal: en ambas ciudades el sector servicios es claramente predominante.
+
+##### Conclusión 
+En conjunto, la comparación entre Valencia y Bilbao muestra dos perfiles urbanos diferenciados, aunque ambas ciudades comparten rasgos propios de grandes núcleos urbanos: elevada conectividad digital, predominio del sector servicios y presencia relevante de equipamientos educativos y sanitarios.
+
+Valencia destaca principalmente por su mayor tamaño poblacional, mayor porcentaje de población extranjera y mayor proporción de población con estudios superiores. Estos resultados permiten caracterizarla como una ciudad de mayor escala, más diversa y con un perfil formativo elevado.
+
+Bilbao, por su parte, presenta un perfil más envejecido y una mayor dotación relativa de equipamientos educativos y sanitarios. Además, destaca claramente en las variables residenciales y económicas, con una renta media superior, pero también con un precio del alquiler y un esfuerzo de alquiler mucho más elevados. Esto indica una mayor presión residencial en comparación con Valencia.
+
+La gráfica de posición dentro del conjunto de municipios permite matizar estas diferencias, ya que muestra que algunas variables de ambas ciudades no solo son superiores entre ellas, sino también relevantes dentro de la distribución general. En particular, Bilbao se sitúa en posiciones altas en variables residenciales, mientras que Valencia destaca en diversidad demográfica y nivel formativo.
+
+Desde el punto de vista laboral, ambas ciudades presentan una estructura claramente terciarizada. El sector servicios domina ampliamente en los dos casos, aunque Bilbao mantiene un componente industrial algo más visible y Valencia presenta una presencia algo mayor de contratos agrícolas.
+
+Por tanto, Valencia puede interpretarse como una ciudad más grande, diversa y formada, mientras que Bilbao se caracteriza por un mayor envejecimiento, una mayor renta, mejores ratios relativas de equipamientos y una presión residencial más intensa.
+
+
+## 4.3. Comparación de los clústers
