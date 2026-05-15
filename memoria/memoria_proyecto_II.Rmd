@@ -8800,8 +8800,7 @@ En primer lugar, se aplica clustering jerárquico con el método de Ward, ya que
 ```{r}
 clustering_jerarquico <- hclust(
   d = dist_distritos,
-  method = "ward.D2"
-)
+  method = "ward.D2")
 
 fviz_dend(
   clustering_jerarquico,
@@ -8814,8 +8813,7 @@ fviz_dend(
   xlab = "Distritos",
   ylab = "Altura",
   cex = 0.5,
-  lwd = 0.4
-)
+  lwd = 0.4)
 ```
 El dendrograma permite visualizar cómo se van fusionando progresivamente los distritos hasta formar una estructura jerárquica. Al cortar el árbol en tres clústeres, se obtiene una partición formada por tres grupos equilibrados.
 
@@ -8823,8 +8821,7 @@ A continuación, se asigna a cada distrito el clúster correspondiente según el
 ```{r}
 cluster_jerarquico <- cutree(
   clustering_jerarquico,
-  k = 3
-)
+  k = 3)
 
 distritos_cluster <- info_distritos_completo %>%
   mutate(cluster_jerarquico = as.factor(cluster_jerarquico))
