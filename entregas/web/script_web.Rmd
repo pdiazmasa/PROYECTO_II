@@ -1,7 +1,36 @@
 ---
-title: "Página web"
-output: html_document
+title: "Ciudad vs Pueblo"
+output:
+  html_document:
+    theme: null
+    self_contained: false
 runtime: shiny
+resource_files:
+- www/comparacion_ciudades_1.png
+- www/comparacion_ciudades_2.png
+- www/comparacion_ciudades_3.png
+- www/comparacion_distritos_1.png
+- www/comparacion_distritos_2.png
+- www/comparacion_distritos_4.png
+- www/comparacion_distritos_3.png
+- www/comparacion_distritos_5.png
+- www/comparacion_distritos_6.png
+- www/comparacion_distritos_7.png
+- www/comparacion_distritos_8.png
+- www/comparacion_distritos_9.png
+- www/comparacion_distritos_10.png
+- www/comparacion_distritos_11.png
+- www/comparacion_municipios_1.png
+- www/comparacion_municipios_2.png
+- www/comparacion_municipios_3.png
+- www/comparacion_municipios_4.png
+- www/comparacion_municipios_5.png
+- www/comparacion_municipios_6.png
+- www/comparacion_municipios_7.png
+- www/comparacion_municipios_8.png
+- MUNICIPIOS_5000_ETRS89.dbf
+- MUNICIPIOS_5000_ETRS89.prj
+- MUNICIPIOS_5000_ETRS89.shx
 ---
 
 ```{r setup, include=FALSE}
@@ -17,7 +46,11 @@ library(stringr)
 library(bslib)
 library(readr)
 
-addResourcePath("imgs", "www")
+addResourcePath("imgs", getwd())
+
+tags$head(tags$style(HTML("
+  body { margin: 0 !important; padding: 0 !important; }
+")))
 ```
 
 ```{r datos, include=FALSE}
@@ -88,13 +121,11 @@ vizcaya_rec  <- read_csv(ruta("municipios_vizcaya_recomendador.csv"),  show_col_
 # ---- Descripciones de municipios ----
 descripciones <- read.csv(
   ruta("descripciones_municipios.csv"),
-  encoding = "UTF-8",
+  sep            = ";",
+  encoding       = "UTF-8",
   stringsAsFactors = FALSE
 )
-# Normalizar para el join: todo en minusculas y sin espacios extra
-descripciones <- descripciones %>%
-  mutate(provincia_join = tolower(str_trim(provincia)),
-         pueblo_join    = tolower(str_trim(pueblo)))
+# nombre_municipio_arreglado coincide exactamente con lo que devuelve el recomendador
 ```
 
 ```{r recomendador_logica, include=FALSE}
@@ -244,7 +275,7 @@ aplicar_filtros <- function(p1, p2, p3, p4) {
   datos
 }
 
-# ---- KNN ----
+
 cats_ord <- c("muy bajo" = 1, "bajo" = 2, "medio" = 3, "alto" = 4, "muy alto" = 5)
 
 pasar_a_numero <- function(x) {
@@ -264,7 +295,7 @@ construir_perfil <- function(p5, p6, p7, p8, p9) {
   perfil
 }
 
-aplicar_knn <- function(candidatos, perfil_usuario, k = 5) {
+ordenar_por_similitud <- function(candidatos, perfil_usuario, k = 5) {
   candidatos_num <- candidatos %>%
     mutate(
       pob_total_n             = pasar_a_numero(pob_total_cat),
@@ -292,12 +323,12 @@ aplicar_knn <- function(candidatos, perfil_usuario, k = 5) {
   diferencias <- sweep(matriz_municipios, 2, perfil_num, "-")
   candidatos_num %>%
     mutate(
-      distancia_knn      = sqrt(rowSums(diferencias^2)),
+      distancia_similitud      = sqrt(rowSums(diferencias^2)),
       coincidencias_exactas = rowSums(diferencias == 0),
       diferencia_maxima  = apply(abs(diferencias), 1, max)
     ) %>%
-    arrange(distancia_knn, desc(coincidencias_exactas), diferencia_maxima) %>%
-    select(nombre_municipio, provincia, distancia_knn) %>%
+    arrange(distancia_similitud, desc(coincidencias_exactas), diferencia_maxima) %>%
+    select(nombre_municipio, provincia, distancia_similitud) %>%
     slice_head(n = k)
 }
 
@@ -305,7 +336,7 @@ recomendar <- function(p1, p2, p3, p4, p5, p6, p7, p8, p9, k = 5) {
   candidatos     <- aplicar_filtros(p1, p2, p3, p4)
   if (is.null(candidatos)) return(NULL)
   perfil_usuario <- construir_perfil(p5, p6, p7, p8, p9)
-  aplicar_knn(candidatos, perfil_usuario, k)
+  ordenar_por_similitud(candidatos, perfil_usuario, k)
 }
 ```
 
@@ -451,7 +482,12 @@ bloque_grafica_doble <- function(src1, desc1, src2, desc2) {
 }
 
 css_responsive <- "
+* { box-sizing: border-box; }
+body, html { width: 100vw !important; max-width: 100vw !important; overflow-x: hidden; }
   html, body { width: 100%; overflow-x: hidden; }
+  .shiny-frame { width: 100% !important; min-width: 100% !important; border: none !important; }
+  iframe { width: 100% !important; border: none !important; }
+  .container { width: 100% !important; max-width: 100% !important; }
   .container-fluid {
     padding-left: 12px !important; padding-right: 12px !important;
     width: 100% !important; max-width: 100% !important;
@@ -555,7 +591,19 @@ ui <- navbarPage(
   title  = "Ciudad vs Pueblo",
   theme  = bs_theme(bootswatch = "flatly", primary = "#2c3e50"),
   fluid  = TRUE,
-  header = tags$head(tags$style(HTML(css_responsive))),
+  position = "fixed-top",
+  header = tags$head(
+    tags$meta(name = "viewport",
+              content = "width=device-width, initial-scale=1, maximum-scale=1"),
+    tags$style(HTML(css_responsive)),
+    tags$style(HTML("
+      body { padding-top: 70px !important; }
+      .navbar { width: 100vw !important; left: 0 !important; }
+      .tab-content { width: 100% !important; padding: 0 !important; }
+      .shiny-frame { width: 100vw !important; }
+      html { overflow-x: hidden; }
+    "))
+  ),
 
   # ================================================================
   # 1. RECOMENDADOR DE MUNICIPIOS
@@ -565,7 +613,7 @@ ui <- navbarPage(
     fluidPage(
       div(class = "recomendador-wrap",
         br(),
-        div(class = "rec-titulo", "\U1F3E1 Recomendador de municipios"),
+        div(class = "rec-titulo", "Recomendador de municipios"),
         div(class = "rec-subtitulo",
           "\u00BFTeletrabajas y quieres saber d\u00F3nde vivir?",
           " Responde estas preguntas y te diremos qu\u00E9 municipio encaja contigo."
@@ -672,7 +720,7 @@ ui <- navbarPage(
         ),
 
         actionButton("btn_recomendar",
-                     "\U1F50D Calcular mi municipio ideal",
+                     "Calcular mi municipio ideal",
                      class = "btn-recomendar"),
 
         uiOutput("resultado_recomendador")
@@ -866,11 +914,10 @@ server <- function(input, output, session) {
 
     # Municipio principal (el mejor)
     principal <- res[1, ]
-    prov_join <- tolower(str_trim(principal$provincia))
-    nom_join  <- tolower(str_trim(principal$nombre_municipio))
 
     desc_principal <- descripciones %>%
-      filter(provincia_join == prov_join, pueblo_join == nom_join)
+      filter(tolower(str_trim(provincia)) == tolower(str_trim(principal$provincia)),
+             nombre_municipio_arreglado   == principal$nombre_municipio)
 
     desc1 <- if (nrow(desc_principal) > 0) desc_principal$descripcion1[1] else ""
     desc2 <- if (nrow(desc_principal) > 0) desc_principal$descripcion2[1] else ""
@@ -880,10 +927,9 @@ server <- function(input, output, session) {
 
     otros_ui <- lapply(seq_len(nrow(otros)), function(i) {
       fila      <- otros[i, ]
-      pj        <- tolower(str_trim(fila$provincia))
-      nj        <- tolower(str_trim(fila$nombre_municipio))
       desc_otro <- descripciones %>%
-        filter(provincia_join == pj, pueblo_join == nj)
+        filter(tolower(str_trim(provincia)) == tolower(str_trim(fila$provincia)),
+               nombre_municipio_arreglado   == fila$nombre_municipio)
       d1 <- if (nrow(desc_otro) > 0) desc_otro$descripcion1[1] else ""
 
       div(class = "otro-municipio",
