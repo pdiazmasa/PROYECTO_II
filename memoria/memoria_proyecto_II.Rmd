@@ -910,7 +910,7 @@ ruta_colegios_bilbao    <- "centros_educativos_vizcaya_coords.csv"
 
 # --- Hospitales ---
 ruta_hospitales_valencia <- "hospitales_valencia_coords.csv"
-ruta_hospitales_bilbao   <- "hospitales_vizcaya_coords.csv"
+ruta_hospitales_bilbao   <- "hospitales_bizkaia_coords.csv"
 
 # --- Zonas verdes ---
 ruta_zonas_valencia <- "zonas_verdes_valencia_coords.csv"
@@ -927,11 +927,10 @@ Los dos archivos de distritos vienen en sistemas de coordenadas proyectadas (no 
 # --- Valencia ---
 distritos_valencia <- st_read(ruta_distritos_valencia, quiet = TRUE) |>
   st_transform(4326) |>
-  # Disolvemos por nombre de distrito para eliminar polígonos duplicados
-  group_by(nombre) |>
+  st_make_valid() |>
+  group_by(DISTRITO) |>
   summarise(geometry = st_union(geometry), .groups = "drop") |>
-  rename(distrito = nombre)
-
+  rename(distrito = DISTRITO)
 cat("Distritos Valencia:", nrow(distritos_valencia), "\n")
 
 # --- Bilbao ---
