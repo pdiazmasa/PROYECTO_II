@@ -886,7 +886,7 @@ print(resumen)
 
 En este apartado se construyen los resúmenes finales por distritos de Valencia y Bilbao a partir de distintas capas de información geocodificada. Para ello, se utilizan las bases de zonas verdes, centros educativos y hospitales con coordenadas, junto con los archivos de delimitación territorial de los distritos de ambas ciudades: "delimitacion_distritos_valencia.json" y "delimitacion_distritos_bilbao.geojson".
 
-El objetivo es integrar la información espacial disponible para asignar cada elemento a su distrito correspondiente y obtener una síntesis territorial comparable entre ciudades. A partir de este proceso, se generan dos bases resumen, "datasets/valencia_resumen.csv"*" y "datasets/bilbao_resumen.csv", que recogen la información agregada por distrito y que servirán como base para los análisis posteriores a nivel urbano.
+El objetivo es integrar la información espacial disponible para asignar cada elemento a su distrito correspondiente y obtener una síntesis territorial comparable entre ciudades. A partir de este proceso, se generan dos bases resumen, "datasets/valencia_resumen.csv" y "datasets/bilbao_resumen.csv", que recogen la información agregada por distrito y que servirán como base para los análisis posteriores a nivel urbano.
 
 ##### Cargamos las librerías necesarias.
 El paquete `sf` es el núcleo de este notebook: nos permite leer geometrías, reproyectar coordenadas y hacer el cruce espacial entre puntos y polígonos. El resto son para lectura y transformación de datos.
@@ -4768,7 +4768,7 @@ sum(is.na(distritos_valencia_base$indice_envejecimiento))
 ```{r}
 valencia_resumen <- read_csv2("valencia_resumen.csv",
                               show_col_types = FALSE) %>%
-  mutate(distrito_norm = normalizar_distrito(distrito))
+  mutate(cod_distrito = as.integer(distrito))
 
 head(valencia_resumen)
 dim(valencia_resumen)
@@ -4778,15 +4778,15 @@ colnames(valencia_resumen)
 ##### Incorporación de la variable *num_colegios*.
 ```{r}
 distritos_valencia_base <- distritos_valencia_base %>%
-  mutate(nombre_distrito_norm = normalizar_distrito(nombre_distrito_norm)) %>%
+  mutate(cod_distrito = as.integer(cod_distrito)) %>%
   select(-any_of("num_colegios")) %>%
   left_join(
-    valencia_resumen %>% select(distrito_norm, num_colegios),
-    by = c("nombre_distrito_norm" = "distrito_norm")
+    valencia_resumen %>% select(cod_distrito, num_colegios),
+    by = "cod_distrito"
   ) %>%
   mutate(num_colegios = coalesce(num_colegios, 0L))
 
-head(distritos_valencia_base[, c("nombre_distrito", "num_colegios")])
+head(distritos_valencia_base[, c("cod_distrito", "nombre_distrito", "num_colegios")])
 ```
 
 ##### Calculamos la variable *ratio_colegio*.
@@ -4812,12 +4812,12 @@ sum(is.na(distritos_valencia_base$ratio_colegio))
 distritos_valencia_base <- distritos_valencia_base %>%
   select(-any_of("num_hospitales")) %>%
   left_join(
-    valencia_resumen %>% select(distrito_norm, num_hospitales),
-    by = c("nombre_distrito_norm" = "distrito_norm")
+    valencia_resumen %>% select(cod_distrito, num_hospitales),
+    by = "cod_distrito"
   ) %>%
   mutate(num_hospitales = coalesce(num_hospitales, 0L))
 
-head(distritos_valencia_base[, c("nombre_distrito", "num_hospitales")])
+head(distritos_valencia_base[, c("cod_distrito", "nombre_distrito", "num_hospitales")])
 ```
 
 ##### Calculamos la variable *ratio_hospital*.
@@ -4931,12 +4931,12 @@ distritos_valencia_base %>%
 distritos_valencia_base <- distritos_valencia_base %>%
   select(-any_of("num_zonas_verdes")) %>%
   left_join(
-    valencia_resumen %>% select(distrito_norm, num_zonas_verdes),
-    by = c("nombre_distrito_norm" = "distrito_norm")
+    valencia_resumen %>% select(cod_distrito, num_zonas_verdes),
+    by = "cod_distrito"
   ) %>%
   mutate(num_zonas_verdes = coalesce(num_zonas_verdes, 0L))
 
-head(distritos_valencia_base[, c("nombre_distrito", "num_zonas_verdes")])
+head(distritos_valencia_base[, c("cod_distrito", "nombre_distrito", "num_zonas_verdes")])
 ```
 
 ##### Calculamos la variable *ratio_zonas_verdes*.
@@ -7637,7 +7637,7 @@ library(corrplot)
 library(tidyr)
 ```
 
-### Leemos de los datasets finales de distritos.
+##### Leemos de los datasets finales de distritos.
 ```{r}
 distritos_valencia <- read_csv("distritos_valencia_base_final.csv")
 distritos_bilbao <- read_csv("distritos_bilbao_base_final.csv")
@@ -7663,18 +7663,6 @@ setdiff(colnames(distritos_bilbao), colnames(distritos_valencia))
 ```
 
 ##### ARMONIZACIÓN DE LAS VARIABLES DE DISTRITOS
-
-##### Unificamos el identificador de distrito.
-```{r}
-distritos_valencia <- distritos_valencia %>%
-  rename(cod_distrito = num_distrito)
-```
-
-##### Unificamos la variable de ratio hospitalaria.
-```{r}
-distritos_valencia <- distritos_valencia %>%
-  rename(ratio_hospital = ratio_hospitales)
-```
 
 ##### Creamos el ratio de zonas verdes en Bilbao.
 ```{r}
@@ -7932,18 +7920,25 @@ distritos_corr_principal_limpia <- distritos_corr_principal %>%
   select(all_of(variables_validas))
 ```
 
-##### Recalculamos la matriz de correlación de Pearson.
+##### Recalculamos las matrices de correlación de Pearson y Spearman.
 ```{r}
 cor_pearson <- cor(distritos_corr_principal_limpia,
                    use = "pairwise.complete.obs",
                    method = "pearson")
+cor_spearman <- cor(distritos_corr_principal_limpia,
+                   use = "pairwise.complete.obs",
+                   method = "spearman")
 ```
 
-##### Comprobamos los valores no válidos en la matriz.
+##### Comprobamos los valores no válidos en las matrices.
 ```{r}
 sum(is.na(cor_pearson))
 sum(is.nan(cor_pearson))
 sum(is.infinite(cor_pearson))
+
+sum(is.na(cor_spearman))
+sum(is.nan(cor_spearman))
+sum(is.infinite(cor_spearman))
 ```
 
 ##### VISUALIZACIÓN DE LAS CORRELACIONES
@@ -8090,7 +8085,7 @@ library(gridExtra)
 
 ##### Cargamos el dataset final de distritos de Valencia.
 ```{r}
-distritos_valencia_base <- read_csv("../../datasets/valencia/distritos_valencia_base_final.csv", show_col_types = FALSE)
+distritos_valencia_base <- read_csv("distritos_valencia_base_final.csv", show_col_types = FALSE)
 
 head(distritos_valencia_base)
 dim(distritos_valencia_base)
