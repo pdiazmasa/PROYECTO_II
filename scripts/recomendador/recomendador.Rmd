@@ -13,6 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ## Carga de datos
 
 Cargamos los dos datasets finales de municipios y añadimos la variable *provincia* para identificar si cada municipio pertenece a Valencia o Vizcaya.
+La conectividad digital no se incluye como pregunta directa del formulario porque las bases de partida ya han sido filtradas previamente para mantener municipios compatibles con un perfil de teletrabajo. Por tanto, el recomendador se centra en diferenciar los municipios según territorio, accesibilidad a servicios, esfuerzo residencial y perfil del entorno.
 
 ```{r}
 library(tidyverse)
@@ -114,7 +115,7 @@ discretizar_distancia <- function(x) {
 
 # Clasificación de la actividad del entorno
 
-La variable *naturaleza_contratos* no se utilizará como filtro, sino como una dimensión más del perfil KNN. Para poder compararla con la respuesta del usuario, se agrupa en cinco categorías generales: agrícola/rural, rural-mixto, mixto, servicios e industrial/empresarial.
+La variable *naturaleza_contratos* no se utilizará como filtro, sino como una dimensión más del perfil de similitud. Para poder compararla con la respuesta del usuario, se agrupa en cinco categorías generales: agrícola/rural, rural-mixto, mixto, servicios e industrial/empresarial.
 
 ```{r}
 clasificar_actividad_entorno <- function(x) {
@@ -137,8 +138,7 @@ clasificar_actividad_entorno <- function(x) {
     TRUE ~ "mixto")}
 ```
 
-Creamos también una versión numérica de esos perfiles para poder incluirlos en el cálculo de la distancia KNN.
-
+Creamos también una versión numérica de esos perfiles para poder incluirlos en el cálculo de la distancia de similitud entre el usuario y los municipios candidatos.
 ```{r}
 actividad_ord <- c(
   "agricola_rural" = 1,
@@ -153,8 +153,7 @@ pasar_actividad_a_numero <- function(x) {
 
 # Preparación de los datasets para el recomendador
 
-Seleccionamos las variables que se utilizarán en el perfil KNN y las variables de distancia que se utilizarán en los filtros.
-
+Seleccionamos las variables que se utilizarán para construir el perfil de similitud del usuario y las variables de distancia que se utilizarán en los filtros.
 ```{r}
 vars_perfil <- c(
   "pob_total",
@@ -188,6 +187,7 @@ preparar_recomendador <- function(datos) {
 ```
 
 Aplicamos la preparación por separado a Valencia y Vizcaya. Así, los quintiles se calculan dentro de cada territorio y no se ven condicionados por las diferencias generales entre ambas provincias.
+Esto implica que, cuando el usuario no tiene una preferencia territorial clara y se consideran conjuntamente ambas provincias, la comparación se realiza a partir de categorías relativas dentro de cada contexto territorial. Esta decisión es adecuada porque el recomendador busca municipios compatibles con el perfil del usuario, no comparar directamente los valores brutos de Valencia y Vizcaya.
 
 ```{r}
 valencia_rec <- preparar_recomendador(valencia)
@@ -196,8 +196,7 @@ vizcaya_rec <- preparar_recomendador(vizcaya)
 
 # Comprobación de las categorías creadas
 
-Una vez preparadas las bases, se revisan únicamente las variables que se utilizarán posteriormente en el recomendador. En este caso, interesan sobre todo las variables categorizadas, ya que son las que se emplearán en los filtros y en el cálculo de similitud mediante KNN.
-
+En este caso, interesan sobre todo las variables categorizadas, ya que son las que se emplearán en los filtros y en el cálculo de similitud entre el perfil del usuario y los municipios candidatos.
 ```{r}
 valencia_rec %>%
   select(
@@ -266,7 +265,7 @@ vizcaya_rec %>%
 
 # Guardado de las bases preparadas
 
-Una vez creadas las variables categorizadas, se guardan dos nuevos datasets preparados específicamente para el recomendador. A partir de este punto, el KNN ya no partirá de las bases originales, sino de estas bases categorizadas.
+Una vez creadas las variables categorizadas, se guardan dos nuevos datasets preparados específicamente para el recomendador. A partir de este punto, el recomendador ya no partirá de las bases originales, sino de estas bases categorizadas.
 
 ```{r}
 write_csv(valencia_rec, "../datasets/valencia/municipios_valencia_recomendador.csv")
@@ -276,7 +275,7 @@ write_csv(vizcaya_rec, "../datasets/vizcaya-bilbao/municipios_vizcaya_recomendad
 
 # Carga de las bases del recomendador
 
-A partir de este apartado se cargan directamente los datasets preparados para el recomendador. De esta forma, los filtros y el KNN trabajan sobre las bases que ya contienen las variables categorizadas.
+A partir de este apartado se cargan directamente los datasets preparados para el recomendador. De esta forma, los filtros trabajan sobre las bases que ya contienen las variables categorizadas.
 
 ```{r}
 valencia_rec <- read_csv(
@@ -333,7 +332,7 @@ vizcaya_rec %>%
 
 # Bloque 1. Filtros iniciales
 
-Las cuatro primeras preguntas funcionan como filtros. Su objetivo es reducir el conjunto de municipios candidatos antes de calcular la similitud mediante KNN.
+Las cuatro primeras preguntas funcionan como filtros. Su objetivo es reducir el conjunto de municipios candidatos antes de calcular la similitud entre el perfil del usuario y los municipios.
 
 La estructura queda así:
 
@@ -358,7 +357,7 @@ seleccionar_territorio <- function(p1) {
 
 ## Pregunta 2. Cercanía en la rutina diaria
 
-Esta pregunta filtra simultáneamente por *distancia_centro_educativo* y *distancia_hospital*. Cuanto más exigente sea la respuesta del usuario, más restrictivo será el filtro.
+Esta pregunta actúa como un primer umbral general de accesibilidad. No sustituye a las preguntas específicas de educación y sanidad, sino que establece el nivel básico de cercanía que el usuario desea para los servicios considerados en el análisis. Después, las preguntas 3 y 4 permiten concretar si la educación o la sanidad deben tener una exigencia adicional. Por este motivo, los filtros se aplican de forma acumulativa: las preguntas posteriores no relajan el filtro general, sino que lo mantienen o lo hacen más específico.
 
 ```{r}
 filtrar_cercania <- function(datos, p2) {
@@ -432,7 +431,9 @@ filtrar_sanidad <- function(datos, p4) {
       ratio_centros_salud_num = replace_na(
         suppressWarnings(as.numeric(ratio_centros_salud)),
         0),
-      atencion_basica = consultorio_local_num == 1 | ratio_centros_salud_num > 0)
+      atencion_basica = consultorio_local_num == 1 |
+        ratio_centros_salud_num > 0 |
+        distancia_hospital_cat == "0")
   
   if (p4 == 1) {
     return(datos %>%
@@ -495,11 +496,11 @@ candidatos %>%
   head(10)
 ```
 
-# Bloque 2. Perfil del usuario y KNN
+# Bloque 2. Perfil del usuario y ordenación por similitud
 
-Una vez aplicados los filtros, las preguntas 5 a 9 se utilizan para construir el perfil del usuario. Este perfil se compara con las categorías discretizadas de cada municipio candidato.
+Una vez aplicados los filtros, las preguntas 5 a 9 se utilizan para construir el perfil del usuario. Este perfil se compara con las categorías discretizadas de cada municipio candidato mediante una distancia de similitud. La lógica es similar a una búsqueda de vecinos más cercanos, ya que se devuelven los municipios más próximos al perfil indicado, pero no se trata de un KNN supervisado ni de un modelo predictivo. No existe una variable objetivo que se quiera predecir; el objetivo es ordenar los municipios candidatos según su cercanía al perfil declarado por el usuario.
 
-La estructura queda así:
+La estructura del perfil de similitud queda así:
 
 - Pregunta 5: perfil de tamaño y ritmo cotidiano, asociado a *pob_total*.
 - Pregunta 6: perfil residencial, asociado a *esfuerzo_alquiler*.
@@ -511,7 +512,7 @@ La estructura queda así:
 
 Las preguntas 5 y 6 se traducen directamente a una escala de 1 a 5. En la pregunta 7, el *indice_envejecimiento* se invierte porque un entorno más dinámico se asocia con menor envejecimiento, mientras que *pct_extranjeros* mantiene el mismo sentido de la respuesta.
 
-La pregunta 8 entra en el KNN solo si el usuario no responde “No es relevante”. La pregunta 9 utiliza valores intermedios porque sus respuestas agrupan categorías.
+La pregunta 8 entra en el cálculo de similitud solo si el usuario no responde “No es relevante”. La pregunta 9 utiliza valores intermedios porque sus respuestas agrupan categorías.
 
 ```{r}
 construir_perfil <- function(p5, p6, p7, p8, p9) {
@@ -541,7 +542,7 @@ construir_perfil <- function(p5, p6, p7, p8, p9) {
 
 ## Conversión de categorías a números
 
-Para aplicar el KNN, las categorías de los municipios se pasan a valores numéricos. Las categorías faltantes se sustituyen por el valor medio para evitar que un municipio quede descartado automáticamente por falta de información en una variable concreta.
+Para calcular la similitud, las categorías de los municipios se pasan a valores numéricos. Las categorías faltantes se sustituyen por el valor medio para evitar que un municipio quede descartado automáticamente por falta de información en una variable concreta.
 
 ```{r}
 cats_ord <- c(
@@ -557,14 +558,14 @@ pasar_a_numero <- function(x) {
   replace_na(salida, 3)}
 ```
 
-## Cálculo de la distancia KNN
+## Cálculo de la distancia de similitud
 
-Con el perfil numérico del usuario y el perfil numérico de cada municipio, se calcula la distancia euclídea. Los municipios con menor distancia son los más parecidos al perfil indicado por el usuario.
+Con el perfil numérico del usuario y el perfil numérico de cada municipio candidato, se calcula una distancia euclídea entre ambos perfiles. Los municipios con menor distancia se consideran más compatibles con las preferencias indicadas. Por tanto, el recomendador no predice una categoría ni entrena un modelo, sino que ordena los municipios candidatos según su cercanía al perfil del usuario.
 
-La variable *naturaleza_contratos* entra en el cálculo solo si el usuario considera relevante la actividad del entorno. Si responde “No es relevante”, esa dimensión no se utiliza.
+La variable *naturaleza_contratos* entra en el cálculo de similitud solo si el usuario considera relevante la actividad del entorno. Si responde “No es relevante”, esa dimensión no se utiliza.
 
 ```{r}
-aplicar_knn <- function(candidatos, perfil_usuario, k = 5) {
+ordenar_por_similitud <- function(candidatos, perfil_usuario, k = 5) {
   
   candidatos_num <- candidatos %>%
     mutate(
@@ -597,18 +598,18 @@ aplicar_knn <- function(candidatos, perfil_usuario, k = 5) {
   matriz_municipios <- matriz_municipios[filas_validas, , drop = FALSE]
   
   if (nrow(matriz_municipios) == 0) {
-    message("No hay municipios válidos para calcular el KNN después de aplicar los filtros.")
+    message("No hay municipios válidos para calcular la similitud después de aplicar los filtros.")
     return(NULL)}
   
   diferencias <- sweep(matriz_municipios, 2, perfil_num, "-")
   
   candidatos_num %>%
     mutate(
-      distancia_knn = sqrt(rowSums(diferencias^2)),
+      distancia_similitud = sqrt(rowSums(diferencias^2)),
       coincidencias_exactas = rowSums(diferencias == 0),
       diferencia_maxima = apply(abs(diferencias), 1, max)) %>%
     arrange(
-      distancia_knn,
+      distancia_similitud,
       desc(coincidencias_exactas),
       diferencia_maxima) %>%
     select(
@@ -623,7 +624,7 @@ aplicar_knn <- function(candidatos, perfil_usuario, k = 5) {
       pct_estudios_sup_cat,
       distancia_centro_educativo_cat,
       distancia_hospital_cat,
-      distancia_knn,
+      distancia_similitud,
       coincidencias_exactas,
       diferencia_maxima
     ) %>%
@@ -632,7 +633,7 @@ aplicar_knn <- function(candidatos, perfil_usuario, k = 5) {
 
 # Función completa del recomendador
 
-Finalmente, se crea una función que recibe las nueve respuestas del usuario. Primero aplica los filtros de las preguntas 1 a 4 y después calcula el KNN con las preguntas 5 a 9.
+Finalmente, se crea una función que recibe las nueve respuestas del usuario. Primero aplica los filtros de las preguntas 1 a 4 y después construye el perfil del usuario con las preguntas 5 a 9. Sobre los municipios candidatos, se calcula la distancia de similitud entre cada municipio y el perfil declarado, devolviendo aquellos con menor distancia y, por tanto, mayor compatibilidad.
 
 ```{r}
 recomendar <- function(p1, p2, p3, p4, p5, p6, p7, p8, p9, k = 5) {
@@ -643,12 +644,12 @@ recomendar <- function(p1, p2, p3, p4, p5, p6, p7, p8, p9, k = 5) {
   
   perfil_usuario <- construir_perfil(p5, p6, p7, p8, p9)
   
-  aplicar_knn(candidatos, perfil_usuario, k)}
+  ordenar_por_similitud(candidatos, perfil_usuario, k)}
 ```
 
 # Comprobación final del recomendador
 
-Probamos el recomendador completo con un perfil de ejemplo. En este primer caso, la actividad del entorno sí se tiene en cuenta dentro del KNN.
+Probamos el recomendador completo con un perfil de ejemplo. En este primer caso, la actividad del entorno sí se tiene en cuenta dentro del cálculo de similitud.
 
 ```{r}
 resultado <- recomendar(
@@ -661,8 +662,7 @@ resultado <- recomendar(
   p7 = 2,  # entorno tranquilo y estable
   p8 = 4,  # actividad de servicios
   p9 = 1,  # perfil formativo bajo o medio-bajo
-  k = 5
-)
+  k = 5)
 
 resultado
 ```
@@ -711,7 +711,7 @@ perfil_usuario_tabla <- tibble(
   pct_estudios_sup_cat = etiqueta_estudios(1),
   distancia_centro_educativo_cat = NA_character_,
   distancia_hospital_cat = NA_character_,
-  distancia_knn = 0,
+  distancia_similitud = 0,
   coincidencias_exactas = NA_real_,
   diferencia_maxima = NA_real_)
 
@@ -720,7 +720,7 @@ bind_rows(perfil_usuario_tabla, resultado)
 
 # Resumen de la lógica del recomendador
 
-La lógica final del recomendador queda organizada en dos fases. Primero se aplican filtros básicos para reducir los municipios candidatos. Después, sobre esos candidatos, se calcula la similitud entre el perfil del usuario y el perfil de cada municipio mediante KNN.
+La lógica final del recomendador queda organizada en dos fases. Primero se aplican filtros básicos para reducir los municipios candidatos. Después, sobre esos candidatos, se calcula una distancia de similitud entre el perfil del usuario y el perfil categorizado de cada municipio. El resultado no predice una clase ni aplica un modelo supervisado, sino que ordena los municipios según su cercanía al perfil indicado.
 
 ```{r}
 tibble(
@@ -730,9 +730,9 @@ tibble(
     "Filtro por cercanía general a servicios",
     "Filtro por cercanía educativa",
     "Filtro por tranquilidad sanitaria",
-    "KNN con pob_total",
-    "KNN con esfuerzo_alquiler",
-    "KNN con indice_envejecimiento y pct_extranjeros",
-    "KNN con naturaleza_contratos si es relevante",
-    "KNN con pct_estudios_sup"))
+    "Similitud con pob_total",
+    "Similitud con esfuerzo_alquiler",
+    "Similitud con indice_envejecimiento y pct_extranjeros",
+    "Similitud con naturaleza_contratos si es relevante",
+    "Similitud con pct_estudios_sup"))
 ```
