@@ -5838,6 +5838,8 @@ El primer objetivo consiste en identificar y caracterizar distintos tipos de mun
 
 ## 2.1 Estudio de correlación municipios
 
+Se realiza un estudio de correlación previa al clustering para seleccionar las variables a utilizar, tal y como se ha explicado anteriormente en apartados anteriores.
+
 ##### PREPARACIONES INICIALES
 
 ##### Cargamos de paquetes.
@@ -6330,7 +6332,9 @@ Adicionalmente, una vez obtenidos los clusters, se realizará una representació
 
 Esta visualización permitirá explorar de forma descriptiva la posible relación entre los grupos obtenidos y la estructura contractual dominante de cada municipio, sin incorporar directamente dichas variables al proceso de agrupamiento.
 
-## 2.2 Clustering Municipios Valencia 
+## 2.2 Clustering municipios Valencia 
+
+En este apartado se realiza el clustering de los municipios de Valencia a partir del dataset municipal final. Para ello, se seleccionan y estandarizan las variables activas, se comprueba la tendencia al agrupamiento, se determina el número de clústeres y se comparan distintos métodos de clustering. Finalmente, se interpreta la solución obtenida mediante perfiles medios, PCA y variables complementarias como naturaleza_contratos.
 
 ##### Cargamos los paquetes necesarios.
 ```{r}
@@ -6362,7 +6366,7 @@ table(municipios$provincia)
 ```
 
 #### Seleccionamos las variables activas del clustering.
-Las cuales han sido seleccionadas tras realizar el estudio de correlación anterior. Para ello, creamos el objeto datos_clustering, que contiene únicamente dichas variables activas.
+Estas han sido seleccionadas tras realizar el estudio de correlación anterior. Para ello, creamos el objeto datos_clustering, que contiene únicamente dichas variables activas.
 ```{r}
 datos_clustering <- municipios %>%
   select(
@@ -6990,6 +6994,8 @@ c6 — Municipios urbanos con alta formación y presión de alquiler Esfuerzo de
 
 ## 2.3 Clustering municipios Vizcaya
 
+En este apartado se realiza el clustering de los municipios de Vizcaya a partir del dataset municipal final. Para ello, se seleccionan y estandarizan las variables activas, se comprueba la tendencia al agrupamiento, se determina el número de clústeres y se comparan distintos métodos de clustering. Finalmente, se interpreta la solución obtenida mediante perfiles medios, PCA y variables complementarias como naturaleza_contratos.
+
 ##### Cargamos los paquetes necesarios.
 ```{r}
 library(tidyverse)
@@ -7606,3 +7612,460 @@ c3 — Municipios rurales con baja accesibilidad a servicios Mayor distancia al 
 c4 — Municipios jóvenes con buena dotación sanitaria Menor índice de envejecimiento (115,19) y mayor ratio de hospital (0,18). Formado únicamente por 2 municipios, ambos de naturaleza servicios (100%).
 
 c5 — Municipios equilibrados con alta conectividad digital Perfil intermedio con buen nivel formativo (32,65% de estudios superiores) y la mayor conectividad digital del conjunto (97,95% de hogares con 100 Mbps). Mezcla de perfiles mixtos y de construcción.
+
+# 3. Objetivo 2 - Caracterización de los distritos
+
+El segundo objetivo consiste en identificar y caracterizar distintos tipos de distritos en Bilbao y Valencia. En este caso, el análisis se traslada a una escala más concreta, lo que permite profundizar en la diversidad interna de ambas ciudades y complementar la visión obtenida a nivel municipal.
+
+## 3.1 Estudio de correlación distritos
+Se realiza un estudio de correlación previa al clustering para seleccionar las variables a utilizar, tal y como se ha explicado anteriormente en apartados anteriores.
+
+##### PREPARACIONES INICIALES
+
+##### Cargamos de paquetes.
+```{r}
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(corrplot)
+library(tidyr)
+```
+
+### Leemos de los datasets finales de distritos.
+```{r}
+distritos_valencia <- read_csv("distritos_valencia_base.csv")
+distritos_bilbao <- read_csv("vizcaya-bilbao/distritos_bilbao_base.csv")
+```
+
+##### Exploración inicial de ambas bases de datos
+```{r}
+head(distritos_valencia)
+dim(distritos_valencia)
+colnames(distritos_valencia)
+str(distritos_valencia)
+
+head(distritos_bilbao)
+dim(distritos_bilbao)
+colnames(distritos_bilbao)
+str(distritos_bilbao)
+```
+
+##### Revisamos de las diferencias de estructura entre ambas bases.
+```{r}
+setdiff(colnames(distritos_valencia), colnames(distritos_bilbao))
+setdiff(colnames(distritos_bilbao), colnames(distritos_valencia))
+```
+
+##### ARMONIZACIÓN DE LAS VARIABLES DE DISTRITOS
+
+##### Unificamos el identificador de distrito.
+```{r}
+distritos_valencia <- distritos_valencia %>%
+  rename(cod_distrito = num_distrito)
+```
+
+##### Unificamos la variable de ratio hospitalaria.
+```{r}
+distritos_valencia <- distritos_valencia %>%
+  rename(ratio_hospital = ratio_hospitales)
+```
+
+##### Creamos el ratio de zonas verdes en Bilbao.
+```{r}
+distritos_bilbao <- distritos_bilbao %>%
+  mutate(ratio_zonas_verdes = num_zonas_verdes / pob_total)
+```
+
+##### Comprobamos la compatibilidad final de columnas.
+```{r}
+setdiff(colnames(distritos_valencia), colnames(distritos_bilbao))
+setdiff(colnames(distritos_bilbao), colnames(distritos_valencia))
+```
+
+##### CONSTRUCCIÓN DE LA BASE CONJUNTA DE DISTRITOS
+
+##### Identificamos el territorio de procedencia.
+```{r}
+distritos_valencia <- distritos_valencia %>%
+  mutate(ciudad = "Valencia")
+
+distritos_bilbao <- distritos_bilbao %>%
+  mutate(ciudad = "Bilbao")
+```
+
+##### Unimos ambas bases de distritos.
+```{r}
+distritos_base <- bind_rows(distritos_valencia, distritos_bilbao)
+```
+
+##### Exploración inicial de la base conjunta.
+```{r}
+head(distritos_base)
+dim(distritos_base)
+colnames(distritos_base)
+str(distritos_base)
+```
+
+##### Comprobamos el número de distritos por ciudad.
+```{r}
+table(distritos_base$ciudad)
+```
+
+##### REVISIÓN INICIAL DE LA BASE CONJUNTA
+
+##### Identificación de variables numéricas y no numéricas.
+```{r}
+sapply(distritos_base, class)
+
+variables_numericas <- distritos_base %>%
+  select(where(is.numeric)) %>%
+  colnames()
+
+variables_no_numericas <- distritos_base %>%
+  select(where(~ !is.numeric(.))) %>%
+  colnames()
+
+variables_numericas
+variables_no_numericas
+```
+
+##### Resumen descriptivo inicial de las variables numéricas.
+```{r}
+summary(distritos_base %>% select(all_of(variables_numericas)))
+```
+
+##### Revisamos los valores faltantes.
+```{r}
+valores_perdidos <- distritos_base %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(cols = everything(),
+               names_to = "variable",
+               values_to = "n_na") %>%
+  arrange(desc(n_na))
+
+valores_perdidos
+```
+
+##### Calculamos el porcentaje de valores faltantes por variable.
+```{r}
+porcentaje_perdidos <- distritos_base %>%
+  summarise(across(everything(), ~ mean(is.na(.)) * 100)) %>%
+  pivot_longer(cols = everything(),
+               names_to = "variable",
+               values_to = "pct_na") %>%
+  arrange(desc(pct_na))
+
+porcentaje_perdidos
+```
+
+##### Unificamos la información sobre valores faltantes.
+```{r}
+resumen_perdidos <- left_join(valores_perdidos, porcentaje_perdidos, by = "variable")
+
+resumen_perdidos
+```
+
+##### Revisamos las variables con valores perdidos.
+```{r}
+resumen_perdidos %>%
+  filter(n_na > 0)
+```
+
+##### REVISIÓN DE LA VARIABILIDAD DE LAS VARIABLES NUMÉRICAS
+
+##### Número de valores distintos por variable numérica.
+```{r}
+variabilidad_variables <- distritos_base %>%
+  select(where(is.numeric)) %>%
+  summarise(across(everything(), ~ n_distinct(., na.rm = TRUE))) %>%
+  pivot_longer(cols = everything(),
+               names_to = "variable",
+               values_to = "n_valores_distintos") %>%
+  arrange(n_valores_distintos)
+
+variabilidad_variables
+```
+
+##### Identificamos las variables con poca variabilidad.
+```{r}
+variabilidad_variables %>%
+  filter(n_valores_distintos <= 5)
+```
+
+##### DEFINICIÓN DE LA BASE DE TRABAJO PARA EL ESTUDIO DE CORRELACIÓN
+
+##### Excleimos las variables identificadoras y descriptivas.
+```{r}
+distritos_base %>%
+  select(cod_distrito, nombre_distrito, nombre_distrito_norm, ciudad) %>%
+  head()
+```
+
+##### Selección inicial de variables candidatas.
+```{r}
+variables_candidatas <- c(
+  "pob_total",
+  "pob_menor_16",
+  "pob_mayor_65",
+  "indice_envejecimiento",
+  "num_colegios",
+  "ratio_colegio",
+  "num_hospitales",
+  "ratio_hospital",
+  "alquiler_m2",
+  "renta_media_hogar",
+  "esfuerzo_alquiler",
+  "num_zonas_verdes",
+  "ratio_zonas_verdes")
+```
+
+##### Construimos la base específica para correlación.
+```{r}
+distritos_corr_base <- distritos_base %>%
+  select(all_of(variables_candidatas))
+```
+
+##### Comprobamaosla base de trabajo.
+```{r}
+head(distritos_corr_base)
+dim(distritos_corr_base)
+colnames(distritos_corr_base)
+str(distritos_corr_base)
+```
+
+##### PRIMERA DEPURACIÓN DE VARIABLES ANTES DEL CÁLCULO DE CORRELACIONES
+
+##### Identificamos los valores perdidos en la base de correlación.
+```{r}
+resumen_perdidos_corr <- distritos_corr_base %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(cols = everything(),
+               names_to = "variable",
+               values_to = "n_na") %>%
+  mutate(pct_na = n_na / nrow(distritos_corr_base) * 100) %>%
+  arrange(desc(pct_na))
+
+resumen_perdidos_corr
+```
+
+##### Seleccionamos una primera base depurada para la correlación principal.
+```{r}
+variables_corr_principal <- resumen_perdidos_corr %>%
+  filter(pct_na <= 15) %>%
+  pull(variable)
+
+variables_corr_principal
+
+distritos_corr_principal <- distritos_corr_base %>%
+  select(all_of(variables_corr_principal))
+```
+
+##### Comprobamos la base depurada.
+```{r}
+head(distritos_corr_principal)
+dim(distritos_corr_principal)
+colnames(distritos_corr_principal)
+```
+
+##### CÁLCULO DE LAS MATRICES DE CORRELACIÓN
+
+##### Preparamos la base para el cálculo de correlaciones.
+```{r}
+summary(distritos_corr_principal)
+```
+
+##### Calculamos la matriz de correlación de Pearson.
+```{r}
+cor_pearson <- cor(distritos_corr_principal,
+                   use = "pairwise.complete.obs",
+                   method = "pearson")
+
+cor_pearson
+```
+
+##### Redondeamos la matriz de correlación de Pearson.
+```{r}
+round(cor_pearson, 3)
+```
+
+##### Calculamos la matriz de correlación de Spearman.
+```{r}
+cor_spearman <- cor(distritos_corr_principal,
+                    use = "pairwise.complete.obs",
+                    method = "spearman")
+
+cor_spearman
+```
+
+##### Redondeamos la matriz de correlación de Spearman.
+```{r}
+round(cor_spearman, 3)
+```
+
+##### REVISIÓN DE VARIABLES PROBLEMÁTICAS ANTES DE LA VISUALIZACIÓN
+
+##### Comprobamos la desviación típica de las variables.
+```{r}
+desv_variables <- sapply(distritos_corr_principal, sd, na.rm = TRUE)
+
+desv_variables
+```
+
+##### Identificamos las variables problemáticas.
+```{r}
+variables_problematicas <- names(desv_variables[is.na(desv_variables) | desv_variables == 0])
+
+variables_problematicas
+```
+
+##### Construimos una base limpia para la representación gráfica.
+```{r}
+variables_validas <- names(desv_variables[!is.na(desv_variables) & desv_variables > 0])
+
+distritos_corr_principal_limpia <- distritos_corr_principal %>%
+  select(all_of(variables_validas))
+```
+
+##### Recalculamos la matriz de correlación de Pearson.
+```{r}
+cor_pearson <- cor(distritos_corr_principal_limpia,
+                   use = "pairwise.complete.obs",
+                   method = "pearson")
+```
+
+##### Comprobamos los valores no válidos en la matriz.
+```{r}
+sum(is.na(cor_pearson))
+sum(is.nan(cor_pearson))
+sum(is.infinite(cor_pearson))
+```
+
+##### VISUALIZACIÓN DE LAS CORRELACIONES
+
+##### Representación gráfica de la matriz de Pearson.
+```{r}
+corrplot(cor_pearson,
+         method = "color",
+         type = "upper",
+         order = "hclust",
+         tl.col = "black",
+         tl.srt = 45,
+         addCoef.col = "black",
+         number.cex = 0.6,
+         mar = c(0, 0, 1, 0))
+```
+
+##### Representación gráfica de la matriz de Spearman.
+```{r}
+corrplot(cor_spearman,
+         method = "color",
+         type = "upper",
+         order = "hclust",
+         tl.col = "black",
+         tl.srt = 45,
+         addCoef.col = "black",
+         number.cex = 0.6,
+         mar = c(0, 0, 1, 0))
+```
+
+##### IDENTIFICACIÓN DE RELACIONES FUERTES ENTRE VARIABLES
+
+##### Convertimos la matriz de correlación en formato tabla.
+```{r}
+cor_pearson_tabla <- as.data.frame(as.table(cor_pearson)) %>%
+  rename(variable_1 = Var1,
+         variable_2 = Var2,
+         correlacion = Freq)
+```
+
+##### Eliminamos autocorrelaciones y pares duplicados.
+```{r}
+cor_pearson_tabla <- cor_pearson_tabla %>%
+  filter(variable_1 != variable_2) %>%
+  rowwise() %>%
+  mutate(par = paste(sort(c(variable_1, variable_2)), collapse = " - ")) %>%
+  ungroup() %>%
+  distinct(par, .keep_all = TRUE) %>%
+  select(-par)
+```
+
+##### Ordenamos los pares según la intensidad de la correlación.
+```{r}
+cor_pearson_tabla_ordenada <- cor_pearson_tabla %>%
+  mutate(cor_abs = abs(correlacion)) %>%
+  arrange(desc(cor_abs))
+
+cor_pearson_tabla_ordenada
+```
+
+##### Visualizamos las correlaciones más intensas.
+```{r}
+cor_pearson_tabla_ordenada %>%
+  filter(cor_abs >= 0.7)
+```
+
+##### REVISIÓN DE RELACIONES MUY ALTAS Y POSIBLES REDUNDANCIAS
+
+##### Identificamos los pares con correlación muy alta.
+```{r}
+relaciones_muy_altas <- cor_pearson_tabla_ordenada %>%
+  filter(cor_abs >= 0.8)
+
+relaciones_muy_altas
+```
+
+##### Identificamos los pares con correlación alta o moderadamente alta.
+```{r}
+relaciones_altas <- cor_pearson_tabla_ordenada %>%
+  filter(cor_abs >= 0.7 & cor_abs < 0.8)
+
+relaciones_altas
+```
+
+##### APOYO A LA INTERPRETACIÓN MEDIANTE GRÁFICOS DE DISPERSIÓN
+
+##### Representación de algunos pares de variables relevantes.
+```{r}
+ggplot(distritos_base, aes(x = pob_mayor_65, y = indice_envejecimiento)) +
+  geom_point() +
+  labs(title = "Relación entre población mayor de 65 años e índice de envejecimiento",
+       x = "Población mayor de 65 años",
+       y = "Índice de envejecimiento")
+```
+
+```{r}
+ggplot(distritos_base, aes(x = num_colegios, y = ratio_colegio)) +
+  geom_point() +
+  labs(title = "Relación entre número de colegios y ratio de colegios",
+       x = "Número de colegios",
+       y = "Ratio de colegios")
+```
+
+```{r}
+ggplot(distritos_base, aes(x = alquiler_m2, y = esfuerzo_alquiler)) +
+  geom_point() +
+  labs(title = "Relación entre alquiler por m2 y esfuerzo de alquiler",
+       x = "Alquiler por m2",
+       y = "Esfuerzo de alquiler")
+```
+
+##### PROPUESTA INICIAL DE VARIABLES PARA CLUSTERING SEGÚN RESULTADOS GRÁFICOS
+
+El análisis de correlación realizado sobre los distritos de Valencia y Bilbao ha permitido identificar la existencia de varios bloques de variables fuertemente relacionadas, especialmente entre variables demográficas de tamaño (*pob_total, pob_menor_16, pob_mayor_65*), así como entre recuentos absolutos de equipamientos y sus correspondientes ratios (*num_colegios y ratio_colegio, num_zonas_verdes y ratio_zonas_verdes*). Estas relaciones elevadas indican la presencia de redundancias que podrían sesgar el análisis de clustering si no se corrigen.
+
+En consecuencia, se ha optado por priorizar variables relativas o sintéticas frente a variables absolutas, con el objetivo de evitar que la dimensión de tamaño del distrito tenga un peso excesivo en la segmentación. Asimismo, en el bloque de vivienda y nivel económico, se ha decidido utilizar *esfuerzo_alquiler* como indicador sintético, en lugar de incluir simultáneamente *alquiler_m2* y *renta_media_hogar*, ya que esta variable recoge de forma conjunta la relación entre el coste del alquiler y la capacidad económica.
+
+A partir de estos criterios, se propone la siguiente batería de variables para el análisis de clustering de distritos:
+
+*indice_envejecimiento*
+*ratio_colegio*
+*ratio_hospital*
+*esfuerzo_alquiler*
+*ratio_zonas_verdes*
+
+Esta selección permite construir un conjunto de variables más compacto, interpretable y libre de redundancias, asegurando que cada dimensión relevante del territorio esté representada sin duplicar información.
+
+
+## 3.2 Clustering Distritos Valencia 
+
+## 3.3 Clustering Distritos Bilbao
