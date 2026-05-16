@@ -4768,7 +4768,7 @@ sum(is.na(distritos_valencia_base$indice_envejecimiento))
 ```{r}
 valencia_resumen <- read_csv2("valencia_resumen.csv",
                               show_col_types = FALSE) %>%
-  mutate(cod_distrito = as.integer(distrito))
+  mutate(distrito_norm = normalizar_distrito(distrito))
 
 head(valencia_resumen)
 dim(valencia_resumen)
@@ -4777,16 +4777,20 @@ colnames(valencia_resumen)
 
 ##### Incorporación de la variable *num_colegios*.
 ```{r}
+valencia_resumen <- valencia_resumen %>%
+  mutate(distrito_norm = normalizar_distrito(distrito))
+
 distritos_valencia_base <- distritos_valencia_base %>%
-  mutate(cod_distrito = as.integer(cod_distrito)) %>%
+  mutate(nombre_distrito_norm = normalizar_distrito(nombre_distrito)) %>%
   select(-any_of("num_colegios")) %>%
   left_join(
-    valencia_resumen %>% select(cod_distrito, num_colegios),
-    by = "cod_distrito"
+    valencia_resumen %>%
+      select(distrito_norm, num_colegios),
+    by = c("nombre_distrito_norm" = "distrito_norm")
   ) %>%
-  mutate(num_colegios = coalesce(num_colegios, 0L))
+  mutate(num_colegios = coalesce(num_colegios, 0))
 
-head(distritos_valencia_base[, c("cod_distrito", "nombre_distrito", "num_colegios")])
+head(distritos_valencia_base[, c("nombre_distrito", "num_colegios")])
 ```
 
 ##### Calculamos la variable *ratio_colegio*.
@@ -4809,15 +4813,20 @@ sum(is.na(distritos_valencia_base$ratio_colegio))
 
 ##### Incorporamos la variable *num_hospitales*.
 ```{r}
+valencia_resumen <- valencia_resumen %>%
+  mutate(distrito_norm = normalizar_distrito(distrito))
+
 distritos_valencia_base <- distritos_valencia_base %>%
+  mutate(nombre_distrito_norm = normalizar_distrito(nombre_distrito)) %>%
   select(-any_of("num_hospitales")) %>%
   left_join(
-    valencia_resumen %>% select(cod_distrito, num_hospitales),
-    by = "cod_distrito"
+    valencia_resumen %>%
+      select(distrito_norm, num_hospitales),
+    by = c("nombre_distrito_norm" = "distrito_norm")
   ) %>%
-  mutate(num_hospitales = coalesce(num_hospitales, 0L))
+  mutate(num_hospitales = coalesce(num_hospitales, 0))
 
-head(distritos_valencia_base[, c("cod_distrito", "nombre_distrito", "num_hospitales")])
+head(distritos_valencia_base[, c("nombre_distrito", "num_hospitales")])
 ```
 
 ##### Calculamos la variable *ratio_hospital*.
@@ -4928,15 +4937,20 @@ distritos_valencia_base %>%
 
 ##### Incorporación de la variable *num_zonas_verdes*.
 ```{r}
+valencia_resumen <- valencia_resumen %>%
+  mutate(distrito_norm = normalizar_distrito(distrito))
+
 distritos_valencia_base <- distritos_valencia_base %>%
+  mutate(nombre_distrito_norm = normalizar_distrito(nombre_distrito)) %>%
   select(-any_of("num_zonas_verdes")) %>%
   left_join(
-    valencia_resumen %>% select(cod_distrito, num_zonas_verdes),
-    by = "cod_distrito"
+    valencia_resumen %>%
+      select(distrito_norm, num_zonas_verdes),
+    by = c("nombre_distrito_norm" = "distrito_norm")
   ) %>%
-  mutate(num_zonas_verdes = coalesce(num_zonas_verdes, 0L))
+  mutate(num_zonas_verdes = coalesce(num_zonas_verdes, 0))
 
-head(distritos_valencia_base[, c("cod_distrito", "nombre_distrito", "num_zonas_verdes")])
+head(distritos_valencia_base[, c("nombre_distrito", "num_zonas_verdes")])
 ```
 
 ##### Calculamos la variable *ratio_zonas_verdes*.
@@ -10828,7 +10842,7 @@ datos <- datos %>%
 datos_final <- datos %>%
   select(
     provincia,
-    nombre_municipio,
+    nombre_municipio = nombre_municipio.y,
     nombre_municipio_arreglado,
     nombre_municipio_norm,
     descripcion1,
@@ -11135,7 +11149,6 @@ vizcaya_rec %>%
 ```
 
 ##### FILTROS INICIALES
-
 Las cuatro primeras preguntas funcionan como filtros. Su objetivo es reducir el conjunto de municipios candidatos antes de calcular la similitud entre el perfil del usuario y los municipios.
 
 La estructura queda así:
@@ -11275,8 +11288,7 @@ candidatos <- aplicar_filtros(
   p1 = 1,  # Valencia
   p2 = 3,  # acepta distancias medias
   p3 = 2,  # recursos educativos relativamente cerca
-  p4 = 3   # sanidad básica + hospital a distancia media
-  )
+  p4 = 3)   # sanidad básica + hospital a distancia media)
 
 candidatos %>%
   select(
