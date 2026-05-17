@@ -18,6 +18,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(httr)
 library(jsonlite)
+library(vtable)
 library(knitr)
 library(readxl)
 library(sf)
@@ -1255,12 +1256,7 @@ head(municipios_valencia_base)
 ```{r}
 head(municipios_valencia_base)
 
-summary(municipios_valencia_base[, c("pob_total",
-                                     "pob_extranjera",
-                                     "pob_menor_16",
-                                     "pob_mayor_65",
-                                     "pct_extranjeros",
-                                     "indice_envejecimiento")])
+st(municipios_valencia_base, vars = c("pob_total", "pob_extranjera", "pob_menor_16", "pob_mayor_65", "pct_extranjeros", "indice_envejecimiento"))
 ```
 
 ##### BLOQUE EDUCATIVO
@@ -1356,7 +1352,7 @@ head(municipios_valencia_base)
 
 ##### Comprobamos los resultados del nivel educativo.
 ```{r}
-summary(municipios_valencia_base$pct_estudios_sup)
+st(municipios_valencia_base, vars = "pct_estudios_sup")
 sum(is.na(municipios_valencia_base$pct_estudios_sup))
 head(municipios_valencia_base[, c("cod_municipio",
                                   "nombre_municipio",
@@ -1449,7 +1445,7 @@ head(municipios_valencia_base[, c("nombre_municipio",
 
 ##### Comprobamos los resultados obtenidos de los centros educativos.
 ```{r}
-summary(municipios_valencia_base$ratio_colegios)
+st(municipios_valencia_base, vars = "ratio_colegios")
 sum(is.na(municipios_valencia_base$num_colegios))
 sum(is.na(municipios_valencia_base$ratio_colegios))
 
@@ -1477,8 +1473,8 @@ municipios_valencia_base <- left_join(
 head(municipios_valencia_base[, c("nombre_municipio",
                                   "nombre_municipio_norm",
                                   "distancia_centro_educativo")])
-summary(municipios_valencia_base$distancia_centro_educativo)
 
+st(municipios_valencia_base, vars = "distancia_centro_educativo")
 sum(is.na(municipios_valencia_base$distancia_centro_educativo))
 ```
 
@@ -1573,7 +1569,7 @@ head(municipios_valencia_base[, c("nombre_municipio",
 
 ##### Comprobamos los resultados de centros de salud.
 ```{r}
-summary(municipios_valencia_base$ratio_centros_salud)
+st(municipios_valencia_base, vars = "ratio_centros_salud")
 sum(is.na(municipios_valencia_base$num_centros_salud))
 sum(is.na(municipios_valencia_base$ratio_centros_salud))
 ```
@@ -1694,7 +1690,7 @@ head(municipios_valencia_base[, c("nombre_municipio",
 
 ##### Comprobamos los resultados de hospitales.
 ```{r}
-summary(municipios_valencia_base$ratio_hospital)
+st(municipios_valencia_base, vars = "ratio_hospital")
 sum(is.na(municipios_valencia_base$num_hospitales))
 sum(is.na(municipios_valencia_base$ratio_hospital))
 ```
@@ -1713,8 +1709,8 @@ municipios_valencia_base <- left_join(
 head(municipios_valencia_base[, c("nombre_municipio",
                                   "nombre_municipio_norm",
                                   "distancia_hospital")])
-summary(municipios_valencia_base$distancia_hospital)
 
+st(municipios_valencia_base, vars = "distancia_hospital")
 sum(is.na(municipios_valencia_base$distancia_hospital))
 ```
 
@@ -1799,7 +1795,7 @@ head(municipios_valencia_base[, c("nombre_municipio",
 Tras incorporar la variable a la base principal, se comprueba cuántos municipios no disponen de información de alquiler. Estos valores faltantes son esperables en esta fuente, ya que en algunos municipios pequeños no hay suficientes transacciones para generar el indicador.
 ```{r}
 sum(is.na(municipios_valencia_base$precio_m2_alquiler))
-summary(municipios_valencia_base$precio_m2_alquiler)
+st(municipios_valencia_base, vars = "precio_m2_alquiler")
 ```
 
 ##### Lectura y exploración inicial de la base de datos de renta.
@@ -1846,7 +1842,7 @@ str(renta_muni)
 ```{r}
 sum(duplicated(renta_muni$cod_municipio))
 length(unique(renta_muni$cod_municipio))
-summary(renta_muni$renta_media_hogar)
+st(renta_muni, vars = "renta_media_hogar")
 ```
 
 ##### Incorporación de la variable *renta_media_hogar*.
@@ -1865,7 +1861,7 @@ head(municipios_valencia_base[, c("cod_municipio",
 Como esta variable depende del precio del alquiler, los municipios sin dato de alquiler también quedarán sin valor en *esfuerzo_alquiler*.
 ```{r}
 sum(is.na(municipios_valencia_base$renta_media_hogar))
-summary(municipios_valencia_base$renta_media_hogar)
+st(municipios_valencia_base, vars = "renta_media_hogar")
 ```
 
 ##### Construimos la variable *esfuerzo_alquiler*.
@@ -1883,7 +1879,7 @@ head(municipios_valencia_base[, c("nombre_municipio",
 ##### Comprobamos los resultados del esfuerzo de alquiler.
 ```{r}
 sum(is.na(municipios_valencia_base$esfuerzo_alquiler))
-summary(municipios_valencia_base$esfuerzo_alquiler)
+st(municipios_valencia_base, vars = "esfuerzo_alquiler")
 ```
 
 ##### BLOQUE DE CONTRATOS
@@ -1932,11 +1928,7 @@ contratos_valencia$contratos_industria_mes <- limpiar_contratos(contratos_valenc
 contratos_valencia$contratos_construccion_mes <- limpiar_contratos(contratos_valencia$`Contratos Construcción`)
 contratos_valencia$contratos_servicios_mes <- limpiar_contratos(contratos_valencia$`Contratos  Servicios`)
 
-summary(contratos_valencia$total_contratos_mes)
-summary(contratos_valencia$contratos_agricultura_mes)
-summary(contratos_valencia$contratos_industria_mes)
-summary(contratos_valencia$contratos_construccion_mes)
-summary(contratos_valencia$contratos_servicios_mes)
+st(contratos_valencia, vars = c("total_contratos_mes", "contratos_agricultura_mes", "contratos_industria_mes", "contratos_construccion_mes", "contratos_servicios_mes"))
 ```
 
 ##### Construimos las variables anuales por municipio.
@@ -1961,7 +1953,7 @@ str(contratos_muni)
 contratos_muni$contratos_total <- round(contratos_muni$total_contratos_anual)
 
 head(contratos_muni[, c("cod_municipio", "contratos_total")])
-summary(contratos_muni$contratos_total)
+st(contratos_muni, vars = "contratos_total")
 ```
 
 ##### Calculamos los porcentajes sectoriales.
@@ -2015,11 +2007,12 @@ head(municipios_valencia_base[, c("cod_municipio",
 
 ##### Comprobamos los resultados del bloque de contratos.
 ```{r}
-summary(
+st(data.frame(Suma_Porcentajes = 
   municipios_valencia_base$pct_contratos_agricultura +
   municipios_valencia_base$pct_contratos_industria +
   municipios_valencia_base$pct_contratos_construccion +
-  municipios_valencia_base$pct_contratos_servicios)
+  municipios_valencia_base$pct_contratos_servicios
+))
 ```
 
 ##### Creación de la naturaleza contractual de los municipios: Seleccionamos las variables de contratos utilizadas.
@@ -2183,7 +2176,7 @@ internet_valencia$pct_hogares_100mbps <-
   as.numeric(internet_valencia$pct_hogares_100mbps) * 100
 
 head(internet_valencia[, c("cod_municipio", "pct_hogares_100mbps")])
-summary(internet_valencia$pct_hogares_100mbps)
+st(internet_valencia, vars = "pct_hogares_100mbps")
 ```
 
 ##### Creamos la variable *internet_100mbps_mayor90*.
@@ -2216,7 +2209,7 @@ head(municipios_valencia_base[, c("cod_municipio",
 sum(is.na(municipios_valencia_base$pct_hogares_100mbps))
 sum(is.na(municipios_valencia_base$internet_100mbps_mayor90))
 
-summary(municipios_valencia_base$pct_hogares_100mbps)
+st(municipios_valencia_base, vars = "pct_hogares_100mbps")
 table(municipios_valencia_base$internet_100mbps_mayor90, useNA = "ifany")
 ```
 
@@ -3018,12 +3011,7 @@ head(municipios_bizkaia_base)
 ```{r}
 head(municipios_bizkaia_base)
 
-summary(municipios_bizkaia_base[, c("pob_total",
-                                    "pob_extranjera",
-                                    "pob_menor_16",
-                                    "pob_mayor_65",
-                                    "pct_extranjeros",
-                                    "indice_envejecimiento")])
+st(municipios_bizkaia_base, vars = c("pob_total", "pob_extranjera", "pob_menor_16", "pob_mayor_65", "pct_extranjeros", "indice_envejecimiento"))
 ```
 
 ##### BLOQUE EDUCATIVO
@@ -3116,7 +3104,7 @@ head(municipios_bizkaia_base)
 
 ##### Comprobamos los resultados del nivel educativo.
 ```{r}
-summary(municipios_bizkaia_base$pct_estudios_sup)
+st(municipios_bizkaia_base, vars = "pct_estudios_sup")
 sum(is.na(municipios_bizkaia_base$pct_estudios_sup))
 head(municipios_bizkaia_base[, c("cod_municipio",
                                  "nombre_municipio",
@@ -3203,7 +3191,7 @@ head(municipios_bizkaia_base[, c("nombre_municipio",
 
 ##### Comprobamos los resultados de los centros educativos.
 ```{r}
-summary(municipios_bizkaia_base$ratio_colegios)
+st(municipios_bizkaia_base, vars = "ratio_colegios")
 sum(is.na(municipios_bizkaia_base$num_colegios))
 sum(is.na(municipios_bizkaia_base$ratio_colegios))
 
@@ -3230,7 +3218,7 @@ municipios_bizkaia_base <- left_join(
 head(municipios_bizkaia_base[, c("nombre_municipio",
                                  "nombre_municipio_norm",
                                  "distancia_centro_educativo")])
-summary(municipios_bizkaia_base$distancia_centro_educativo)
+st(municipios_bizkaia_base, vars = "distancia_centro_educativo")
 
 sum(is.na(municipios_bizkaia_base$distancia_centro_educativo))
 ```
@@ -3301,7 +3289,7 @@ head(municipios_bizkaia_base[, c("nombre_municipio",
 
 ##### Comprobamos los resultados de centros de salud.
 ```{r}
-summary(municipios_bizkaia_base$ratio_centros_salud)
+st(municipios_bizkaia_base, vars = "ratio_centros_salud")
 sum(is.na(municipios_bizkaia_base$num_centros_salud))
 sum(is.na(municipios_bizkaia_base$ratio_centros_salud))
 ```
@@ -3404,7 +3392,7 @@ head(municipios_bizkaia_base[, c("nombre_municipio",
 
 ##### Comprobamos los resultados de hospitales.
 ```{r}
-summary(municipios_bizkaia_base$ratio_hospital)
+st(municipios_bizkaia_base, vars = "ratio_hospital")
 sum(is.na(municipios_bizkaia_base$num_hospitales))
 sum(is.na(municipios_bizkaia_base$ratio_hospital))
 ```
@@ -3423,7 +3411,7 @@ municipios_bizkaia_base <- left_join(
 head(municipios_bizkaia_base[, c("nombre_municipio",
                                  "nombre_municipio_norm",
                                  "distancia_hospital")])
-summary(municipios_bizkaia_base$distancia_hospital)
+st(municipios_bizkaia_base, vars = "distancia_hospital")
 
 sum(is.na(municipios_bizkaia_base$distancia_hospital))
 ```
@@ -3468,7 +3456,7 @@ En este caso, la base de Vizcaya ya proporciona directamente la variable de alqu
 ```{r}
 alquiler$precio_m2_alquiler <- as.numeric(alquiler$precio_m2_alquiler)
 
-summary(alquiler$precio_m2_alquiler)
+st(alquiler, vars = "precio_m2_alquiler")
 sum(is.na(alquiler$precio_m2_alquiler))
 
 ```
@@ -3487,7 +3475,7 @@ municipios_bizkaia_base <- left_join(municipios_bizkaia_base,
 ##### Comprobamos los resultados del alquiler.
 ```{r}
 sum(is.na(municipios_bizkaia_base$precio_m2_alquiler))
-summary(municipios_bizkaia_base$precio_m2_alquiler)
+st(municipios_bizkaia_base, vars = "precio_m2_alquiler")
 ```
 
 ##### Lectura y exploración inicial de la base de datos de renta.
@@ -3581,7 +3569,7 @@ municipios_bizkaia_base <- left_join(municipios_bizkaia_base,
 ##### Comprobamos los resultados de la renta.
 ```{r}
 sum(is.na(municipios_bizkaia_base$renta_media_hogar))
-summary(municipios_bizkaia_base$renta_media_hogar)
+st(municipios_bizkaia_base, vars = "renta_media_hogar")
 ```
 
 ##### Construimos la variable *esfuerzo_alquiler*.
@@ -3601,7 +3589,7 @@ head(municipios_bizkaia_base[, c("nombre_municipio",
 Como esta variable depende del precio del alquiler, los municipios sin dato de alquiler también quedarán sin valor en esfuerzo_alquiler.
 ```{r}
 sum(is.na(municipios_bizkaia_base$esfuerzo_alquiler))
-summary(municipios_bizkaia_base$esfuerzo_alquiler)
+st(municipios_bizkaia_base, vars = "esfuerzo_alquiler")
 ```
 
 ```{r}
@@ -3726,7 +3714,7 @@ contratos_muni <- contratos_muni %>%
                       contratos_construccion_abs +
                       contratos_servicios_abs)
 
-summary(contratos_muni$contratos_total)
+st(contratos_muni, vars = "contratos_total")
 
 head(contratos_muni[, c("cod_municipio",
                         "nombre_municipio",
@@ -3796,7 +3784,7 @@ municipios_bizkaia_base$suma_pct_contratos <-
   municipios_bizkaia_base$pct_contratos_construccion +
   municipios_bizkaia_base$pct_contratos_servicios
 
-summary(municipios_bizkaia_base$suma_pct_contratos)
+st(municipios_bizkaia_base, vars = "suma_pct_contratos")
 
 sum(is.na(municipios_bizkaia_base$contratos_total))
 sum(is.na(municipios_bizkaia_base$pct_contratos_agricultura))
@@ -3964,7 +3952,7 @@ internet_vizcaya$pct_hogares_100mbps <-
   as.numeric(internet_vizcaya$pct_hogares_100mbps) * 100
 
 head(internet_vizcaya[, c("cod_municipio", "pct_hogares_100mbps")])
-summary(internet_vizcaya$pct_hogares_100mbps)
+st(internet_vizcaya, vars = "pct_hogares_100mbps")
 sum(is.na(internet_vizcaya$pct_hogares_100mbps))
 ```
 
@@ -4004,7 +3992,7 @@ head(municipios_bizkaia_base[, c("cod_municipio",
 sum(is.na(municipios_bizkaia_base$pct_hogares_100mbps))
 sum(is.na(municipios_bizkaia_base$internet_100mbps_mayor90))
 
-summary(municipios_bizkaia_base$pct_hogares_100mbps)
+st(municipios_bizkaia_base, vars = "pct_hogares_100mbps")
 table(municipios_bizkaia_base$internet_100mbps_mayor90, useNA = "ifany")
 ```
 
@@ -4714,7 +4702,7 @@ distritos_valencia_base <- distritos_valencia_base %>%
     pob_mayor_65 = censo$`65 y más`[1:nrow(distritos_valencia_base)])
 
 head(distritos_valencia_base)
-summary(distritos_valencia_base)
+st(distritos_valencia_base)
 ```
 
 ##### Comprobamos los duplicados y la cobertura.
@@ -4740,10 +4728,7 @@ head(distritos_valencia_base)
 ```{r}
 head(distritos_valencia_base)
 
-summary(distritos_valencia_base[, c("pob_total",
-                                    "pob_menor_16",
-                                    "pob_mayor_65",
-                                    "indice_envejecimiento")])
+st(distritos_valencia_base, vars = c("pob_total", "pob_menor_16", "pob_mayor_65", "indice_envejecimiento"))
 
 sum(is.na(distritos_valencia_base$pob_total))
 sum(is.na(distritos_valencia_base$pob_menor_16))
@@ -4793,7 +4778,7 @@ head(distritos_valencia_base[, c("nombre_distrito", "num_colegios", "ratio_coleg
 
 ##### Comprobamos los resultados del bloque educativo.
 ```{r}
-summary(distritos_valencia_base[, c("num_colegios", "ratio_colegio")])
+st(distritos_valencia_base, vars = c("num_colegios", "ratio_colegio"))
 sum(is.na(distritos_valencia_base$num_colegios))
 sum(is.na(distritos_valencia_base$ratio_colegio))
 ```
@@ -4829,7 +4814,7 @@ head(distritos_valencia_base[, c("nombre_distrito", "num_hospitales", "ratio_hos
 
 ##### Comprobamos los resultados del bloque sanitario.
 ```{r}
-summary(distritos_valencia_base[, c("num_hospitales", "ratio_hospital")])
+st(distritos_valencia_base, vars = c("num_hospitales", "ratio_hospital"))
 sum(is.na(distritos_valencia_base$num_hospitales))
 sum(is.na(distritos_valencia_base$ratio_hospital))
 ```
@@ -4895,7 +4880,7 @@ head(distritos_valencia_base[, c("nombre_distrito", "alquiler_m2", "renta_media_
 
 ##### Comprobamos los resultados del bloque de vivienda.
 ```{r}
-summary(distritos_valencia_base[, c("alquiler_m2", "renta_media_hogar", "esfuerzo_alquiler")])
+st(distritos_valencia_base, vars = c("alquiler_m2", "renta_media_hogar", "esfuerzo_alquiler"))
 sum(is.na(distritos_valencia_base$alquiler_m2))
 sum(is.na(distritos_valencia_base$renta_media_hogar))
 sum(is.na(distritos_valencia_base$esfuerzo_alquiler))
@@ -4953,7 +4938,7 @@ head(distritos_valencia_base[, c("nombre_distrito", "num_zonas_verdes", "ratio_z
 
 ##### Comprobamos los resultados del bloque de zonas verdes.
 ```{r}
-summary(distritos_valencia_base[, c("num_zonas_verdes", "ratio_zonas_verdes")])
+st(distritos_valencia_base, vars = c("num_zonas_verdes", "ratio_zonas_verdes"))
 sum(is.na(distritos_valencia_base$num_zonas_verdes))
 sum(is.na(distritos_valencia_base$ratio_zonas_verdes))
 ```
@@ -5355,7 +5340,7 @@ distritos_bilbao_base <- distritos_bilbao_base %>%
     pob_mayor_65 = censo$pob_65_mas[1:nrow(distritos_bilbao_base)])
 
 head(distritos_bilbao_base)
-summary(distritos_bilbao_base)
+st(distritos_bilbao_base)
 ```
 
 ##### Comprobación de duplicados y cobertura.
@@ -5381,10 +5366,7 @@ head(distritos_bilbao_base)
 ```{r}
 head(distritos_bilbao_base)
 
-summary(distritos_bilbao_base[, c("pob_total",
-                                   "pob_menor_16",
-                                   "pob_mayor_65",
-                                   "indice_envejecimiento")])
+st(distritos_bilbao_base, vars = c("pob_total", "pob_menor_16", "pob_mayor_65", "indice_envejecimiento"))
 
 sum(is.na(distritos_bilbao_base$pob_total))
 sum(is.na(distritos_bilbao_base$pob_menor_16))
@@ -5431,7 +5413,7 @@ head(distritos_bilbao_base[, c("nombre_distrito", "num_colegios", "ratio_colegio
 
 ##### Comprobamos los resultados del bloque educativo.
 ```{r}
-summary(distritos_bilbao_base[, c("num_colegios", "ratio_colegio")])
+st(distritos_bilbao_base, vars = c("num_colegios", "ratio_colegio"))
 sum(is.na(distritos_bilbao_base$num_colegios))
 sum(is.na(distritos_bilbao_base$ratio_colegio))
 ```
@@ -5462,7 +5444,7 @@ head(distritos_bilbao_base[, c("nombre_distrito", "num_hospitales", "ratio_hospi
 
 ##### Comprobamos los resultados del bloque sanitario.
 ```{r}
-summary(distritos_bilbao_base[, c("num_hospitales", "ratio_hospital")])
+st(distritos_bilbao_base, vars = c("num_hospitales", "ratio_hospital"))
 sum(is.na(distritos_bilbao_base$num_hospitales))
 sum(is.na(distritos_bilbao_base$ratio_hospital))
 ```
@@ -5539,7 +5521,7 @@ head(distritos_bilbao_base[, c("nombre_distrito", "alquiler_m2", "renta_media_ho
 
 ##### Comprobamos los resultados del bloque de vivienda.
 ```{r}
-summary(distritos_bilbao_base[, c("alquiler_m2", "renta_media_hogar", "esfuerzo_alquiler")])
+st(distritos_bilbao_base, vars = c("alquiler_m2", "renta_media_hogar", "esfuerzo_alquiler"))
 sum(is.na(distritos_bilbao_base$alquiler_m2))
 sum(is.na(distritos_bilbao_base$renta_media_hogar))
 sum(is.na(distritos_bilbao_base$esfuerzo_alquiler))
@@ -5590,7 +5572,7 @@ head(distritos_bilbao_base[, c("nombre_distrito", "num_zonas_verdes", "ratio_zon
 
 ##### Comprobamos los resultados del bloque de zonas verdes.
 ```{r}
-summary(distritos_bilbao_base[, c("num_zonas_verdes", "ratio_zonas_verdes")])
+st(distritos_bilbao_base, vars = c("num_zonas_verdes", "ratio_zonas_verdes"))
 sum(is.na(distritos_bilbao_base$num_zonas_verdes))
 sum(is.na(distritos_bilbao_base$ratio_zonas_verdes))
 ```
@@ -5936,7 +5918,7 @@ variables_no_numericas
 
 ##### Resumen descriptivo inicial de las variables numéricas.
 ```{r}
-summary(municipios_base %>% select(all_of(variables_numericas)))
+st(municipios_base, vars = variables_numericas)
 ```
 
 ##### Revisamos los valores faltantes.
@@ -6096,7 +6078,7 @@ colnames(municipios_corr_principal)
 
 ##### Preparamos la base para el cálculo de correlaciones.
 ```{r}
-summary(municipios_corr_principal)
+st(municipios_corr_principal)
 ```
 
 ##### Calculamos de la matriz de correlación de Pearson.
@@ -6397,7 +6379,7 @@ Ya quetenemos variables en escalas distintas. Para ello, centramos y escalamosme
 ```{r}
 datos_clustering_scaled <- scale(datos_clustering_completo)
 
-summary(datos_clustering_scaled)
+st(as.data.frame(datos_clustering_scaled))
 ```
 
 Finalmente, se guarda la matriz estandarizada con el nombre*matriz_clustering*, que será el objeto utilizado en los siguientesapartados para calcular distancias y aplicar los distintos métodos de clustering.
@@ -7036,7 +7018,7 @@ Ya que tenemos variables en escalas distintas. Para ello, centramos y escalamos 
 ```{r}
 datos_clustering_scaled <- scale(datos_clustering_completo)
 
-summary(datos_clustering_scaled)
+st(as.data.frame(datos_clustering_scaled))
 ```
 
 Finalmente, se guarda la matriz estandarizada con el nombre *matriz_clustering*, que será el objeto utilizado en los siguientes apartados para calcular distancias y aplicar los distintos métodos de clustering.
@@ -7676,7 +7658,7 @@ variables_no_numericas
 
 ##### Resumen descriptivo inicial de las variables numéricas.
 ```{r}
-summary(distritos_base %>% select(all_of(variables_numericas)))
+st(distritos_base, vars = variables_numericas)
 ```
 
 ##### Revisamos los valores faltantes.
@@ -7816,7 +7798,7 @@ colnames(distritos_corr_principal)
 
 ##### Preparamos la base para el cálculo de correlaciones.
 ```{r}
-summary(distritos_corr_principal)
+st(distritos_corr_principal)
 ```
 
 ##### Calculamos la matriz de correlación de Pearson.
@@ -8084,7 +8066,7 @@ Antes de calcular distancias, debemos estandarizar los datos, ya que tenemos var
 ```{r}
 datos_clustering_scaled <- scale(datos_clustering_completo)
 
-summary(datos_clustering_scaled)
+st(as.data.frame(datos_clustering_scaled))
 ```
 
 Finalmente, se guarda la matriz estandarizada con el nombre *matriz_clustering*, que será el objeto utilizado en los siguientes apartados para calcular distancias y aplicar los distintos métodos de clustering.
@@ -8589,7 +8571,7 @@ Ya que tenemos variables en escalas distintas. Para ello, centramos y escalamos 
 ```{r}
 datos_clustering_scaled <- scale(datos_clustering_completo)
 
-summary(datos_clustering_scaled)
+st(as.data.frame(datos_clustering_scaled))
 ```
 
 Finalmente, se guarda la matriz estandarizada con el nombre *matriz_clustering*, que será el objeto utilizado en los siguientes apartados para calcular distancias y aplicar los distintos métodos de clustering.
@@ -10944,7 +10926,7 @@ valencia_rec %>%
     distancia_centro_educativo_cat,
     distancia_hospital_cat,
     grupo_contratos) %>%
-  summary()
+  st()
 ```
 
 ```{r}
@@ -10958,7 +10940,7 @@ vizcaya_rec %>%
     distancia_centro_educativo_cat,
     distancia_hospital_cat,
     grupo_contratos) %>%
-  summary()
+  st()
 ```
 
 ##### Guardamos las bases preparadas.
