@@ -123,7 +123,8 @@ geocodificar_lista <- function(df_municipios) {
 ```
 
 ##### Ejecutamos la función para Vizcaya primero.
-```{r}
+Esta llamada hace peticiones a Nominatim y tarda varios minutos, así que la dejamos con `eval=FALSE`. El CSV de salida ya está generado en la carpeta del proyecto.
+```{r, eval=FALSE}
 cat("--------- VIZCAYA --------\n")
 
 # Extraemos y limpiamos el listado de municipios de Vizcaya
@@ -134,7 +135,8 @@ coords_vizcaya <- geocodificar_lista(municipios_vizcaya)
 ```
 
 ##### Ejecutamos la función para Valencia.
-```{r}
+Mismo motivo que en el bloque anterior: el chunk se desactiva con `eval=FALSE` porque la geocodificación es lenta y los resultados ya están guardados.
+```{r, eval=FALSE}
 cat("========== VALENCIA ==========\n")
 
 # Extraemos y limpiamos el listado de municipios de Bizkaia
@@ -145,7 +147,8 @@ coords_valencia <- geocodificar_lista(municipios_valencia)
 ```
 
 ##### Guardamos los archivos en cvs en la ruta indicada.
-```{r}
+Este chunk depende de los anteriores, así que también va con `eval=FALSE`. Los CSVs ya existen en la carpeta del proyecto.
+```{r, eval=FALSE}
 #csv de Vizcaya
 write_csv(coords_vizcaya, ruta_output_vizcaya)
 
@@ -338,7 +341,8 @@ geocodificar_lista_servicios <- function(df_servicios) {
 ```
 
 ##### Geocodificamos los hospitales de Vizcaya.
-```{r}
+La geocodificación con Nominatim es lenta; el chunk se desactiva con `eval=FALSE` y el CSV final ya está disponible en la carpeta.
+```{r, eval=FALSE}
 # Leemos y limpiamos la base de hospitales de Vizcaya
 hospitales_bizkaia <- limpiar_hospitales(ruta_hospitales_bizkaia)
 
@@ -355,7 +359,8 @@ hospitales_bizkaia_coords |>
 ```
 
 ##### Imputamos manualmente los faltantes.
-```{r}
+Depende del chunk anterior, por lo que también va desactivado.
+```{r, eval=FALSE}
 hospitales_bizkaia_coords[2,  c("lat", "lon")] <- list(43.2969436, -2.9934568)
 hospitales_bizkaia_coords[3,  c("lat", "lon")] <- list(43.4226671, -2.7228639)
 hospitales_bizkaia_coords[6,  c("lat", "lon")] <- list(43.2684271, -2.9278286)
@@ -375,7 +380,8 @@ hospitales_bizkaia_coords |>
 ```
 
 ##### Geocodificamos los hospitales de Valencia.
-```{r}
+Mismo caso: chunk desactivado por lentitud; las coordenadas ya están en disco.
+```{r, eval=FALSE}
 # Leemos y limpiamos la base de hospitales de Valencia
 hospitales_valencia <- limpiar_hospitales(ruta_hospitales_valencia)
 
@@ -392,7 +398,7 @@ hospitales_valencia_coords |>
 ```
 
 ##### Imputamos manualmente los faltantes.
-```{r}
+```{r, eval=FALSE}
 hospitales_valencia_coords[2,  c("lat", "lon")] <- list(39.5785165, -0.4452444)
 hospitales_valencia_coords[3,  c("lat", "lon")] <- list(39.5023262, -0.4083376)
 hospitales_valencia_coords[4,  c("lat", "lon")] <- list(39.0882347, -0.3552443)
@@ -412,7 +418,8 @@ hospitales_valencia_coords |>
 ```
 
 ##### Geocodificamos los centros educativos de Vizcaya.
-```{r}
+Mismo caso de geocodificación lenta con Nominatim; chunk desactivado.
+```{r, eval=FALSE}
 # Leemos y limpiamos la base de centros educativos de Bizkaia
 centros_bizkaia <- limpiar_centros_educativos(ruta_centros_bizkaia)
 
@@ -433,7 +440,7 @@ centros_bizkaia_coords |>
 ```
 
 ##### Geocodificamos los centros educativos de Valencia.
-```{r}
+```{r, eval=FALSE}
 # Leemos y limpiamos la base de centros educativos de Valencia
 centros_valencia <- limpiar_centros_educativos(ruta_centros_valencia)
 
@@ -454,7 +461,8 @@ centros_valencia_coords |>
 ```
 
 ##### Guardamos los resultados.
-```{r}
+Este chunk también va con `eval=FALSE` porque depende de las variables generadas en los chunks anteriores. Los CSVs finales ya están en la carpeta.
+```{r, eval=FALSE}
 # Nos quedamos solo con las columnas que necesitaremos en el Script 3
 hospitales_vizcaya_export <- hospitales_bizkaia_coords |>
   select(nombre_hospital, municipio, lat, lon)
@@ -686,7 +694,8 @@ calcular_distancia_final <- function(lat_mun, lon_mun, municipio_norm, servicios
 ```
 
 ##### Calculamos las distancias finales para Valencia.
-```{r}
+El cálculo de distancias por carretera con OSRM hace muchas llamadas a la API pública y tarda bastante. Lo dejamos con `eval=FALSE`; el dataset final ya está guardado.
+```{r, eval=FALSE}
 # Calculamos la distancia a hospitales para Valencia
 dist_hospital_valencia <- map_dbl(
   seq_len(nrow(municipios_valencia)),
@@ -716,7 +725,8 @@ dataset_distancias_valencia <- municipios_valencia |>
 ```
 
 ##### Calculamos de las distancias para Vizcaya.
-```{r}
+Mismo motivo que en Valencia: chunk desactivado por lentitud.
+```{r, eval=FALSE}
 # Calculamos la distancia a hospitales para Vizcaya
 dist_hospital_vizcaya <- map_dbl(
   seq_len(nrow(municipios_vizcaya)),
@@ -746,7 +756,8 @@ dataset_distancias_vizcaya <- municipios_vizcaya |>
 ```
 
 ##### Guardamos los datasets
-```{r}
+Depende de los chunks anteriores, por lo que también va con `eval=FALSE`.
+```{r, eval=FALSE}
 # Guardamos los datasets finales de distancias
 write_csv(dataset_distancias_vizcaya, ruta_output_distancias_vizcaya)
 write_csv(dataset_distancias_valencia, ruta_output_distancias_valencia)
@@ -884,9 +895,9 @@ print(resumen)
 
 ### 1.1.5. Cálculo de servicios públicos por distrito
 
-En este apartado se construyen los resúmenes finales por distritos de Valencia y Bilbao a partir de distintas capas de información geocodificada. Para ello, se utilizan las bases de zonas verdes, centros educativos y hospitales con coordenadas, junto con los archivos de delimitación territorial de los distritos de ambas ciudades: "delimitacion_distritos_valencia.json" y "delimitacion_distritos_bilbao.geojson".
+En este apartado se construyen los resúmenes finales por distritos de Valencia y Bilbao a partir de distintas capas de información geocodificada. Para ello, se utilizan las bases de zonas verdes, centros educativos y hospitales con coordenadas, junto con los archivos de delimitación territorial de los distritos de ambas ciudades: "delimitacion_distritos_valencia.geojson" y "delimitacion_distritos_bilbao.geojson".
 
-El objetivo es integrar la información espacial disponible para asignar cada elemento a su distrito correspondiente y obtener una síntesis territorial comparable entre ciudades. A partir de este proceso, se generan dos bases resumen, "datasets/valencia_resumen.csv" y "datasets/bilbao_resumen.csv", que recogen la información agregada por distrito y que servirán como base para los análisis posteriores a nivel urbano.
+El objetivo es integrar la información espacial disponible para asignar cada elemento a su distrito correspondiente y obtener una síntesis territorial comparable entre ciudades. A partir de este proceso, se generan dos bases resumen, "valencia_resumen.csv" y "bilbao_resumen.csv", que recogen la información agregada por distrito y que servirán como base para los análisis posteriores a nivel urbano.
 
 ##### Cargamos las librerías necesarias.
 El paquete `sf` es el núcleo de este notebook: nos permite leer geometrías, reproyectar coordenadas y hacer el cruce espacial entre puntos y polígonos. El resto son para lectura y transformación de datos.
@@ -921,11 +932,12 @@ ruta_output_bilbao   <- "bilbao_resumen.csv"
 ```
 
 ##### Cargamos y preparamos los distritos.
-Los dos archivos de distritos vienen en sistemas de coordenadas proyectadas (no en latitud/longitud directamente): Valencia en EPSG:25830 y Bilbao en EPSG:3042. Los reproyectamos ambos a WGS84 (EPSG:4326) para que sean compatibles con nuestros puntos. Además, el archivo de Bilbao contiene barrios, no distritos, así que los agrupamos por su campo `distrito` para obtener los polígonos a ese nivel.
+Los dos archivos de distritos vienen en sistemas de coordenadas proyectadas y los reproyectamos ambos a WGS84 (EPSG:4326) para que sean compatibles con nuestros puntos. El archivo de Valencia contiene polígonos de todos los municipios de la provincia, por lo que filtramos por el código INE de Valencia ciudad (`46250`) antes de disolver por distrito. Aplicamos `st_make_valid()` antes de la unión porque algunas geometrías tienen vértices duplicados que romperían la operación. En Bilbao, el archivo contiene barrios, así que los agrupamos por su campo `distrito` para obtener los polígonos a ese nivel.
 ```{r}
 # --- Valencia ---
 distritos_valencia <- st_read(ruta_distritos_valencia, quiet = TRUE) |>
   st_transform(4326) |>
+  filter(INE_MUN == "46250") |>
   st_make_valid() |>
   group_by(DISTRITO) |>
   summarise(geometry = st_union(geometry), .groups = "drop") |>
@@ -946,47 +958,78 @@ if ("distrito" %in% names(distritos_bilbao)) {
 cat("Distritos Bilbao:", nrow(distritos_bilbao), "\n")
 ```
 
-##### Creamos la función para leer los CSVs de puntos y convertirlos a objetos espaciales.
-Nuestros CSVs de colegios, hospitales y zonas verdes tienen coordenadas en texto, pero necesitamos convertirlos a objetos `sf` para poder hacer geometría con ellos. Esta función también elimina las filas sin coordenadas y acepta tanto punto como coma como separador decimal, ya que los archivos no son consistentes entre sí.
+##### Asignamos los nombres oficiales de los distritos.
+Los GeoJSON solo contienen el **número** de distrito (1, 2, ...), pero el resto del proyecto trabaja con los nombres oficiales (`ALGIROS`, `DEUSTU`, etc.). Aquí construimos un diccionario número → nombre y sustituimos la columna `distrito`. Los mapeos están sacados del padrón municipal de Valencia y del censo de Bilbao.
 ```{r}
-csv_a_sf <- function(ruta, col_lat = "lat", col_lon = "lon", decimal = ".") {
-  
-  # Elegimos la función de lectura según el separador decimal
-  df <- if (decimal == ",") {
-    read_csv2(ruta, show_col_types = FALSE)} else {
-    read_delim(ruta, delim = ";", show_col_types = FALSE)}
-  
-  # Limpiamos coordenadas: eliminamos filas con NA o valores no numéricos
+# --- Valencia ---
+nombres_valencia <- c(
+  "1"  = "CIUTAT VELLA",      "2"  = "L'EIXAMPLE",        "3"  = "EXTRAMURS",
+  "4"  = "CAMPANAR",          "5"  = "LA SAIDIA",          "6"  = "EL PLA DEL REAL",
+  "7"  = "L'OLIVERETA",       "8"  = "PATRAIX",            "9"  = "JESUS",
+  "10" = "QUATRE CARRERES",   "11" = "POBLATS MARITIMS",   "12" = "CAMINS AL GRAU",
+  "13" = "ALGIROS",           "14" = "BENIMACLET",         "15" = "RASCANYA",
+  "16" = "BENICALAP",         "17" = "POBLATS DEL NORD",   "18" = "POBLATS DE L'OEST",
+  "19" = "POBLATS DEL SUD")
+
+distritos_valencia <- distritos_valencia |>
+  mutate(distrito = unname(nombres_valencia[as.character(distrito)]))
+
+# --- Bilbao ---
+nombres_bilbao <- c(
+  "1" = "DEUSTU",            "2" = "URIBARRI",          "3" = "OTXARKOAGA-TXURDINAGA",
+  "4" = "BEGOÑA",            "5" = "IBAIONDO",          "6" = "ABANDO",
+  "7" = "ERREKALDE",         "8" = "BASURTU-ZORROTZA")
+
+distritos_bilbao <- distritos_bilbao |>
+  mutate(distrito = unname(nombres_bilbao[as.character(distrito)]))
+
+cat("Valencia:\n"); print(distritos_valencia$distrito)
+cat("\nBilbao:\n"); print(distritos_bilbao$distrito)
+```
+
+##### Creamos la función para leer los CSVs de puntos y convertirlos a objetos espaciales.
+Los CSVs de colegios, hospitales y zonas verdes vienen con formatos no homogéneos: algunos usan `;` como separador de columnas y otros `,`; algunas coordenadas usan `.` como decimal y otras `,`. Para gestionar todos los casos sin parámetros adicionales, la función detecta automáticamente el separador mirando la primera línea, fuerza la lectura como texto (`col_character()`) para que `read_delim` no malinterprete las comas decimales como separadores de miles, y normaliza después con `gsub` antes de convertir a numérico.
+```{r}
+csv_a_sf <- function(ruta, col_lat = "lat", col_lon = "lon") {
+
+  # Detectar separador de columnas: si la primera línea contiene ";", úsalo
+  primera_linea <- readLines(ruta, n = 1, warn = FALSE)
+  sep <- if (grepl(";", primera_linea)) ";" else ","
+
+  df <- read_delim(ruta, delim = sep, show_col_types = FALSE,
+                   col_types = cols(.default = col_character()))
+
+  # lat/lon llegan siempre como texto, así que podemos normalizar coma decimal
+  # de forma uniforme antes de convertir a numérico.
   df <- df |>
     mutate(
       lat = as.numeric(gsub(",", ".", .data[[col_lat]])),
       lon = as.numeric(gsub(",", ".", .data[[col_lon]]))) |>
     filter(!is.na(lat), !is.na(lon))
-  
-  # Convertimos a objeto sf con CRS WGS84
+
   df |> st_as_sf(coords = c("lon", "lat"), crs = 4326)}
 ```
 
 ##### Cargamos los puntos de cada ciudad.
-Leemos los seis archivos de puntos y los convertimos a objetos espaciales usando la función anterior. Los hospitales usan coma como separador decimal y los colegios usan punto, así que lo indicamos en cada llamada.
+Leemos los seis archivos de puntos y los convertimos a objetos espaciales usando la función anterior. Como la función gestiona internamente las diferencias de formato, no hace falta pasar parámetros adicionales en cada llamada.
 ```{r}
 # --- Valencia ---
-colegios_valencia   <- csv_a_sf(ruta_colegios_valencia,  decimal = ".")
-hospitales_valencia <- csv_a_sf(ruta_hospitales_valencia, decimal = ",")
-zonas_valencia      <- csv_a_sf(ruta_zonas_valencia,      decimal = ",")
+colegios_valencia   <- csv_a_sf(ruta_colegios_valencia)
+hospitales_valencia <- csv_a_sf(ruta_hospitales_valencia)
+zonas_valencia      <- csv_a_sf(ruta_zonas_valencia)
 
-cat("Colegios Valencia:   ", nrow(colegios_valencia),   "\n")
-cat("Hospitales Valencia: ", nrow(hospitales_valencia), "\n")
-cat("Zonas verdes Valencia:", nrow(zonas_valencia),     "\n")
+cat("Colegios Valencia:    ", nrow(colegios_valencia),   "\n")
+cat("Hospitales Valencia:  ", nrow(hospitales_valencia), "\n")
+cat("Zonas verdes Valencia:", nrow(zonas_valencia),      "\n")
 
 # --- Bilbao ---
-colegios_bilbao   <- csv_a_sf(ruta_colegios_bilbao,   decimal = ".")
-hospitales_bilbao <- csv_a_sf(ruta_hospitales_bilbao,  decimal = ",")
-zonas_bilbao      <- csv_a_sf(ruta_zonas_bilbao,       decimal = ",")
+colegios_bilbao   <- csv_a_sf(ruta_colegios_bilbao)
+hospitales_bilbao <- csv_a_sf(ruta_hospitales_bilbao)
+zonas_bilbao      <- csv_a_sf(ruta_zonas_bilbao)
 
-cat("\nColegios Bilbao:    ", nrow(colegios_bilbao),   "\n")
-cat("Hospitales Bilbao:  ", nrow(hospitales_bilbao), "\n")
-cat("Zonas verdes Bilbao:", nrow(zonas_bilbao),      "\n")
+cat("\nColegios Bilbao:     ", nrow(colegios_bilbao),   "\n")
+cat("Hospitales Bilbao:   ", nrow(hospitales_bilbao), "\n")
+cat("Zonas verdes Bilbao: ", nrow(zonas_bilbao),      "\n")
 ```
 
 ##### Creamos la función de spatial join y conteo.
