@@ -144,7 +144,7 @@ municipios_valencia <- extraer_municipios(ruta_crudo_valencia, "Valencia")
 coords_valencia <- geocodificar_lista(municipios_valencia)
 ```
 
-##### Guardamos los archivos en cvs en la ruta indicada.
+##### Guardamos los archivos en csv en la ruta indicada.
 Este chunk depende de los anteriores, así que también va con `eval=FALSE`. Los CSVs ya existen en la carpeta del proyecto.
 ```{r, eval=FALSE}
 #csv de Vizcaya
@@ -1186,7 +1186,7 @@ head(municipios_valencia_base)
 dim(municipios_valencia_base)
 ```
 
-##### Comprobación de duplicados y cobertura
+##### Comprobación de duplicados y cobertura.
 ```{r}
 sum(duplicated(municipios_valencia_base$cod_municipio))
 sum(duplicated(municipios_valencia_base$nombre_municipio))
@@ -1702,7 +1702,7 @@ head(municipios_valencia_base[, c("nombre_municipio",
                                   "ratio_hospital")])
 ```
 
-##### Incorporación a la base principal.
+##### Comprobamos los resultados de ratio_hospital.
 ```{r}
 head(municipios_valencia_base[, c("nombre_municipio",
                                   "num_hospitales",
@@ -2039,7 +2039,7 @@ summary(
   municipios_valencia_base$pct_contratos_servicios)
 ```
 
-##### Creación de la naturaleza contractual de los municipios: Seleecionamos las variables de contratos utilizadas.
+##### Creación de la naturaleza contractual de los municipios: Seleccionamos las variables de contratos utilizadas.
 ```{r}
 vars_contratos <- c(
   "pct_contratos_agricultura",
@@ -4111,7 +4111,7 @@ En concreto, *pct_estudios_sup* presenta 4 valores faltantes, mientras que *prec
 
 Con el fin de dar respuesta al objetivo 1 del proyecto, se va a aplicar una técnica de clustering sobre los municipios de la provincia de Vizcaya, con el propósito de identificar perfiles municipales homogéneos a partir de sus características demográficas, socioeconómicas y de acceso a servicios. Antes de realizar este análisis, resulta necesario estudiar en profundidad las variables que formarán parte del mismo.
 
-La selección de variables se ha realizado a partir de un análisis previo de correlaciones (que se encuentra en el apartado "Objetivo 1" de este archivo), con el objetivo de evitar redundancias excesivas y conservar únicamente aquellas variables que aportan información relevante y complementaria para la caracterización de los municipios. En este sentido, se han priorizado indicadores expresados en porcentajes, ratios o distancias, ya que permiten comparar municipios de distinto tamaño en condiciones más homogéneas. A pesar de aún no haberse mostrado a esta altura del archivo dicho estudio de correlaciones, consideramos que los resultados obtenidos en él deben ser analizados exploratoriamente en este apartado de la creación del dataset de los municipios de Valencia debido a sus posibles posteriores tratamientos.
+La selección de variables se ha realizado a partir de un análisis previo de correlaciones (que se encuentra en el apartado "Objetivo 1" de este archivo), con el objetivo de evitar redundancias excesivas y conservar únicamente aquellas variables que aportan información relevante y complementaria para la caracterización de los municipios. En este sentido, se han priorizado indicadores expresados en porcentajes, ratios o distancias, ya que permiten comparar municipios de distinto tamaño en condiciones más homogéneas. A pesar de aún no haberse mostrado a esta altura del archivo dicho estudio de correlaciones, consideramos que los resultados obtenidos en él deben ser analizados exploratoriamente en este apartado de la creación del dataset de los municipios de Vizcaya debido a sus posibles posteriores tratamientos.
 
 Las variables finalmente seleccionadas recogen distintas dimensiones del fenómeno estudiado. Por una parte, *pct_extranjeros*, *indice_envejecimiento* y *pct_estudios_sup* permiten describir la composición demográfica y educativa de los municipios. Por otra, *ratio_colegios*, *distancia_centro_educativo*, *ratio_centros_salud*, *ratio_hospital* y *distancia_hospital* aportan información sobre la disponibilidad y accesibilidad de servicios básicos. A ello se suman variables de carácter socioeconómico y residencial, como *renta_media_hogar* y *esfuerzo_alquiler*, así como *pct_hogares_100mbps*, que recoge el nivel de conectividad digital. Finalmente, *pct_contratos_agricultura*, *pct_contratos_industria* y *pct_contratos_construccion* permiten aproximar la estructura productiva de cada municipio.
 
@@ -4461,7 +4461,7 @@ comparacion_estudios_xgb <- comparacion_estudios_xgb[order(-comparacion_estudios
 comparacion_estudios_xgb
 ```
 
-Construimos la base de entrenamiento final con el 100% de los municipios con *pct_estudios_sup* conocido
+Construimos la base de entrenamiento final con el 100% de los municipios con *pct_estudios_sup* conocido.
 ```{r}
 X_train_final_estudios_xgb <- municipios_bizkaia_base %>%
   filter(!is.na(pct_estudios_sup)) %>%
@@ -5067,7 +5067,7 @@ Con el fin de dar respuesta al objetivo 2 del proyecto, se va a aplicar una téc
 
 La selección de variables se ha realizado a partir de un análisis previo de correlaciones (que se encuentra en el apartado "Objetivo 2" de este archivo), con el objetivo de evitar redundancias excesivas y conservar únicamente aquellas variables que aportan información relevante y complementaria para la caracterización de los municipios. En este sentido, se han priorizado indicadores expresados en porcentajes, ratios o distancias, ya que permiten comparar municipios de distinto tamaño en condiciones más homogéneas. A pesar de aún no haberse mostrado a esta altura del archivo dicho estudio de correlaciones, consideramos que los resultados obtenidos en él deben ser analizados exploratoriamente en este apartado de la creación del dataset de los distritos de Valencia debido a sus posibles posteriores tratamientos.
 
-Las variables finalmente seleccionadas recogen distintas dimensiones del fenómeno estudiado. Por una parte, *indice_envejecimiento* permite aproximar la estructura demográfica de cada distrito. Por otra, *ratio_colegio* y *ratio_hospital* aportan información sobre la disponibilidad de estso servicios. Además, *esfuerzo_alquiler* incorpora una dimensión socioeconómica, mientras que *ratio_zonas_verdes* permite aproximar la presencia de espacios verdes dentro de cada distrito.
+Las variables finalmente seleccionadas recogen distintas dimensiones del fenómeno estudiado. Por una parte, *indice_envejecimiento* permite aproximar la estructura demográfica de cada distrito. Por otra, *ratio_colegio* y *ratio_hospital* aportan información sobre la disponibilidad de estos servicios. Además, *esfuerzo_alquiler* incorpora una dimensión socioeconómica, mientras que *ratio_zonas_verdes* permite aproximar la presencia de espacios verdes dentro de cada distrito.
 
 A continuación, se realiza un análisis exploratorio en profundidad de estas variables:
 
@@ -5121,7 +5121,7 @@ Generamos la variable respuesta de entrenamiento para la validación.
 y_train_valencia_xgb <- train_data_valencia$alquiler_m2
 ```
 
-Ajustmaos el modelo XGBoost de validación.
+Ajustamos el modelo XGBoost de validación.
 ```{r}
 set.seed(123)
 
@@ -5448,7 +5448,7 @@ sum(is.na(distritos_bilbao_base$indice_envejecimiento))
 
 ##### BLOQUE EDUCATIVO
 
-##### Lectura del resumen de Bilbao (conteo del número de hospitales, centros educativos y zonas verdes)..
+##### Lectura del resumen de Bilbao (conteo del número de hospitales, centros educativos y zonas verdes).
 ```{r}
 bilbao_resumen <- read_delim("bilbao_resumen.csv", delim = ";", show_col_types = FALSE)
 
@@ -5618,7 +5618,7 @@ distritos_bilbao_base %>%
   head(8)
 ```
 
-#### BLOQUE DE ZONAS VERDES
+##### BLOQUE DE ZONAS VERDES
 
 ##### Incorporación de la variable *num_zonas_verdes*.
 ```{r}
@@ -5885,11 +5885,11 @@ El primer objetivo consiste en identificar y caracterizar distintos tipos de mun
 
 ## 2.1 Estudio de correlación municipios
 
-Se realiza un estudio de correlación previa al clustering para seleccionar las variables a utilizar, tal y como se ha explicado anteriormente en apartados anteriores.
+Se realiza un estudio de correlación previa al clustering para seleccionar las variables a utilizar, tal y como se ha explicado en apartados anteriores.
 
 ##### PREPARACIONES INICIALES
 
-##### Cargamos de paquetes.
+##### Cargamos los paquetes necesarios.
 ```{r}
 library(dplyr)
 library(readr)
@@ -5898,7 +5898,7 @@ library(corrplot)
 library(tidyr)
 ```
 
-##### Leemos de los datasets finales de municipios.
+##### Leemos los datasets finales de municipios.
 ```{r}
 municipios_valencia <- read_csv("municipios_valencia_base_final.csv")
 municipios_vizcaya <- read_csv("municipios_vizcaya_base_final.csv")
@@ -5925,7 +5925,7 @@ setdiff(colnames(municipios_vizcaya), colnames(municipios_valencia))
 
 ##### ARMONIZACIÓN DE LAS VARIABLES DE MUNICIPIOS
 
-##### Unificacamos la variable binaria de internet.
+##### Unificamos la variable binaria de internet.
 ```{r}
 if ("internet_100mbps_mayor95" %in% colnames(municipios_valencia)) {
   municipios_valencia <- municipios_valencia %>%
@@ -5966,7 +5966,7 @@ municipios_vizcaya <- municipios_vizcaya %>%
 municipios_base <- bind_rows(municipios_valencia, municipios_vizcaya)
 ```
 
-##### Exploramosla base conjunta.
+##### Exploramos la base conjunta.
 ```{r}
 head(municipios_base)
 dim(municipios_base)
@@ -6412,7 +6412,7 @@ dim(municipios)
 table(municipios$provincia)
 ```
 
-#### Seleccionamos las variables activas del clustering.
+##### Seleccionamos las variables activas del clustering.
 Estas han sido seleccionadas tras realizar el estudio de correlación anterior. Para ello, creamos el objeto datos_clustering, que contiene únicamente dichas variables activas.
 ```{r}
 datos_clustering <- municipios %>%
@@ -7672,11 +7672,11 @@ c5 — Municipios equilibrados con alta conectividad digital. Perfil intermedio 
 El segundo objetivo consiste en identificar y caracterizar distintos tipos de distritos en Bilbao y Valencia. En este caso, el análisis se traslada a una escala más concreta, lo que permite profundizar en la diversidad interna de ambas ciudades y complementar la visión obtenida a nivel municipal.
 
 ## 3.1 Estudio de correlación distritos
-Se realiza un estudio de correlación previa al clustering para seleccionar las variables a utilizar, tal y como se ha explicado anteriormente en apartados anteriores.
+Se realiza un estudio de correlación previa al clustering para seleccionar las variables a utilizar, tal y como se ha explicado en apartados anteriores.
 
 ##### PREPARACIONES INICIALES
 
-##### Cargamos de paquetes.
+##### Cargamos los paquetes necesarios.
 ```{r}
 library(dplyr)
 library(readr)
@@ -7685,7 +7685,7 @@ library(corrplot)
 library(tidyr)
 ```
 
-##### Leemos de los datasets finales de distritos.
+##### Leemos los datasets finales de distritos.
 ```{r}
 distritos_valencia <- read_csv("distritos_valencia_base_final.csv")
 distritos_bilbao <- read_csv("distritos_bilbao_base_final.csv")
@@ -7836,7 +7836,7 @@ variabilidad_variables %>%
 
 ##### DEFINICIÓN DE LA BASE DE TRABAJO PARA EL ESTUDIO DE CORRELACIÓN
 
-##### Excleimos las variables identificadoras y descriptivas.
+##### Excluimos las variables identificadoras y descriptivas.
 ```{r}
 distritos_base %>%
   select(cod_distrito, nombre_distrito, nombre_distrito_norm, ciudad) %>%
@@ -7867,7 +7867,7 @@ distritos_corr_base <- distritos_base %>%
   select(all_of(variables_candidatas))
 ```
 
-##### Comprobamaosla base de trabajo.
+##### Comprobamosla base de trabajo.
 ```{r}
 head(distritos_corr_base)
 dim(distritos_corr_base)
@@ -9853,7 +9853,7 @@ En un principio las gráficas pretenden representar únicamente los tres distrit
 
 El gráfico de educación muestra un liderazgo claro de Otxarkoaga en Bilbao, que casi duplica el ratio del mejor distrito valenciano (Poblats Marítims). Llama la atención que en Bilbao todos los distritos analizados tienen cobertura, mientras que en Valencia aparecen distritos sin ningún tipo de oferta educativa en las pedanías, obligando a los residentes a desplazarse a otras zonas sí o sí.
 
-La infraestructura hospitalaria está muy concentrada en ambas ciudades. El valor en el ratio de hospitales que más destaca de las dos ciudades es el de Campanar, que sirve como principal proovedor de servicios sanitarios de Valencia. En Bilbao, el servicio está algo más repartido entre Otxarkoaga, Abando y Basurto, aunque en ambas capitales la realidad es que si no vives en unos pocos distritos específicos, lo normal es que el ratio hospitalario sea nulo.
+La infraestructura hospitalaria está muy concentrada en ambas ciudades. El valor en el ratio de hospitales que más destaca de las dos ciudades es el de Campanar, que sirve como principal proveedor de servicios sanitarios de Valencia. En Bilbao, el servicio está algo más repartido entre Otxarkoaga, Abando y Basurto, aunque en ambas capitales la realidad es que si no vives en unos pocos distritos específicos, lo normal es que el ratio hospitalario sea nulo.
 
 ##### Comparación bloque residencial y económico
 En este bloque se comparan las variables relacionadas con la situación de alquileres y económica de los municipios. Para ello se analizan el precio por metro cuadrado de alquiler (*alquiler_m2*), la renta media del hogar (*renta_media_hogar*) y el esfuerzo de alquiler (*esfuerzo_alquiler*). Estas variables permiten valorar si existen diferencias entre ambas ciudades en términos de nivel de renta, coste de la vivienda y presión económica asociada al alquiler.
@@ -9993,7 +9993,7 @@ ggplot(extremos_zonas_verdes, aes(x = reorder(nombre_distrito_norm, ratio_zonas_
   theme(legend.position = "none",
         axis.text.y = element_text(size = 9))
 ```
-Esta gráfica de piruletas demuestra gráficamente la superioridad de Bilbao en infraestructura verde, situando a Otxarkoaga y Basurto como los principales proovedores de entornos verdes de la ciudad. En Valencia, la distribución es mucho más desigual, ya que mientras que Campanar destaca masivamente como un caso excepcional, las pedanías periféricas aparecen en el extremo opuesto con ratios nulos. Esto indica que, aunque Bilbao tiene más verde en general, Valencia concentra sus mejores espacios naturales en unos pocos puntos clave, dejando a los distritos de la periferia con un acceso muy limitado a zonas ajardinadas.
+Esta gráfica de piruletas demuestra gráficamente la superioridad de Bilbao en infraestructura verde, situando a Otxarkoaga y Basurto como los principales proveedores de entornos verdes de la ciudad. En Valencia, la distribución es mucho más desigual, ya que mientras que Campanar destaca masivamente como un caso excepcional, las pedanías periféricas aparecen en el extremo opuesto con ratios nulos. Esto indica que, aunque Bilbao tiene más verde en general, Valencia concentra sus mejores espacios naturales en unos pocos puntos clave, dejando a los distritos de la periferia con un acceso muy limitado a zonas ajardinadas.
 
 ##### ANÁLISIS GENERALES
 Una vez analizados los distintos bloques de variables por separado, realizamos una resumen global de la comparación entre los municipios de Valencia y Vizcaya. 
@@ -10356,7 +10356,7 @@ En las variables laborales, ambas ciudades se sitúan por encima de la media en 
 
 En conjunto, el perfil estandarizado resume bien la comparación: Valencia destaca por diversidad y formación, mientras que Bilbao destaca por renta, envejecimiento y presión residencial.
 
-#### COMPARACIÓN DE LA ESTRUCTURA DE CONTRATOS POR SECTOR
+##### COMPARACIÓN DE LA ESTRUCTURA DE CONTRATOS POR SECTOR
 Para completar la comparación laboral, se representa la distribución porcentual de los contratos por sector en ambas ciudades. Este gráfico permite observar con mayor detalle la composición interna del mercado laboral de Valencia y Bilbao.
 ```{r}
 contratos_ciudades <- ciudades %>%
