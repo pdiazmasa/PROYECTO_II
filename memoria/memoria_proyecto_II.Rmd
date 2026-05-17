@@ -14,6 +14,37 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r}
+library(tidyverse)
+library(httr)
+library(jsonlite)
+library(knitr)
+library(readxl)
+library(sf)
+library(osrm)
+library(dplyr)
+library(readr)
+library(tidyr)
+library(stringr)
+library(stringi)
+library(xgboost)
+library(ggplot2)
+library(corrplot)
+library(cluster)
+library(factoextra)
+library(NbClust)
+library(gridExtra)
+library(PLSandO)
+library(plotly)
+library(clValid)
+library(aricode)
+library(biostatcolors)
+library(ggrepel)
+library(scales)
+library(kableExtra)
+```
+
+
 # 1. Creación y AED de los datasets
 
 
@@ -25,14 +56,6 @@ knitr::opts_chunk$set(echo = TRUE)
 En este apartado se realiza la geocodificación de los municipios de Vizcaya y Valencia a partir de las bases de datos correspondientes a sus censos. El objetivo es obtener las coordenadas geográficas de cada municipio para poder utilizarlas posteriormente en análisis espaciales, representaciones cartográficas o visualizaciones relacionadas con la localización territorial de los municipios.
 
 Para ello, se emplea la API de Nominatim, perteneciente a OpenStreetMap, que permite obtener coordenadas de forma gratuita y sin necesidad de clave de acceso. Como resultado de este proceso, se generan dos nuevas bases con información geográfica: "municipios_bizkaia_coords.csv" y "municipios_valencia_coords.csv", que incorporan las coordenadas asociadas a cada municipio.
-
-##### Cargamos las librerías necesarias.
-```{r}
-library(tidyverse) #Leer, limpiar, transformar datos
-library(httr) #Llamar a Nominatim para las coordenadas
-library(jsonlite) #Leer la respuesta JSON
-library(knitr)
-```
 
 ##### Fijamos las rutas de entrada (bases de datos) y de salida (datasets hechos).
 ```{r}
@@ -158,14 +181,6 @@ write_csv(coords_valencia, ruta_output_valencia)
 ### 1.1.2. Geocodificación de hospitales y centros educativos
 
 En este segundo apartado geocodificamos los servicios que después utilizaremos para calcular la accesibilidad territorial de cada municipio. En concreto, trabajamos con dos tipos de equipamientos: hospitales y centros educativos. Para ello, partimos de las bases de datos crudas de Vizcaya y Valencia, limpiamos las variables mínimas necesarias para geocodificar cada registro y, a continuación, consultamos la API de Nominatim para obtener sus coordenadas geográficas. En el caso de educación, no consideramos todos los centros de la base, sino únicamente aquellos vinculados con educación primaria y secundaria, ya que son los que utilizaremos después en la creación de los datasets para las variables *num_colegios*, *ratio_colegios* y *distancia_centro_educativo*. El resultado final de este apartado son cuatro datasets geocodificados: hospitales de Vizcaya, hospitales de Valencia, centros educativos de Vizcaya y centros educativos de Valencia.
-
-##### Cargamos las librerías que necesitaremos.
-```{r}
-library(tidyverse) #Leer, limpiar, transformar datos
-library(httr) #Llamar a Nominatim para las coordenadas
-library(jsonlite) #Leer la respuesta JSON
-library(readxl) #Leer los archivos .xls
-```
 
 ##### Fijamos las rutas de entrada (bases de datos) y de salida (datasets hechos).
 ```{r}
@@ -487,13 +502,8 @@ write_delim(centros_valencia_export, ruta_output_centros_valencia, delim = ";")
 En este tercer apartado se construyen los datasets finales de distancias para Vizcaya y Valencia. Para ello, se parte de los municipios geocodificados y de los servicios geocodificados en el apartado anterior.
 En primer lugar, se estandarizan los nombres de municipio para mejorar los cruces textuales. Después, se comprueba si cada municipio dispone de hospital o centro educativo propio; en ese caso, se asigna una distancia de 0, al encontrarse el servicio en el propio municipio. En caso contrario, se calcula la distancia euclídea desde el municipio a todos los servicios válidos de su provincia, se selecciona el más cercano y se intenta obtener la distancia real en coche mediante OSRM. Si no es posible calcular la ruta, se utiliza la distancia euclídea como valor de respaldo. Como resultado final, se obtienen dos tablas, una para Valencia y otra para Vizcaya, con las columnas municipio, distancia_centro_educativo y distancia_hospital.
 
-##### Cargamos las librerías necesarias.
+##### Fijamos el servidor público de OSRM para calcular distancias en coche.
 ```{r}
-library(tidyverse)
-library(sf)
-library(osrm)
-
-# Fijamos el servidor público de OSRM para calcular distancias en coche
 options(
   osrm.server = "https://router.project-osrm.org/",
   osrm.profile = "car")
@@ -766,13 +776,6 @@ write_csv(dataset_distancias_valencia, ruta_output_distancias_valencia)
 
 En este apartado se realiza la geocodificación de las zonas verdes de Valencia y Bilbao. Para ello, se utiliza OpenStreetMap a través de la API Overpass, una fuente gratuita y sin necesidad de clave de acceso. La consulta se realiza mediante el paquete osmdata, que permite acceder a OpenStreetMap desde R. Además, se utiliza el paquete sf para gestionar los objetos geoespaciales, como polígonos o puntos, mientras que el resto de paquetes se emplean para la manipulación y exportación de los datos. Como resultado de este proceso, se generan dos datasets con las coordenadas de las zonas verdes: "zonas_verdes_valencia_coords.csv" y "zonas_verdes_bilbao_coords.csv".
 
-##### Cargamos las librerías necesarias.
-```{r}
-library(sf)
-library(dplyr)
-library(readr)
-```
-
 ##### Fijamos las rutas de entrada (bases de datos) y de salida (datasets hechos).
 ```{r}
 # GeoJSON de entrada
@@ -893,15 +896,6 @@ resumen
 En este apartado se construyen los resúmenes finales por distritos de Valencia y Bilbao a partir de distintas capas de información geocodificada. Para ello, se utilizan las bases de zonas verdes, centros educativos y hospitales con coordenadas, junto con los archivos de delimitación territorial de los distritos de ambas ciudades: "delimitacion_distritos_valencia.geojson" y "delimitacion_distritos_bilbao.geojson".
 
 El objetivo es integrar la información espacial disponible para asignar cada elemento a su distrito correspondiente y obtener una síntesis territorial comparable entre ciudades. A partir de este proceso, se generan dos bases resumen, "valencia_resumen.csv" y "bilbao_resumen.csv", que recogen la información agregada por distrito y que servirán como base para los análisis posteriores a nivel urbano.
-
-##### Cargamos las librerías necesarias.
-El paquete `sf` es el núcleo de este notebook: nos permite leer geometrías, reproyectar coordenadas y hacer el cruce espacial entre puntos y polígonos. El resto son para lectura y transformación de datos.
-```{r}
-library(sf)      # Geometría espacial y spatial join
-library(dplyr)   # Transformación de datos
-library(readr)   # Lectura y escritura de CSVs
-library(tidyr)
-```
 
 ##### Fijamos las rutas de entrada y salida.
 ```{r}
@@ -1088,17 +1082,6 @@ write_csv2(resumen_bilbao,   ruta_output_bilbao)
 En este apartado se construye el dataset final de municipios de Valencia a partir de distintas fuentes de información municipal. El objetivo es integrar en una única tabla variables demográficas, educativas, sanitarias, residenciales, económicas, laborales y digitales, utilizando el código y el nombre normalizado del municipio como elementos principales de unión entre bases.
 
 Para ello, primero se prepara la base censal principal y, posteriormente, se van incorporando los distintos bloques de información mediante procesos de limpieza, normalización, agregación y unión de datos. Como resultado final, se obtiene el archivo "municipios_valencia_base_final.csv", que servirá como base para los análisis exploratorios, comparativos y de clustering posteriores.
-
-##### PREPARACIONES INICIALES
-
-##### Cargamos los paquetes necesarios.
-```{r}
-library(dplyr)
-library(readr)
-library(readxl)
-library(stringr)
-library(stringi)
-```
 
 ##### Creamos la función de normalización de municipios.
 ```{r}
@@ -1347,7 +1330,7 @@ head(estudios_sup_muni)
 dim(estudios_sup_muni)
 ```
 
-##### Calculamos la variable *pct_estudios_sup*
+##### Calculamos la variable *pct_estudios_sup*.
 Una vez obtenidos el total de población y la población con estudios superiores, se calcula el porcentaje correspondiente para cada municipio.
 ```{r}
 pct_estudios_sup <- left_join(total_estudios,
@@ -1511,7 +1494,7 @@ dim(ap)
 colnames(ap)
 ```
 
-##### Revisamos los tipos de centro que existen en la base de datos
+##### Revisamos los tipos de centro que existen en la base de datos.
 Antes de construir las variables, revisamos qué categorías aparecen en la variable TIPO CENTRO de la base de datos, ya que nos interesa distinguir entre CENTRO SALUD y CONSULTORIO LOCAL.
 ```{r}
 table(ap$`TIPO CENTRO`)
@@ -1595,7 +1578,7 @@ sum(is.na(municipios_valencia_base$num_centros_salud))
 sum(is.na(municipios_valencia_base$ratio_centros_salud))
 ```
 
-##### Construcción de la variable *`*consultorio_local*`*
+##### Construcción de la variable *consultorio_local*.
 Construimos una variable binaria que valga 1 si el municipio tiene en la base de datos al menos un registro con TIPO CENTRO == "CONSULTORIO LOCAL" y 0 en caso contrario.
 ```{r}
 consultorio_muni <- ap %>%
@@ -1647,7 +1630,7 @@ head(hospitales[, c("Municipio",
                     "nombre_municipio_norm")])
 ```
 
-##### Corregimos manualmente ciertos nombres de municipios
+##### Corregimos manualmente ciertos nombres de municipios.
 ```{r}
 hospitales$nombre_municipio_join <- hospitales$nombre_municipio_norm
 
@@ -1702,7 +1685,7 @@ head(municipios_valencia_base[, c("nombre_municipio",
                                   "ratio_hospital")])
 ```
 
-##### Comprobamos los resultados de ratio_hospital.
+##### Comprobamos los resultados de *ratio_hospital*.
 ```{r}
 head(municipios_valencia_base[, c("nombre_municipio",
                                   "num_hospitales",
@@ -1866,7 +1849,7 @@ length(unique(renta_muni$cod_municipio))
 summary(renta_muni$renta_media_hogar)
 ```
 
-##### Incorporación de la variable *renta_media_hogar*`*.
+##### Incorporación de la variable *renta_media_hogar*.
 A continuación, se calcula la variable *esfuerzo_alquiler*, que aproxima el porcentaje de renta media del hogar destinado al pago del alquiler.
 ```{r}
 municipios_valencia_base <- left_join(municipios_valencia_base,
@@ -2345,11 +2328,6 @@ municipios_valencia_base <- municipios_valencia_base %>%
 
 ##### Imputación del alquiler mediante XGBoost.
 Imputaremos los valores faltantes tanto de *alquiler_m2* como de *pct_estudios_sup* mediante un modelo de regresión XGBoost, realizando previamente una prueba del modelo con el 80% de los municipios que sí que tengan valor para entrenar al modelo, y el 20% restante para probarlo. De esta forma se podrán comparar sus valores reales en alquiler/estudios superiores con la estimación proporcionada por el modelo antes de imputar y comprobar el error del modelo.
-```{r}
-# Carga de los paquetes necesarios
-library(xgboost)
-library(dplyr)
-```
 
 A continuación, seleccionamos los municipios con alquiler conocido para validar el modelo.
 ```{r}
@@ -2879,15 +2857,6 @@ En este apartado se construye el dataset final de municipios de Vizcaya a partir
 Para ello, se parte de la base censal de municipios y se van incorporando progresivamente los distintos bloques de información mediante procesos de limpieza, normalización, agregación, cálculo de indicadores e imputación de valores faltantes. Como resultado final, se obtiene una base depurada y preparada para los análisis exploratorios, comparativos y de clustering posteriores.
 
 ##### PREPARACIONES INICIALES
-
-##### Cargamos los paquetes necesarios.
-```{r}
-library(dplyr)
-library(readr)
-library(readxl)
-library(stringr)
-library(stringi)
-```
 
 ##### Creamos la función de normalización de municipios.
 ```{r}
@@ -4140,11 +4109,6 @@ En las variables seleccionadas para clustering se mantiene el patrón de faltant
 
 ##### Imputación del alquiler mediante XGBoost.
 Imputaremos los valores faltantes tanto de *alquiler_m2* como de *pct_estudios_sup* mediante un modelo de regresión XGBoost, realizando previamente una prueba del modelo con el 80% de los municipios que sí que tengan valor para entrenar al modelo, y el 20% restante para probarlo. De esta forma se podrán comparar sus valores reales en alquiler/estudios superiores con la estimación proporcionada por el modelo antes de imputar y comprobar el error del modelo.
-```{r}
-# Carga de los paquetes necesarios
-library(xgboost)
-library(dplyr)
-```
 
 Seleccionamos los municipios con alquiler conocido para validar el modelo.
 ```{r}
@@ -4680,15 +4644,6 @@ En este apartado se construye el dataset final de distritos de Valencia a partir
 Para ello, se parte de la base censal de distritos y se incorporan progresivamente variables relacionadas con población, envejecimiento, centros educativos, hospitales, alquiler, renta, esfuerzo de alquiler y zonas verdes. Además, se realiza un análisis exploratorio de la base de datos obtenida. Como resultado final, se obtiene el archivo "distritos_valencia_base_final.csv", que servirá como base para los análisis posteriores del proyecto a nivel de distritos.
 
 ##### PREPARACIONES INICIALES
-
-##### Cargamos los paquetes necesarios.
-```{r}
-library(dplyr)
-library(readr)
-library(readxl)
-library(stringr)
-library(stringi)
-```
 
 ##### Creamos la función de normalización de distritos.
 ```{r}
@@ -5343,15 +5298,6 @@ Para ello, se parte de la base censal de distritos y se incorporan progresivamen
 
 ##### PREPARACIONES INICIALES
 
-##### Cargamos los paquetes necesarios.
-```{r}
-library(dplyr)
-library(readr)
-library(readxl)
-library(stringr)
-library(stringi)
-```
-
 ##### Creamos la función de normalización de distritos.
 ```{r}
 normalizar_distrito <- function(x) {
@@ -5889,15 +5835,6 @@ Se realiza un estudio de correlación previa al clustering para seleccionar las 
 
 ##### PREPARACIONES INICIALES
 
-##### Cargamos los paquetes necesarios.
-```{r}
-library(dplyr)
-library(readr)
-library(ggplot2)
-library(corrplot)
-library(tidyr)
-```
-
 ##### Leemos los datasets finales de municipios.
 ```{r}
 municipios_valencia <- read_csv("municipios_valencia_base_final.csv")
@@ -6382,18 +6319,6 @@ Esta visualización permitirá explorar de forma descriptiva la posible relació
 ## 2.2 Clustering municipios Valencia 
 
 En este apartado se realiza el clustering de los municipios de Valencia a partir del dataset municipal final. Para ello, se seleccionan y estandarizan las variables activas, se comprueba la tendencia al agrupamiento, se determina el número de clústeres y se comparan distintos métodos de clustering. Finalmente, se interpreta la solución obtenida mediante perfiles medios, PCA y variables complementarias como naturaleza_contratos.
-
-##### Cargamos los paquetes necesarios.
-```{r}
-library(tidyverse)
-library(readr)
-library(cluster)
-library(factoextra)
-library(NbClust)
-library(gridExtra)
-library(PLSandO)
-library(plotly)
-```
 
 ##### Cargamos el dataset final de municipios de Valencia.
 ```{r}
@@ -7044,16 +6969,6 @@ c6 — Municipios urbanos con alta formación y presión de alquiler Esfuerzo de
 
 En este apartado se realiza el clustering de los municipios de Vizcaya a partir del dataset municipal final. Para ello, se seleccionan y estandarizan las variables activas, se comprueba la tendencia al agrupamiento, se determina el número de clústeres y se comparan distintos métodos de clustering. Finalmente, se interpreta la solución obtenida mediante perfiles medios, PCA y variables complementarias como naturaleza_contratos.
 
-##### Cargamos los paquetes necesarios.
-```{r}
-library(tidyverse)
-library(readr)
-library(cluster)
-library(factoextra)
-library(NbClust)
-library(gridExtra)
-```
-
 ##### Cargamos el dataset final de municipios de Vizcaya.
 ```{r}
 municipios_vizcaya <- read_csv("municipios_vizcaya_base_final.csv", show_col_types = FALSE)
@@ -7403,7 +7318,6 @@ datos_interpretacion <- bind_cols(
 misclust <- municipios_cluster$cluster_kmeans
 
 # PCA sobre la matriz utilizada en el clustering
-library(PLSandO)
 miPCA <- pca(
   matriz_clustering,
   scaling = "none")
@@ -7544,8 +7458,6 @@ round(tabla_naturaleza_pct, 2)
 ```
 Finalmente, se representa gráficamente la solución jerárquica coloreando los municipios según la variable *naturaleza_contratos*. De esta forma, se puede observar si la estructura de los clústeres se relaciona visualmente con la naturaleza predominante de los contratos.
 ```{r}
-library(plotly)
-
 pca_plot_datos <- as.data.frame(prcomp(matriz_clustering)$x[, 1:2])
 
 pca_plot_datos <- pca_plot_datos %>%
@@ -7675,15 +7587,6 @@ El segundo objetivo consiste en identificar y caracterizar distintos tipos de di
 Se realiza un estudio de correlación previa al clustering para seleccionar las variables a utilizar, tal y como se ha explicado en apartados anteriores.
 
 ##### PREPARACIONES INICIALES
-
-##### Cargamos los paquetes necesarios.
-```{r}
-library(dplyr)
-library(readr)
-library(ggplot2)
-library(corrplot)
-library(tidyr)
-```
 
 ##### Leemos los datasets finales de distritos.
 ```{r}
@@ -8121,16 +8024,6 @@ En este apartado se realiza el análisis de clustering de los distritos de Valen
 
 Para ello, se seleccionan las variables relevantes, se revisan los valores faltantes y se estandarizan los datos antes de calcular la matriz de distancias. Posteriormente, se analiza la tendencia de agrupamiento, se determina un número adecuado de clústeres y se comparan distintos métodos de clustering, como el jerárquico, k-medias y PAM. Finalmente, se interpretan los grupos obtenidos mediante perfiles medios y representación PCA, con el fin de caracterizar los distintos tipos de distritos de Valencia.
 
-##### Cargamos los paquetes necesarios.
-```{r}
-library(tidyverse)
-library(readr)
-library(cluster)
-library(factoextra)
-library(NbClust)
-library(gridExtra)
-```
-
 ##### Cargamos el dataset final de distritos de Valencia.
 ```{r}
 distritos_valencia_base <- read_csv("distritos_valencia_base_final.csv", show_col_types = FALSE)
@@ -8471,7 +8364,6 @@ datos_interpretacion <- bind_cols(
 misclust <- distritos_cluster$cluster_pam
 
 # PCA sobre la matriz utilizada en el clustering
-library(PLSandO)
 miPCA <- pca(
   matriz_clustering,
   scaling = "none")
@@ -8621,23 +8513,6 @@ c5 — Distritos con baja dotación educativa y presión residencial. Envejecimi
 En este apartado se realiza el análisis de clustering de los distritos de Bilbao a partir del dataset final construido previamente. El objetivo es identificar grupos de distritos con características similares en función de variables demográficas, residenciales, sanitarias y de servicios.
 
 Para ello, se seleccionan las variables relevantes, se revisan los valores faltantes y se estandarizan los datos antes de calcular la matriz de distancias. Posteriormente, se analiza la tendencia de agrupamiento, se determina un número adecuado de clústeres y se comparan distintos métodos de clustering, como el jerárquico, k-medias y PAM. Finalmente, se interpretan los grupos obtenidos mediante perfiles medios y representación PCA, con el fin de caracterizar los distintos tipos de distritos de Bilbao.
-
-##### Cargamos los paquetes necesarios.
-
-```{r}
-library(tidyverse)
-library(readr)
-library(NbClust)
-library(gridExtra)
-library(knitr)
-library(cluster)
-library(readr)
-library(factoextra)
-library(clValid)
-library(PLSandO)
-library(aricode)
-library(biostatcolors)
-```
 
 ##### Cargamos el dataset final de distritos de Bilbao
 ```{r}
@@ -9153,13 +9028,6 @@ Para ello, se integran ambas bases en un único conjunto de datos incorporando u
 
 ##### PREPARACIONES INICIALES
 
-##### Cargamos los paquetes necesarios.
-```{r}
-library(tidyverse)
-library(readr)
-library(gridExtra)
-```
-
 ##### Cargamos las bases finales de municipios de Vizcaya y Valencia eliminando sus capitales de provincia. 
 Observamos que hay 39 municipios en el dataset de Vizcaya y 210 en el de Valencia. Además, comprobamos que en ambos hay 30 variables. Sin embargo, antes de realizar la comparación se eliminan las observaciones correspondientes a Bilbao y Valencia ciudad, ya que su análisis se llevará a cabo en otro apartado del proyecto.
 ```{r}
@@ -9618,14 +9486,6 @@ En este apartado se realiza una comparación entre los distritos de Bilbao y Val
 Para ello, se integran ambas bases en un único conjunto de datos incorporando una variable que identifica la ciudad de cada distrito. A partir de esta base conjunta, se realiza un análisis principalmente gráfico, complementado con algunos resúmenes descriptivos, con el fin de comparar la distribución de las variables y detectar patrones diferenciados entre los municipios de ambas provincias.
 
 ##### PREPARACIONES INICIALES
-
-##### Cargamos los paquetes necesarios.
-```{r}
-library(tidyverse)
-library(readr)
-library(gridExtra)
-library(ggrepel)
-```
 
 ##### Cargamos las bases finales de distritos de Valencia y Bilbao. 
 Observamos que hay 8 distritos en el dataset de Bilbao y 19 en el de Valencia. Además, comprobamos que en ambos hay 16 variables.
@@ -10118,14 +9978,6 @@ Para ello, se integran las bases municipales de Valencia y Vizcaya en un único 
 
 ##### PREPARACIONES INICIALES
 
-##### Cargamos los paquetes necesarios.
-```{r}
-library(tidyverse)
-library(readr)
-library(scales)
-library(knitr)
-```
-
 ##### Cargamos las bases finales de municipios de Valencia y Vizcaya.
 En primer lugar, cargamos las bases municipales finales de Valencia y Vizcaya y extraemos las observaciones correspondientes a las ciudades de Valencia y Bilbao.
 ```{r}
@@ -10419,14 +10271,6 @@ Este apartado incorpora la perspectiva del clustering a la comparación entre Vi
 
 Dado que los clústeres se han obtenido de forma independiente para cada territorio y escala, la comparación no se realiza a partir del número de clúster, sino a partir de las dimensiones que caracterizan cada grupo: envejecimiento, presión residencial, accesibilidad a servicios, dotación educativa, dotación sanitaria, conectividad digital y, en el caso municipal, naturaleza de los contratos como capa interpretativa secundaria.
 
-##### Cargamos los paquetes necesarios.
-```{r}
-library(tidyverse)
-library(knitr)
-library(kableExtra)
-library(cluster)
-```
-
 ##### CALIDAD DEL CLUSTERING
 
 ##### Seleccionamos las variables utilizadas en la comparación.
@@ -10718,13 +10562,6 @@ El quinto objetivo consiste en elaborar un motor de recomendación de lugar de r
 
 ## 6.1. Descripciones recomendador
 
-##### Cargamos los paquetes necesarios.
-```{r}
-library(readr)
-library(dplyr)
-library(stringr)
-```
-
 ##### Abrimos los datasets y los unimos  en uno solo.
 ```{r}
 descripciones <- read_delim("descripciones_municipios_solo_parrafo1.csv", delim = ";", show_col_types = FALSE)
@@ -10894,9 +10731,6 @@ write_delim(datos_final, "descripciones_municipios_completo.csv", delim = ";")
 Cargamos los dos datasets finales de municipios y añadimos la variable *provincia* para identificar si cada municipio pertenece a Valencia o Vizcaya.
 La conectividad digital no se incluye como pregunta directa del formulario porque las bases de partida ya han sido filtradas previamente para mantener municipios compatibles con un perfil de teletrabajo. Por tanto, el recomendador se centra en diferenciar los municipios según territorio, accesibilidad a servicios, esfuerzo residencial y perfil del entorno.
 ```{r}
-library(tidyverse)
-library(readr)
-
 valencia <- read_csv("municipios_valencia_base_final.csv",
                      show_col_types = FALSE) %>%
   mutate(provincia = "Valencia")
