@@ -2618,7 +2618,7 @@ faltante de renta_media_hogar se sustituirá por su mediana.
 
 ##### Imputación del alquiler mediante XGBoost.
 
-Sustituimos los NA de *renta_media_hogar* por la mediana.
+Antes que nada sustituimos el único NA de *renta_media_hogar* por su mediana.
 
 ```{r}
 municipios_valencia_base$`renta_media_hogar`[
@@ -4676,7 +4676,7 @@ probarlo. De esta forma se podrán comparar sus valores reales en
 alquiler/estudios superiores con la estimación proporcionada por el
 modelo antes de imputar y comprobar el error del modelo.
 
-Sustituimos los NA de *renta_media_hogar* por la mediana.
+Antes que nada sustituimos el único NA de *renta_media_hogar* por su mediana.
 
 ```{r}
 municipios_bizkaia_base$`renta_media_hogar`[
@@ -7447,7 +7447,7 @@ hopkins_municipios$hopkins_stat
 ```
 
 Como el estadístico de Hopkins presenta un valor de 0,9999951, y este es
-próximo a 1, nos indica una tendencia de agrupamiento clara, ya que los
+muy próximo a 1, nos indica una tendencia de agrupamiento clara, ya que los
 datos no parecen distribuirse de forma aleatoria en el espacio definido
 por las variables seleccionadas. Por tanto, con ello se justifica
 continuar con el análisis de clustering, aplicando distintos métodos
@@ -8106,7 +8106,7 @@ El análisis de clustering de los municipios de la provincia de Valencia
 ha permitido identificar seis perfiles diferenciados a partir de
 variables demográficas, socioeconómicas, educativas, sanitarias,
 digitales y de accesibilidad. Tras preparar y escalar los datos, se
-comprobó una tendencia de agrupamiento clara (Hopkins = 0,832). Para la
+comprobó una tendencia de agrupamiento clara (Hopkins = 0,9999951). Para la
 elección de k = 6, el gráfico de Silhouette muestra una zona estable con
 una ligera recuperación en k = 6 respecto a valores anteriores, mientras
 que el método del codo refleja una suavización progresiva de la
@@ -8118,8 +8118,8 @@ Se compararon tres métodos: clustering jerárquico con Ward.D2, k-medias
 y PAM. El método k-medias se selecciona como solución principal por
 obtener la mayor anchura de silueta media (0,18) y la distribución más
 equilibrada de municipios entre grupos, frente al método jerárquico, que
-genera clústeres de tamaño muy reducido (clúster 5 con apenas 2
-municipios) y presenta el clúster 1 con silueta negativa (-0,02), y PAM,
+genera clústeres de tamaño muy reducido (clúster 6 con apenas 2
+municipios) y presenta el clúster 1 con silueta negativa (-0,006), y PAM,
 que obtiene una silueta media de 0,16 con grupos también menos
 equilibrados.
 
@@ -8135,33 +8135,42 @@ engrupos específicos, como la orientación a servicios del clúster 1
 Finalmente, la caracterización propuesta de los clústeres obtenidos es
 la siguiente:
 
-c1 — Municipios jóvenes con baja accesibilidad sanitaria Envejecimiento
-bajo y ausencia de consultorio local. Presentan la mayor distancia media
-al hospital del conjunto, lo que los define como municipios con escasa
+c1 — Municipios jóvenes con buena accesibilidad sanitaria y mayor
+nivel formativo. Presentan el índice de envejecimiento más bajo, el
+mayor porcentaje de estudios superiores y una distancia media al
+hospital prácticamente nula. También son el único grupo con cierto
+ratio de hospital, por lo que no se caracterizan por una baja
 cobertura sanitaria próxima.
 
-c2 — Municipios equilibrados Perfil medio en todas las variables
-analizadas, sin destacar de forma notable en ninguna dimensión.
-Representan el grupo más numeroso y heterogéneo del análisis.
+c2 — Municipios muy envejecidos y con peor accesibilidad a servicios.
+Destacan por tener el índice de envejecimiento más elevado del
+conjunto, así como las mayores distancias medias al centro educativo
+y al hospital. Aunque presentan consultorio local, su distancia a
+otros servicios básicos es elevada.
 
-c3 — Municipios rurales con buena conectividad Envejecimiento medio con
-buena cobertura de internet de alta velocidad. Combinan un entorno rural
-con una dotación digital por encima de la media del conjunto.
+c3 — Municipios con envejecimiento medio-alto y buena dotación relativa
+de servicios básicos. Presentan el mayor ratio de centros de salud y
+un ratio de colegios elevado, aunque también muestran distancias altas
+al centro educativo y al hospital. Su esfuerzo de alquiler es el más
+bajo del conjunto.
 
-c4 — Municipios muy envejecidos Índice de envejecimiento muy elevado y
-ratio de colegios alto, lo que refleja una estructura demográfica
-envejecida con infraestructura educativa sobredimensionada respecto a la
-población actual.
+c4 — Municipios con mayor presión de alquiler y alta conectividad.
+Presentan el esfuerzo de alquiler más elevado y el mayor porcentaje de
+hogares con 100 Mbps. Además, tienen consultorio local y una distancia
+al hospital moderada, por lo que no destacan por mala accesibilidad
+sanitaria.
 
-c5 — Municipios rurales envejecidos con presión residencial
-Envejecimiento alto combinado con mayor distancia al hospital y esfuerzo
-de alquiler por encima de la media. Municipios que acumulan desventajas
-tanto de accesibilidad como de tensión en el mercado residencial.
+c5 — Municipios jóvenes con buena conectividad y presión residencial
+moderada-alta. Tienen un índice de envejecimiento bajo, buena
+proximidad al centro educativo y un porcentaje alto de hogares con
+100 Mbps. El esfuerzo de alquiler se sitúa por encima de varios
+clústeres, aunque no es el más elevado.
 
-c6 — Municipios urbanos con alta formación y presión de alquiler
-Esfuerzo de alquiler muy elevado, alto porcentaje de población con
-estudios superiores y baja distancia a servicios educativos ysanitarios.
-Perfil claramente urbano con mercado residencial tensionado.
+c6 — Municipios con alta dotación educativa relativa y perfil menos
+tensionado en alquiler. Presentan el mayor ratio de colegios y
+consultorio local, aunque tienen bajo porcentaje de estudios superiores
+y la menor presencia de población extranjera. La distancia al hospital
+es relativamente elevada y el esfuerzo de alquiler se mantiene bajo.
 
 ## 2.3 Clustering municipios Vizcaya
 
@@ -8316,10 +8325,6 @@ municipios con características similares.
 
 ##### Calculamos la tendencia de agrupamiento con el estadístico de Hopkins.
 
-Valores cercanos a 0,5 indican una distribución aproximadamente
-aleatoria, mientras que valores más próximos a 1 sugieren una mayor
-tendencia a formar clústeres.
-
 ```{r}
 set.seed(123)
 
@@ -8331,8 +8336,8 @@ hopkins_municipios <- get_clust_tendency(
 hopkins_municipios$hopkins_stat
 ```
 
-Como el estadístico de Hopkins presenta un valor de 0,9923886, y este es
-próximo a 1, nos indica una tendencia de agrupamiento clara, ya que los
+Como el estadístico de Hopkins presenta un valor de 0,9957041, y este es
+muy próximo a 1, nos indica una tendencia de agrupamiento clara, ya que los
 datos no parecen distribuirse de forma aleatoria en el espacio definido
 por las variables seleccionadas. Por tanto, con ello se justifica
 continuar con el análisis de clustering, aplicando distintos métodos
@@ -8395,10 +8400,10 @@ grid.arrange(p1, p2, nrow = 1)
 
 El gráfico de Silhouette alcanza su valor máximo en k = 2, aunque esta
 solución no es muy lógica para el objetivo del análisis. A partir de k =
-3 los valores se estabilizan en torno a 0,15–0,17, sin degradarse de
+3 los valores se estabilizan en torno a 0,15 y0,17, sin degradarse de
 forma apreciable al aumentar el número de clústeres. Por su parte, el
 método del codo muestra una caída pronunciada de la suma de cuadrados
-intra-clúster hasta k = 4–5, punto a partir del cual la pendiente se
+intra-clúster hasta k = 4 y k = 5, punto a partir del cual la pendiente se
 suaviza considerablemente. Teniendo en cuenta ambos criterios de forma
 conjunta, y con el objetivo de obtener una clasificación suficientemente
 granular que permita caracterizar perfiles diferenciados de municipios
@@ -8463,11 +8468,10 @@ table(municipios_cluster$cluster_jerarquico)
 ```
 
 La solución obtenida no reparte los municipios de forma totalmente
-equilibrada. Los clústeres 1, 2 y 3 concentran la mayor parte de las
-observaciones (53, 66 y 53 municipios respectivamente), mientras que el
-clúster 4 agrupa 32, y los clústeres 5 y 6 son notablemente más
-reducidos, con tan solo 4 y 2 municipios. Esta situación es habitual en
-datos territoriales, donde pueden existir municipios con perfiles muy
+equilibrada.El clúster 2 es el más numeroso con 12 municipios, mientras que 
+los clústeres 1, 3 y 4 contienen un buen número de municipios, con 7,9 y 9 respectivamente.
+Por otro lado, el clúster 5 es el más reducido, con tan solo 2 municipios. Esta situación
+es habitual en datos territoriales, donde pueden existir municipios con perfiles muy
 singulares que el método jerárquico tiende a aislar en grupos propios de
 tamaño reducido.
 
@@ -8542,7 +8546,7 @@ tabla_kmeans_pam
 Las tablas cruzadas permiten comparar las asignaciones obtenidas por los
 distintos métodos. En la comparación entre jerárquico y k-medias se
 aprecian correspondencias parciales: el clúster 2 jerárquico coincide en
-gran medida con el clúster 2 de k-medias (52 de 66 municipios), aunque
+gran medida con el clúster 1 de k-medias (10 de 12 municipios), aunque
 otros grupos se fragmentan de forma notable entre varios clústeres. La
 comparación con PAM muestra un grado de acuerdo similar, mientras que
 entre k-medias y PAM la correspondencia es la más baja de las tres. En
@@ -8583,10 +8587,9 @@ fviz_cluster(
 La solución de k-medias presenta una estructura general similar a la
 jerárquica, con grupos bien separados en los extremos del espacio PCA.
 Sin embargo, se aprecian diferencias notables en la zona central, donde
-los clústeres 3 y 5 del jerárquico se reorganizan de forma distinta en
+los clústeres 2, 3 y 4 del jerárquico se reorganizan de forma distinta en
 k-medias. El clúster 5 jerárquico, situado en la parte superior con solo
-2 municipios, pasa a integrarse como clúster 4 en k-medias con mayor
-tamaño, mientras que el clúster 1 jerárquico, compacto y bien separado a
+2 municipios es exactamente igual que en el k-medias, mientras que el clúster 1 jerárquico, compacto y bien separado a
 la izquierda, se mantiene con una estructura similar en ambos métodos.
 
 Por último, se visualiza también la solución obtenida mediante PAM.
@@ -8650,10 +8653,10 @@ par(mfrow = c(1, 1))
 Tras aplicar los tres métodos con k = 5, se selecciona el clustering
 k-medias como solución principal. Aunque el método jerárquico ofrece una
 partición visualmente más compacta, k-medias obtiene la mayor anchura de
-silueta media (0.19), frente a Ward (0.17) y PAM (0.13). Además, ningún
-clúster presenta valores de silueta negativos, lo que indica que todos
+silueta media (0.19), frente a Ward (0.16) y PAM (0.13). Como ningún
+clúster presenta valores de silueta negativos, sabemos que todos
 los municipios están correctamente asignados a su grupo. Además, el
-clúster 4 agrupa únicamente 2 municipios, lo que refleja la existencia
+clúster 5 agrupa únicamente 2 municipios, lo que refleja la existencia
 de un perfil claramente diferenciado dentro del territorio de Vizcaya.
 Por todo ello, k-medias se mantiene como la solución más adecuada en
 términos de calidad de agrupamiento.
@@ -8666,7 +8669,7 @@ los municipios. Como las variables ya se han centrado y escalado
 previamente para el clustering, aplicamos el PCA sobre matriz_clustering
 con scaling = "none".
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 vars_clustering <- c(
   "pct_extranjeros",
   "indice_envejecimiento",
@@ -8714,7 +8717,7 @@ componentes principales. Para la interpretación gráfica se seleccionan
 cuatro componentes, de forma que se pueda visualizar la PC1 frente a la
 PC2 y la PC3 frente a la PC4, sin repetir componentes.
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 p1 <- pcaPlot(
   miPCA,
   type = "scores",
@@ -8756,8 +8759,8 @@ p4
 ```
 
 A partir de los gráficos de puntuaciones, se observa que en el plano
-PC1-PC2 el clúster 4 queda claramente aislado en la zona inferior, con
-valores muy negativos en PC2, mientras que los clústeres 1, 2 y 5
+PC1-PC2 el clúster 5 queda claramente aislado en la zona inferior, con
+valores muy negativos en PC2, mientras que los clústeres 1, 2 y 4
 presentan cierto solapamiento en la zona central y el clúster 3 se sitúa
 a la izquierda bien diferenciado. En el plano PC3-PC4, la separación
 entre grupos es menor y el solapamiento aumenta notablemente, lo que
@@ -8765,12 +8768,13 @@ indica que las tercera y cuarta componentes aportan información
 complementaria pero menos discriminante.
 
 Los gráficos de correlaciones muestran que en PC1-PC2 las variables más
-discriminantes son distancia_hospital, distancia_centro_educativo y
+discriminantes sondistancia_centro_educativo y
 pct_estudios_sup hacia valores negativos de PC1, frente a
 pct_hogares_100mbps, esfuerzo_alquiler y ratio_centros_salud en sentido
-positivo. En PC3-PC4 destaca el índice de envejecimiento como la
-variable de mayor contribución, seguida del esfuerzo de alquiler y el
-consultorio_local. En conjunto, la accesibilidad a servicios, el nivel
+positivo, y para PC2 destacan ratio_distancia_hospital y ratio_colegios. 
+En PC3-PC4 destaca el índice de envejecimiento como la variable de mayor 
+contribución, seguida del esfuerzo de alquiler y el consultorio_local.
+En conjunto, la accesibilidad a servicios, el nivel
 formativo y el envejecimiento son las dimensiones que más estructuran la
 variabilidad entre los municipios de Vizcaya.
 
@@ -8836,22 +8840,26 @@ legend(
   ncol = 1)
 ```
 
-El análisis del perfil medio de los cinco clústeres permite caracterizar
-cada grupo a partir de las variables activas utilizadas en el
-clustering. El índice de envejecimiento es la variable que presenta
-mayor variabilidad entre clústeres, con el clúster 3 destacando como el
-más envejecido, seguido de cerca por los clústeres 2 y 4. En el extremo
-opuesto, el clúster 4 registra los valores más bajos de envejecimiento,
-apuntando a un perfil de municipios más jóvenes. El esfuerzo de alquiler
-y el porcentaje de hogares con 100 Mbps son las otras dos variables que
-más diferencian los grupos, con el clúster 2 destacando en ambas. La
-distancia al hospital presenta un comportamiento dispar, siendo
-especialmente elevada en el clúster 4. En cambio, variables como el
-ratio de centros de salud, el ratio de colegios o el ratio de hospital
-muestran valores bajos y similares en todos los grupos, contribuyendo
-menos a la diferenciación. En conjunto, el envejecimiento, la presión
-del alquiler y la conectividad digital son las dimensiones que más
-estructuran los perfiles municipales de Vizcaya.
+El análisis del perfil medio de los cinco clústeres muestra que los grupos
+se diferencian principalmente por la combinación de variables demográficas,
+socioeconómicas y de accesibilidad a servicios. El índice de envejecimiento
+presenta diferencias claras, con el clúster 3 como el más envejecido, 
+seguido del clúster 2, mientras que el clúster 5 es el menos envejecido.
+En cuanto al porcentaje de estudios superiores, destacan los clústeres 5 y 3,
+frente al clúster 2, que presenta el valor más bajo.
+Respecto a los servicios, el clúster 1 destaca por el mayor ratio de 
+colegios, mientras que los clústeres 3 y 5 presentan valores muy bajos
+en esta variable. El clúster 3, aunque tiene una elevada presencia de 
+consultorio local, también muestra mayores distancias al centro educativo
+y al hospital, lo que indica un perfil más alejado de ciertos servicios.
+En cambio, el clúster 5 destaca por el mayor ratio de hospital y por una 
+distancia al hospital prácticamente nula.
+En relación con el esfuerzo de alquiler, el clúster 2 presenta el valor más 
+alto, lo que apunta a una mayor presión económica relativa. La conectividad 
+digital es elevada en todos los grupos, aunque el clúster 3 queda algo por 
+debajo del resto. En conjunto, los clústeres se estructuran sobre todo en 
+torno al envejecimiento, el nivel educativo, la accesibilidad a servicios, 
+el esfuerzo de alquiler y la conectividad digital.
 
 ##### Relacionamos los clústeres con la naturaleza de los contratos
 
@@ -9003,7 +9011,7 @@ El análisis de clustering aplicado a los 39 municipios de Vizcaya ha
 permitido distinguir cinco perfiles municipales diferenciados a partir
 de variables demográficas, socioeconómicas, educativas, sanitarias,
 digitales y de accesibilidad. El estadístico de Hopkins, con un valor de
-0,992, confirma que los datos presentan una clara tendencia a agruparse.
+0,9957041, confirma que los datos presentan una clara tendencia a agruparse.
 Tras comparar tres métodos de clustering con *k = 5*, se ha seleccionado
 k-medias como solución principal, ya que obtiene la mayor silueta media,
 con un valor de 0,19, y no presenta ningún clúster con silueta negativa.
@@ -9011,45 +9019,50 @@ con un valor de 0,19, y no presenta ningún clúster con silueta negativa.
 La interpretación de los resultados, apoyada en el PCA y en el análisis
 de los perfiles medios, muestra que las variables con mayor capacidad
 para diferenciar los grupos son la distancia al hospital, el índice de
-envejecimiento y el esfuerzo de alquiler. Entre los resultados obtenidos
-destacan el clúster 2, caracterizado por un mayor envejecimiento y una
-mayor presión asociada al alquiler; el clúster 3, que agrupa los
-municipios con peor accesibilidad a determinados servicios; y el clúster
-4, formado por municipios más jóvenes y con una mejor dotación
-sanitaria.
+envejecimiento y el esfuerzo de alquiler. Entre los resultados obtenidos 
+destacan especialmente el clúster 3, que combina mayor envejecimiento con 
+peor accesibilidad a determinados servicios; el clúster 2, caracterizado 
+por el mayor esfuerzo de alquiler y un envejecimiento elevado; y el clúster
+5, que presenta el perfil menos envejecido, mayor nivel de estudios
+superiores y mejor dotación sanitaria. También resulta relevante el clúster
+1, por su mayor porcentaje de población extranjera y mayor ratio de colegios,
+aunque con una distancia elevada al hospital.
 
-Por último, la variable *naturaleza_contratos* se ha utilizado como
-información complementaria para contextualizar los grupos, pero no como
-variable determinante en la formación de los clústeres, ya que no en
-todos los clusters se obtienen conclusiones sólidas respecto a dicha
-variable tras analizar el gráfico correspondiente.
+Por último, la variable naturaleza_contratos se ha utilizado como información
+complementaria para contextualizar los grupos, pero no como variable 
+determinante en la formación de los clústeres, ya que no en todos los
+clusters se obtienen conclusiones sólidas respecto a dicha variable tras
+analizar el gráfico correspondiente.
 
-Finalmente, la caracterización propuesta de los clusters obtenidos es la
-siguiente:
+Finalmente, la caracterización propuesta de los clusters obtenidos es la siguiente:
 
-c1 — Municipios con alta presión de alquiler y orientación a perfiles
-mixtos y servicios. Envejecimiento moderado, mayor porcentaje de
-extranjeros y esfuerzo de alquiler elevado (18,34). Dominados por
-perfiles mixtos y de servicios (60% y 40%).
+c1 — Municipios con mayor presencia de población extranjera y mejor dotación 
+educativa relativa. Presenta el porcentaje más alto de extranjeros, el mayor
+ratio de colegios y una distancia muy baja al centro educativo. Sin embargo,
+mantiene una distancia elevada al hospital. En cuanto a naturaleza_contratos,
+predominan los perfiles mixtos y de servicios.
 
-c2 — Municipios urbanos envejecidos con alta formación orientados a
-servicios. Mayor esfuerzo de alquiler del conjunto (26,99),
-envejecimiento elevado (199,01) y alto porcentaje de estudios
-superiores. Predominio de municipios de servicios (57,14%).
+c2 — Municipios envejecidos con mayor presión de alquiler. Destaca por el
+esfuerzo de alquiler más alto del conjunto y un índice de envejecimiento elevado.
+También presenta baja distancia al hospital y valores intermedios en consultorio 
+local. Predominan los municipios de servicios.
 
-c3 — Municipios rurales con baja accesibilidad a servicios. Mayor
-distancia al centro educativo (2,79 km) y al hospital (8,52 km) de todos
-los clústeres. Perfil sectorial heterogéneo con presencia de municipios
-industriales, de construcción y agrícolas.
+c3 — Municipios envejecidos y con peor accesibilidad a servicios. Es el clúster
+con mayor índice de envejecimiento, menor conectividad digital y mayores
+distancias tanto al centro educativo como al hospital. Aunque presenta una 
+alta presencia de consultorio local, su accesibilidad general es más limitada.
+Su perfil sectorial es heterogéneo, con presencia de municipios industriales, 
+de construcción y agrícolas.
 
-c4 — Municipios jóvenes con buena dotación sanitaria. Menor índice de
-envejecimiento (115,19) y mayor ratio de hospital (0,18). Formado
-únicamente por 2 municipios, ambos de naturaleza servicios (100%).
+c4 — Municipios de perfil intermedio con buena conectividad digital. Presenta 
+valores moderados en envejecimiento, estudios superiores y esfuerzo de alquiler,
+junto con el porcentaje más alto de hogares con 100 Mbps. Su dotación sanitaria 
+no destaca especialmente, pero mantiene una distancia al hospital relativamente baja.
 
-c5 — Municipios equilibrados con alta conectividad digital. Perfil
-intermedio con buen nivel formativo (32,65% de estudios superiores) y la
-mayor conectividad digital del conjunto (97,95% de hogares con 100
-Mbps). Mezcla de perfiles mixtos y de construcción.
+c5 — Municipios menos envejecidos, con mayor nivel formativo y mejor dotación 
+sanitaria. Tiene el menor índice de envejecimiento, el mayor porcentaje de estudios
+superiores, el mayor ratio de hospital y una distancia al hospital prácticamente nula.
+Mezcla perfiles mixtos y de construcción.
 
 # 3. Objetivo 2 - Caracterización de los distritos
 
@@ -9682,7 +9695,7 @@ hopkins_distritos <- get_clust_tendency(
 hopkins_distritos$hopkins_stat
 ```
 
-El valor del estadístico de Hopkins obtenido es 0,6389. Este valor se
+El valor del estadístico de Hopkins obtenido es 0,6282213. Este valor se
 encuentra por encima de 0,5, por lo que los datos no parecen
 distribuirse de forma completamente aleatoria en el espacio definido por
 las variables seleccionadas. Sin embargo, al no tratarse de un valor muy
@@ -9690,8 +9703,8 @@ próximo a 1, la tendencia de agrupamiento no puede considerarse muy
 fuerte, sino más bien moderada. Hay que tener en cuenta además que, con
 tan solo 19 observaciones, el estadístico de Hopkins tiende a ser más
 conservador y menos estable que con muestras grandes, por lo que un
-valor de 0,64 en este contexto ya resulta indicativo de cierta
-estructura interna en los datos.
+valor de aproximadamente 0,63 en este contexto ya resulta indicativo de 
+cierta estructura interna en los datos.
 
 ##### Determinación del número de clústeres.
 
@@ -9753,7 +9766,7 @@ interpretabilidad. Por su parte, el método del codo muestra una
 disminución pronunciada de la inercia hasta k = 4, y una suavización
 notable a partir de k = 5, punto a partir del cual añadir más grupos
 apenas reduce la variabilidad interna. Dado que *k = 5* ofrece una
-silueta media elevada (≈ 0,30), se opta por esta solución.
+silueta media elevada (≈ 0,25), se opta por esta solución.
 
 ##### Comparación de métodos de clustering.
 
@@ -9829,7 +9842,7 @@ table(distritos_cluster$cluster_kmeans)
 ```
 
 El método k-medias divide los 19 distritos en cinco grupos con tamaños
-de 1, 5, 3, 1 y 9 distritos respectivamente.
+de 1, 7, 3, 1 y 7 distritos respectivamente.
 
 En tercer lugar, se aplica el método PAM (Partitioning Around Medoids),
 también conocido como k-medoides. Al igual que k-medias, es un método de
@@ -9857,7 +9870,7 @@ table(distritos_cluster$cluster_pam)
 ```
 
 El método PAM divide los 19 distritos en cinco grupos con tamaños de 4,
-6, 1, 5 y 3 distritos respectivamente, siendo esta la distribución más
+7, 1, 4 y 3 distritos respectivamente, siendo esta la distribución más
 equilibrada de los tres métodos comparados.
 
 Para comparar los tres métodos utilizados, se construyen tablas cruzadas
@@ -9974,12 +9987,12 @@ par(mfrow = c(1, 1))
 ```
 
 Tras aplicar los tres métodos con k = 5, todos obtienen una anchura
-media de silueta idéntica (0,28), por lo que la elección del método
+media de silueta idéntica (0,25), por lo que la elección del método
 recae en criterios cualitativos y de distribución. Se opta por el método
 PAM (k-medoides) como solución principal. Tanto Ward como k-medias
 generan dos clústeres de observación única, lo que limita la
 interpretabilidad con tan pocas observaciones. PAM, en cambio, produce
-una distribución más equilibrada (4, 6, 1, 5 y 3 distritos por clúster),
+una distribución más equilibrada (4, 7, 1, 4 y 3 distritos por clúster),
 con un único caso singular (clúster 3, n = 1) que puede identificarse
 como un distrito con perfil atípico. Además, al utilizar medoides reales
 como representantes de cada grupo, PAM facilita la interpretación
@@ -9993,7 +10006,7 @@ separación de los distritos. Como las variables ya se han centrado y
 escalado previamente para el clustering, se aplica el PCA sobre
 matriz_clustering con scaling = "none".
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 vars_clustering <- c(
   "indice_envejecimiento",
   "ratio_colegio",
@@ -10030,8 +10043,8 @@ knitr::kable(
   caption = "Varianza explicada por las primeras componentes principales")
 ```
 
-El scree plot muestra que la PC1 explica el 41,9% de la variabilidad, la
-PC2 el 24,5% y la PC3 el 21,0%, acumulando entre las tres componentes un
+El scree plot muestra que la PC1 explica el 39,4% de la variabilidad, la
+PC2 el 27% y la PC3 el 20,1%, acumulando entre las tres componentes un
 87,4% de la varianza total. Dado que las tres primeras componentes
 superan individualmente el umbral del 20% y que la PC4 cae bruscamente
 hasta el 10,3%, se opta por retener tres componentes para la
@@ -10039,7 +10052,7 @@ interpretación gráfica. Esto permite visualizar la PC1 frente a la PC2 y
 la PC3 frente a la PC4 para no repetir componentes, pero centrando el
 análisis en las tres primeras por ser las más informativas.
 
-```{r}
+```{r,warning=FALSE,message=FALSE}
 p1 <- pcaPlot(
   miPCA,
   type = "scores",
@@ -10094,12 +10107,12 @@ centrales.
 
 Los gráficos de correlaciones indican que las variables que más explican
 la separación entre distritos son *esfuerzo_alquiler*, *ratio_colegio*,
-*ratio_hospita*l e *indice_envejecimiento*. En el plano PC1-PC2,
+*ratio_hospital* e *indice_envejecimiento*. En el plano PC1-PC2,
 *ratio_colegio*, *ratio_hospital* y *ratio_zonas_verdes* se orientan
 hacia valores negativos de PC1, mientras que *esfuerzo_alquiler* destaca
 principalmente en PC2 positivo. En el plano PC3-PC4, la variable más
 relevante es *indice_envejecimiento*, que tiene una contribución muy
-alta y ayuda a diferenciar los perfiles demográficos. En cambio,
+alta en PC3 y ayuda a diferenciar los perfiles demográficos. En cambio,
 *ratio_zonas_verdes* apenas permite distinguir los grupos en la tabla de
 medias, ya que toma valores prácticamente nulos en todos los clústeres.
 
@@ -10174,27 +10187,26 @@ permitido identificar cinco perfiles diferenciados a partir de variables
 demográficas, de equipamiento urbano y de mercado residencial: índice de
 envejecimiento, ratio de colegios, ratio de hospitales, esfuerzo de
 alquiler y ratio de zonas verdes. Tras preparar y escalar los datos, el
-estadístico de Hopkins obtuvo un valor de 0,64, que en el contexto de
-tan solo 19 observaciones es indicativo de una tendencia de agrupamiento
-moderada. Para la elección de k = 5, el gráfico de Silhouette muestra
-una silueta media de ≈ 0,30 con una distribución interpretable, mientras
-que el método del codo refleja una suavización progresiva a partir de k
-= 5, lo que indica un equilibrio adecuado entre calidad estadística e
-interpretabilidad.
+estadístico de Hopkins obtuvo un valor de aproxiimadamente 0,63, que en 
+el contexto dectan solo 19 observaciones es indicativo de una tendencia de
+agrupamiento moderada. Para la elección de k = 5, el gráfico de Silhouette 
+muestra una silueta media de ≈ 0,30 con una distribución interpretable, mientras
+que el método del codo refleja una suavización progresiva a partir de k = 5, 
+lo que indica un equilibrio adecuado entre calidad estadística e interpretabilidad.
 
 Se compararon tres métodos: clustering jerárquico con Ward.D2, k-medias
 y PAM. Se ha optado por PAM (k-medoides) como solución principal al
-obtener la distribución más equilibrada entre grupos (4, 6, 1, 5 y 3
+obtener la distribución más equilibrada entre grupos (4, 7, 1, 4 y 3
 distritos) con un único caso singular, frente a Ward y k-medias que
 producen dos clústeres de observación única y limitan la
 interpretabilidad.
 
-El análisis PCA retiene tres componentes que acumulan el 87,4% de la
-varianza. La PC1 (41,9%) está dominada por *esfuerzo_alquiler*,
+El análisis PCA retiene tres componentes que acumulan el 86,5% de la
+varianza. La PC1 (39,4%) está dominada por *esfuerzo_alquiler*,
 *ratio_colegio*, *ratio_hospital* y *ratio_zonas_verdes*, y separa
-principalmente el clúster 5 del resto. La PC2 (24,5%) recoge
+principalmente el clúster 5 del resto. La PC2 (27%) recoge
 variabilidad adicional asociada principalmente a *esfuerzo_alquiler*,
-diferenciando el clúster 1. La PC3 (21,0%) está dominada por el
+diferenciando el clúster 1. La PC3 (20,1%) está dominada por el
 *indice_envejecimiento*, que es la variable que más estructura la
 variabilidad residual entre distritos.
 
@@ -10209,22 +10221,28 @@ Finalmente, la caracterización propuesta de los clusters obtenidos es la
 siguiente:
 
 c1 — Distritos envejecidos con buena dotación educativa y alta presión
-residencial. Envejecimiento alto, mayor ratio_colegio y mayor
-esfuerzo_alquiler.
+residencial. Presentan un envejecimiento elevado, el mayor ratio_colegio
+del conjunto y el esfuerzo_alquiler más alto, por lo que destacan por
+combinar mayor dotación educativa relativa con mayor tensión residencial.
 
-c2 — Distritos muy envejecidos con perfil residencial menos tensionado.
-Envejecimiento muy alto, baja dotación educativa y sanitaria, menor
-presión de alquiler.
+c2 — Distritos muy envejecidos con presión residencial más moderada.
+Tienen el índice de envejecimiento más alto, baja dotación educativa y
+sanitaria, y un esfuerzo de alquiler inferior al de otros clústeres.
 
 c3 — Distrito atípico con mejor dotación sanitaria relativa.
-Envejecimiento más bajo, mayor ratio_hospital y caso singular.
+Presenta un envejecimiento bajo en comparación con c1 y c2, el mayor
+ratio_hospital y el menor esfuerzo_alquiler del conjunto. Por ello,
+destaca más por su singularidad sanitaria que por presión residencial.
 
-c4 — Distritos equilibrados. Envejecimiento bajo-moderado, dotación
-intermedia y esfuerzo de alquiler moderado.
+c4 — Distritos menos envejecidos con presión residencial media-alta.
+Tienen el índice de envejecimiento más bajo, una dotación educativa
+intermedia y un esfuerzo_alquiler elevado, aunque inferior al de c1.
+Su dotación sanitaria no destaca especialmente.
 
-c5 — Distritos con baja dotación educativa y presión residencial.
-Envejecimiento bajo-moderado, ratio_colegio nulo y esfuerzo de alquiler
-elevado.
+c5 — Distritos con baja dotación educativa y presión residencial elevada.
+Presentan un envejecimiento bajo-moderado, ratio_colegio nulo y ausencia
+de ratio_hospital. Su esfuerzo_alquiler es alto, muy próximo al de c4,
+por lo que mantienen cierta tensión residencial pese a su menor dotación.
 
 ## 3.3 Clustering distritos Bilbao
 
@@ -10252,17 +10270,21 @@ head(distritos_bilbao_base)
 dim(distritos_bilbao_base)
 ```
 
-Excluimos al distrito *OTXARKOAGA-TXURDINAGA* del cluster ya que en un
-análisis inicial se le identificó como un outlier extremo debido a su
-perfil único, especialmente por sus altos valores de *ratio_hospital* y
-*ratio_colegio*. Esto distorsionaba el análisis y su posterior
-visualización mediante PCA, ya que el algoritmo se dedicaba
-principalmente a diferenciar ese outlier del resto, dificultando
-distinguir las diferencias más sutiles entre el resto de distritos. Por
-tanto, el distrito *otxarkoaga* se tendrá en cuenta de forma
-independiente, y guardaremos sus valores en una variable para mostrarlos
-más adelante a la hora de compara perfiles medios con el resto de
-clústers.
+El distrito *OTXARKOAGA-TXURDINAGA* se separó del análisis conjunto de
+clustering, ya que en una exploración inicial mostró un comportamiento
+claramente atípico respecto al resto de distritos. Este perfil diferencial
+se debía, principalmente, a sus valores elevados en variables como
+*ratio_hospital* y *ratio_colegio*, que hacían que el algoritmo tendiera
+a diferenciar este distrito del resto en lugar de captar con claridad las
+diferencias internas entre los demás grupos.
+
+Por este motivo, mantenerlo dentro del clustering dificultaba tanto la
+interpretación de los clústeres como su visualización posterior mediante
+PCA, ya que su peso condicionaba la distribución del resto de distritos.
+No obstante, el distrito no se elimina del estudio, sino que se considera
+como un caso singular y se analiza de forma independiente como un clúster más.
+Sus valores se guardan en una variable específica para compararlos 
+posteriormente con los perfiles medios del resto de clústeres.
 
 ```{r}
 outlier_otxarkoaga <- distritos_bilbao_base[distritos_bilbao_base$nombre_distrito_norm == "otxarkoaga", ]
@@ -10373,12 +10395,6 @@ escala común. Además, la distancia euclídea es una de las medidas más
 utilizadas en combinación con métodos como el clustering jerárquico con
 criterio de Ward y el algoritmo k-means.
 
-Antes de aplicar los métodos de agrupamiento, se analiza también la
-tendencia de agrupamiento de los datos mediante el estadístico Hopkins.
-El objetivo es comprobar si los distritos presentan cierta estructura
-interna o si, por el contrario, se distribuyen de forma aproximadamente
-aleatoria en el espacio definido por las variables seleccionadas.
-
 A continuación, realizamos el cálculo de la matriz de distancias
 euclídeas a partir de la matriz estandarizada. Esta matriz recoge la
 disimilitud entre cada par de distritos según las variables activas
@@ -10424,16 +10440,11 @@ hopkins_distritos <- get_clust_tendency(
 hopkins_distritos$hopkins_stat
 ```
 
-El valor obtenido en el estadístico de Hopkins (0.437), aunque sea menor
-que 0.5, refleja la naturaleza real de una ciudad, donde los distritos
-no son piezas totalmente aisladas, sino que forman un continuo urbano
-conectado. Es normal que en este contexto no existan separaciones
-drásticas, ya que los barrios suelen compartir fronteras, servicios y
-rasgos sociales muy parecidos. Por tanto, el objetivo de este
-agrupamiento no es encontrar grupos 'perfectos' separados por muros,
-sino identificar perfiles de barrios que se parecen entre sí para poder
-entender mejor la diversidad de la ciudad y simplificar su análisis, por
-lo que procederemos con el clustering.
+El valor obtenido en el estadístico de Hopkins (0,7945849), al ser mayor que 0.5,
+demuestra que los datos no están distribuidos de forma completamente aleatoria,
+aunque no sea un valor tan cercano a 1. Es normal que en este contexto no existan
+separaciones tan drásticas, ya que los distritos suelen compartir fronteras, servicios
+y rasgos sociales aunque sea mínimamente parecidos.
 
 ##### Determinación del número de clústeres.
 
@@ -10444,10 +10455,8 @@ continuación, ya que no existe una única regla automática que garantice
 la mejor solución.
 
 En primer lugar, se utiliza el método de Silhouette, que permite evaluar
-la calidad de la asignación de las observaciones a los grupos; los
-valores más altos indican que los distritos están mejor agrupados dentro
-de su clúster y más separados de los demás. Simultáneamente, en segundo
-lugar, se aplica el método del codo mediante la suma de cuadrados
+la calidad de la asignación de las observaciones a los grupos. Simultáneamente,
+en segundo lugar, se aplica el método del codo mediante la suma de cuadrados
 intra-clúster, que analiza cómo disminuye la variabilidad interna de los
 grupos al aumentar el número de clústeres. El objetivo es identificar un
 punto a partir del cual añadir más grupos apenas mejora la compactación
@@ -10490,24 +10499,25 @@ p2 <- fviz_nbclust(
 grid.arrange(p1, p2, nrow = 1)
 ```
 
-El gráfico de Silhouette alcanza su valor máximo para *k = 3*, aunque el
-valor para *k = 4* es muy similar. Esto indica que, según este criterio,
-ambas soluciones presentan una separación media comparable entre grupos.
-Tanto para valores anteriores como posteriores a estos, la silueta
-disminuye de forma clara, por lo que soluciones con más o menos
-clústeres no parecen adecuadas.
+El gráfico de Silhouette muestra su valor máximo para *k = 2*, lo que
+indica que una división en dos grupos presenta la mayor separación media
+entre clústeres. Sin embargo, esta solución resulta demasiado general
+para el objetivo del análisis, ya que agrupa los distritos en perfiles
+muy amplios y reduce la capacidad de interpretar diferencias internas
+más específicas.
 
-Por su parte, el método del codo muestra una disminución continua de la
-suma de cuadrados intra-clúster conforme aumenta el número de grupos. La
-reducción es especialmente marcada entre *k = 1* y *k = 4*, y
-posteriormente la curva desciende de forma más progresiva. Esto sugiere
-que una solución de 3 clústeres puede ser razonable desde el punto de
-vista de la compactación interna.
+Por su parte, el método del codo muestra una reducción importante de la
+suma de cuadrados intra-clúster al pasar de k = 1 a k = 3. A partir
+de ese punto la disminución continúa, pero de forma más progresiva, por
+lo que una solución con tres clústeres mantiene un equilibrio razonable
+entre compactación interna e interpretabilidad.
 
-En conjunto, los dos criterios apuntan a una solución sencilla de 3 o 4
-clústeres, sin embargo, nos quedamos con 3 clústeres, que permiten
-obtener una clasificación informativa e interpretable de los distritos
-sin generar un número excesivo de grupos.
+Aunque el criterio de Silhouette favorece una solución más simple de
+k = 2, se opta por k = 3 porque permite diferenciar mejor los
+perfiles de distritos sin generar una clasificación excesivamente
+fragmentada. De este modo, se obtiene una solución más informativa para
+el análisis posterior, manteniendo un número de grupos manejable y
+fácilmente interpretable.
 
 Por tanto, se continúa con una solución de *k = 3*.
 
@@ -10810,7 +10820,7 @@ datos_interpretacion <- bind_cols(
   datos_clustering_completo)
 
 # Clúster principal seleccionado
-misclust <- distritos_cluster$cluster_jerarquico
+misclust <- distritos_cluster$cluster_kmeans
 
 # PCA sobre la matriz utilizada en el clustering
 miPCA <- pca(
@@ -10839,8 +10849,7 @@ componentes principales. Para la interpretación gráfica se seleccionan
 las dos primeras componentes, PC1 y PC2, ya que, aunque PC3 y PC4
 también expliquen un porcentaje mínimamente importante de variabilidad,
 sus autovalores son \< 1 y tan solo con las dos primeras componentes ya
-se explica aproximadamente un 75% de la variabilidad, cifra más que
-suficiente.
+se explica un gran porcentaje de la variabilidad, una cifra suficiente.
 
 ```{r}
 # Scores
@@ -10856,9 +10865,8 @@ p2
 
 A partir del gráfico de puntuaciones, se observa que los tres clústeres
 presentan una distribución bastante equilibrada en el espacio de las
-componentes, explicando conjuntamente el 76,49% de la varianza. El
-clúster 1 se sitúa claramente en el lado positivo de la primera
-componente, mientras que los clústeres 2 y 3 se agrupan en el lado
+componentes. El clúster 1 se sitúa claramente en el lado positivo de la
+primera componente, mientras que los clústeres 2 y 3 se agrupan en el lado
 negativo de la misma, diferenciándose entre sí principalmente por su
 posición a lo largo de la segunda componente, sin que exista ya ningún
 aislado que distorsione el análisis después de eliminar el outlier.

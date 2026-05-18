@@ -429,7 +429,7 @@ datos_interpretacion <- bind_cols(
   datos_clustering_completo)
 
 # Clúster principal seleccionado
-misclust <- distritos_cluster$cluster_jerarquico
+misclust <- distritos_cluster$cluster_kmeans
 
 # PCA sobre la matriz utilizada en el clustering
 miPCA <- pca(

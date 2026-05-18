@@ -1435,19 +1435,19 @@ library(xgboost)
 library(dplyr)
 ```
 
-#### Selección de los municipios con alquiler conocido para validar el modelo
-
-```{r}
-datos_xgb <- municipios_valencia_base %>%
-  filter(!is.na(precio_m2_alquiler))
-```
-
 #### Sustituir los NA de renta_media_hogar por la mediana
 
 ```{r}
 municipios_valencia_base$`renta_media_hogar`[
   is.na(municipios_valencia_base$`renta_media_hogar`)
 ] <- median(municipios_valencia_base$`renta_media_hogar`, na.rm = TRUE)
+```
+
+#### Selección de los municipios con alquiler conocido para validar el modelo
+
+```{r}
+datos_xgb <- municipios_valencia_base %>%
+  filter(!is.na(precio_m2_alquiler))
 ```
 
 
@@ -1664,6 +1664,45 @@ municipios_valencia_base %>%
 municipios_valencia_base <- municipios_valencia_base %>%
   select(-alquiler_faltaba)
 ```
+
+```{r}
+set.seed(123)
+
+modelo_1 <- xgboost(
+  data = X_train_final_xgb,
+  label = y_train_final_xgb,
+  objective = "reg:squarederror",
+  nrounds = 100,
+  max_depth = 3,
+  eta = 0.1,
+  subsample = 0.8,
+  colsample_bytree = 0.8,
+  verbose = 0
+)
+
+pred_1 <- round(predict(modelo_1, X_pred_final_xgb), 1)
+
+
+set.seed(123)
+
+modelo_2 <- xgboost(
+  data = X_train_final_xgb,
+  label = y_train_final_xgb,
+  objective = "reg:squarederror",
+  nrounds = 100,
+  max_depth = 3,
+  eta = 0.1,
+  subsample = 0.8,
+  colsample_bytree = 0.8,
+  verbose = 0
+)
+
+pred_2 <- round(predict(modelo_2, X_pred_final_xgb), 1)
+
+all.equal(pred_1, pred_2)
+```
+
+
 
 ### Imputación del % de estudios superiores
 

@@ -1469,19 +1469,19 @@ library(xgboost)
 library(dplyr)
 ```
 
-#### Selección de los municipios con alquiler conocido para validar el modelo
-
-```{r}
-datos_xgb <- municipios_bizkaia_base %>%
-  filter(!is.na(precio_m2_alquiler))
-```
-
 #### Sustituir los NA de renta_media_hogar por la mediana
 
 ```{r}
 municipios_bizkaia_base$`renta_media_hogar`[
   is.na(municipios_bizkaia_base$`renta_media_hogar`)
 ] <- median(municipios_bizkaia_base$`renta_media_hogar`, na.rm = TRUE)
+```
+
+#### Selección de los municipios con alquiler conocido para validar el modelo
+
+```{r}
+datos_xgb <- municipios_bizkaia_base %>%
+  filter(!is.na(precio_m2_alquiler))
 ```
 
 #### División en muestra de entrenamiento y de prueba
