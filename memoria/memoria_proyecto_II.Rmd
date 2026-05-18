@@ -66,18 +66,18 @@ library(kableExtra)
 ### 1.1.1. Geocodificación de municipios
 
 En este apartado se realiza la geocodificación de los municipios de
-Vizcaya y Valencia a partir de las bases de datos correspondientes a sus
-censos. El objetivo es obtener las coordenadas geográficas de cada
-municipio para poder utilizarlas posteriormente en análisis espaciales,
-representaciones cartográficas o visualizaciones relacionadas con la
-localización territorial de los municipios.
+Vizcaya y Valencia a partir de las bases de datos correspondientes. El
+objetivo es obtener las coordenadas geográficas de cada municipio para
+poder utilizarlas posteriormente para crear datasets con variables de
+distancias o número de servicios.
 
 Para ello, se emplea la API de Nominatim, perteneciente a OpenStreetMap,
-que permite obtener coordenadas de forma gratuita y sin necesidad de
-clave de acceso. Como resultado de este proceso, se generan dos nuevas
-bases con información geográfica: "municipios_bizkaia_coords.csv" y
+que permite obtener coordenadas de forma gratuita y con poca
+restricción. Como resultado de este proceso, se generan dos nuevas bases
+con información geográfica: "municipios_vizcaya_coords.csv" y
 "municipios_valencia_coords.csv", que incorporan las coordenadas
-asociadas a cada municipio.
+asociadas a cada municipio a través de las siguientes columnas:
+codigo_ine, municipio, provincia, lat, lon.
 
 ##### Fijamos las rutas de entrada (bases de datos) y de salida (datasets hechos).
 
@@ -212,20 +212,20 @@ write_csv(coords_valencia, ruta_output_valencia)
 ### 1.1.2. Geocodificación de hospitales y centros educativos
 
 En este segundo apartado geocodificamos los servicios que después
-utilizaremos para calcular la accesibilidad territorial de cada
-municipio. En concreto, trabajamos con dos tipos de equipamientos:
-hospitales y centros educativos. Para ello, partimos de las bases de
-datos de Vizcaya y Valencia, limpiamos las variables mínimas necesarias
-para geocodificar cada registro y, a continuación, consultamos la API de
-Nominatim para obtener sus coordenadas geográficas. En el caso de
-educación, no consideramos todos los centros de la base, sino únicamente
-aquellos vinculados con educación primaria y secundaria, ya que son los
-que utilizaremos después en la creación de los datasets para las
-variables *num_colegios*, *ratio_colegios* y
-*distancia_centro_educativo*. El resultado final de este apartado son
-cuatro datasets geocodificados: hospitales de Vizcaya, hospitales de
-Valencia, centros educativos de Vizcaya y centros educativos de
-Valencia.
+utilizaremos para calcular la accesibilidad de cada municipio. En
+concreto, trabajamos con dos tipos de servicios: hospitales y centros
+educativos. Para ello, partimos de las bases de datos de Vizcaya y
+Valencia, limpiamos las variables necesarias para geocodificar cada
+registro y, a continuación, consultamos la API de Nominatim para obtener
+sus coordenadas geográficas. En el caso de educación, no consideramos
+todos los centros de la base, sino únicamente aquellos vinculados con
+educación primaria y secundaria, ya que son los que utilizaremos después
+en la creación de los datasets para las variables *num_colegios*,
+*ratio_colegios* y *distancia_centro_educativo*. El resultado final de
+este apartado son cuatro datasets geocodificados:
+*hospitales_bizkaia_coords*, *hospitales_valencia_coords*,
+*centros_educativos_vizcaya_coords* y
+*centros_educativos_valencia_coords*.
 
 ##### Fijamos las rutas de entrada (bases de datos) y de salida (datasets hechos).
 
@@ -405,7 +405,7 @@ geocodificar_lista_servicios <- function(df_servicios) {
 
 ##### Geocodificamos los hospitales de Vizcaya.
 
-La geocodificación se realiza con Nominatim.
+La geocodificación se realiza con Nominatim (también).
 
 ```{r, eval=FALSE}
 # Leemos y limpiamos la base de hospitales de Vizcaya
@@ -516,16 +516,15 @@ En este tercer apartado se construyen los datasets finales de distancias
 para Vizcaya y Valencia. Para ello, se parte de los municipios
 geocodificados y de los servicios geocodificados en el apartado
 anterior. En primer lugar, se estandarizan los nombres de municipio para
-mejorar los cruces textuales. Después, se comprueba si cada municipio
+evitar diferencias de escritura. Después, se comprueba si cada municipio
 dispone de hospital o centro educativo propio; en ese caso, se asigna
-una distancia de 0, al encontrarse el servicio en el propio municipio.
-En caso contrario, se calcula la distancia euclídea desde el municipio a
-todos los servicios válidos de su provincia, se selecciona el más
-cercano y se intenta obtener la distancia real en coche mediante OSRM.
-Si no es posible calcular la ruta, se utiliza la distancia euclídea como
-valor de respaldo. Como resultado final, se obtienen dos tablas, una
-para Valencia y otra para Vizcaya, con las columnas municipio,
-distancia_centro_educativo y distancia_hospital.
+una distancia de 0. En caso contrario, se calcula la distancia euclídea
+desde el municipio a todos los servicios válidos de su provincia, se
+selecciona el más cercano y se intenta obtener la distancia real en
+coche mediante OSRM. Si no es posible calcular la ruta, se utiliza la
+distancia euclídea como respaldo. Como resultado final, se obtienen dos
+csv's, uno para Valencia y otro para Vizcaya, con las columnas
+*municipio*, *distancia_centro_educativo* y *distancia_hospital*.
 
 ##### Fijamos el servidor público de OSRM para calcular distancias en coche.
 
@@ -605,7 +604,7 @@ centros_vizcaya <- leer_centros(ruta_centros_vizcaya)
 centros_valencia <- leer_centros(ruta_centros_valencia)
 ```
 
-##### Definimos las funciones mismo_municipio, distancias_euclideas_km, distancia_coche_km y calcular_distancia_servicio.
+##### Definimos las funciones *mismo_municipio*, *distancias_euclideas_km*, *distancia_coche_km* y *calcular_distancia_servicio*.
 
 ```{r}
 # Creamos una función para normalizar nombres de municipio
@@ -734,8 +733,7 @@ calcular_distancia_final <- function(lat_mun, lon_mun, municipio_norm, servicios
 
 ##### Calculamos las distancias finales para Valencia.
 
-El cálculo de distancias por carretera con OSRM hace llamadas a la API
-pública.
+Cálculo de distancias por carretera con OSRM:
 
 ```{r, eval=FALSE}
 # Calculamos la distancia a hospitales para Valencia
@@ -807,15 +805,15 @@ write_csv(dataset_distancias_valencia, ruta_output_distancias_valencia)
 ### 1.1.4. Geocodificación de zonas verdes
 
 En este apartado se realiza la geocodificación de las zonas verdes de
-Valencia y Bilbao. Para ello, se utiliza OpenStreetMap a través de la
-API Overpass, una fuente gratuita y sin necesidad de clave de acceso. La
-consulta se realiza mediante el paquete osmdata, que permite acceder a
-OpenStreetMap desde R. Además, se utiliza el paquete sf para gestionar
+Valencia y Bilbao. Para ello, usamos OpenStreetMap a través de la API
+Overpass, una fuente gratis con rectricciones moderadas. La consulta se
+realiza mediante el paquete `osmdata`, que permite acceder a
+OpenStreetMap desde R. Además, se utiliza el paquete `sf` para gestionar
 los objetos geoespaciales, como polígonos o puntos, mientras que el
 resto de paquetes se emplean para la manipulación y exportación de los
 datos. Como resultado de este proceso, se generan dos datasets con las
-coordenadas de las zonas verdes: "zonas_verdes_valencia_coords.csv" y
-"zonas_verdes_bilbao_coords.csv".
+coordenadas de las zonas verdes: *zonas_verdes_valencia_coords* y
+*zonas_verdes_bilbao_coords*.
 
 ##### Fijamos las rutas de entrada (bases de datos) y de salida (datasets hechos).
 
@@ -906,20 +904,6 @@ coords_valencia <- calcular_puntos(zonas_valencia)
 coords_bilbao <- calcular_puntos(zonas_bilbao)
 ```
 
-##### Realizamos una revisión rápida.
-
-Valencia:
-
-```{r}
-coords_valencia
-```
-
-Bilbao:
-
-```{r}
-coords_bilbao
-```
-
 ##### Exportamos a CSV.
 
 ```{r}
@@ -946,19 +930,19 @@ resumen
 ### 1.1.5. Cálculo de servicios públicos por distrito
 
 En este apartado se construyen los resúmenes finales por distritos de
-Valencia y Bilbao a partir de distintas capas de información
-geocodificada. Para ello, se utilizan las bases de zonas verdes, centros
-educativos y hospitales con coordenadas, junto con los archivos de
-delimitación territorial de los distritos de ambas ciudades:
-"delimitacion_distritos_valencia.geojson" y
-"delimitacion_distritos_bilbao.geojson".
+Valencia y Bilbao a partir de la información geocodificada. Para ello,
+se utilizan las bases de zonas verdes, centros educativos y hospitales
+con coordenadas, junto con los archivos de delimitación territorial de
+los distritos de ambas ciudades:
+*delimitacion_distritos_valencia*.*geojson* y
+*delimitacion_distritos_bilbao*.*geojson*.
 
 El objetivo es integrar la información espacial disponible para asignar
-cada elemento a su distrito correspondiente y obtener una síntesis
-territorial comparable entre ciudades. A partir de este proceso, se
-generan dos bases resumen, "valencia_resumen.csv" y
-"bilbao_resumen.csv", que recogen la información agregada por distrito y
-que servirán como base para los análisis posteriores a nivel urbano.
+cada elemento a su distrito correspondiente para poder hacer
+comparaciones entre ciudades. A partir de este proceso, se generan dos
+bases resumen, *valencia_resumen.csv* y *bilbao_resumen.csv*, que
+recogen la información por distrito y que servirán como base para los
+análisis posteriores.
 
 ##### Fijamos las rutas de entrada y salida.
 
@@ -985,11 +969,11 @@ Los dos archivos de distritos vienen en sistemas de coordenadas
 proyectadas y los reproyectamos ambos a WGS84 (EPSG:4326) para que sean
 compatibles con nuestros puntos. El archivo de Valencia contiene
 polígonos de todos los municipios de la provincia, por lo que filtramos
-por el código INE de Valencia ciudad (`46250`) antes de disolver por
-distrito. Aplicamos `st_make_valid()` antes de la unión porque algunas
-geometrías tienen vértices duplicados que romperían la operación. En
-Bilbao, el archivo contiene barrios, así que los agrupamos por su campo
-`distrito` para obtener los polígonos a ese nivel.
+por el código INE de Valencia ciudad (`46250`). Aplicamos
+`st_make_valid()` antes de la unión para evitar problemas con las
+geometrías. En Bilbao, el archivo contiene barrios, así que los
+agrupamos por su campo `distrito` para obtener los polígonos a ese
+nivel.
 
 ```{r}
 # --- Valencia ---
@@ -2625,9 +2609,12 @@ probarlo. De esta forma se podrán comparar sus valores reales en
 alquiler/estudios superiores con la estimación proporcionada por el
 modelo antes de imputar y comprobar el error del modelo.
 
-Este algoritmo permite trabajar con valores ausentes en variables predictoras, 
-por lo que la presencia puntual de un valor faltante en renta_media_hogar no 
-impidió el ajuste del modelo. Posteriormente, para garantizar la coherencia del conjunto de datos en los análisis descriptivos, correlaciones, clustering y visualizaciones, el valor faltante de renta_media_hogar se sustituirá por su mediana.
+Este algoritmo permite trabajar con valores ausentes en variables
+predictoras, por lo que la presencia puntual de un valor faltante en
+renta_media_hogar no impidió el ajuste del modelo. Posteriormente, para
+garantizar la coherencia del conjunto de datos en los análisis
+descriptivos, correlaciones, clustering y visualizaciones, el valor
+faltante de renta_media_hogar se sustituirá por su mediana.
 
 ##### Imputación del alquiler mediante XGBoost.
 
@@ -2640,7 +2627,7 @@ municipios_valencia_base$`renta_media_hogar`[
 ```
 
 A continuación, seleccionamos los municipios con alquiler conocido para
-validar el modelo. 
+validar el modelo.
 
 ```{r}
 datos_xgb <- municipios_valencia_base %>%
@@ -7384,8 +7371,8 @@ datos_clustering_scaled <- scale(datos_clustering_completo)
 st(as.data.frame(datos_clustering_scaled))
 ```
 
-Finalmente, se guarda la matriz estandarizada con el
-nombre *matriz_clustering*, que será el objeto utilizado en los
+Finalmente, se guarda la matriz estandarizada con el nombre
+*matriz_clustering*, que será el objeto utilizado en los
 siguientesapartados para calcular distancias y aplicar los distintos
 métodos de clustering.
 
@@ -7530,9 +7517,9 @@ suavización progresiva a partir de k = 5. Dado que el objetivo del
 análisis es obtener una clasificación suficientemente granular de los
 municipios de Valencia que permita identificar perfiles diferenciados, y
 teniendo en cuenta que los 210 municipios permiten sostener grupos de
-tamaño razonable (aproximadamente 35 por grupo), se opta por una solución
-de k = 6 clústeres. Esta elección prioriza el criterio sustantivo frente
-al estadístico.
+tamaño razonable (aproximadamente 35 por grupo), se opta por una
+solución de k = 6 clústeres. Esta elección prioriza el criterio
+sustantivo frente al estadístico.
 
 ##### Comparamos los métodos de clustering
 
@@ -7779,13 +7766,13 @@ solución principal, ya que obtiene la anchura de silueta media más alta
 (0,18), frente a WARD, con 0,17 y K-MEDOIDES, con 0,16. Si bien WARD
 presenta el clúster 1 con valor negativo (-0,006) y un clúster 6 de
 apenas 2 municipios, lo que refleja la tendencia del método jerárquico a
-generar grupos muy pequeños con observaciones atípicas, k-medias presenta los clústers 2 y 3 con valores
-muy bajos (0,02 y 0,04). K-MEDOIDES registra el clúster 1 prácticamente en cero
-(-0,0008) y los clústeres 5 y 6 con valores bajos. En este contexto,
-k-medias ofrece la distribución más equilibrada de municipios entre
-grupos (ningún grupo con menos de 5 observaciones) y la mejor calidad
-global de agrupamiento, por lo que se selecciona como método principal
-para la interpretación.
+generar grupos muy pequeños con observaciones atípicas, k-medias
+presenta los clústers 2 y 3 con valores muy bajos (0,02 y 0,04).
+K-MEDOIDES registra el clúster 1 prácticamente en cero (-0,0008) y los
+clústeres 5 y 6 con valores bajos. En este contexto, k-medias ofrece la
+distribución más equilibrada de municipios entre grupos (ningún grupo
+con menos de 5 observaciones) y la mejor calidad global de agrupamiento,
+por lo que se selecciona como método principal para la interpretación.
 
 ##### Interpretamos los resultados.
 
@@ -7885,18 +7872,18 @@ p4
 ```
 
 A partir de los gráficos de puntuaciones, se observa que en el plano
-PC1-PC2 todos los clúesteres se concentran en la zona central con
-un solapamiento considerable, aunque se distinguen de forma correcta los clústeres
-2, 3 y 4. En el plano PC3-PC4, el clúster 1 se separa
+PC1-PC2 todos los clúesteres se concentran en la zona central con un
+solapamiento considerable, aunque se distinguen de forma correcta los
+clústeres 2, 3 y 4. En el plano PC3-PC4, el clúster 1 se separa
 notablemente en el eje vertical, lo que indica que tiene un perfil
 diferencial también en las componentes de menor peso.
 
 Los gráficos de correlaciones muestran que en PC1-PC2 las variables más
 discriminantes son consultorio_local y ratio_centros_salud en el eje
-vertical, y distancia_hospital, distancia_centro_educativo, esfuerzo_alquiler e
-indice_envejecimiento en el horizontal. En PC3-PC4 destacan
-ratio_colegios y ratio_hospital como las de mayor contribución. En
-conjunto, la accesibilidad a servicios y el envejecimiento son las
+vertical, y distancia_hospital, distancia_centro_educativo,
+esfuerzo_alquiler e indice_envejecimiento en el horizontal. En PC3-PC4
+destacan ratio_colegios y ratio_hospital como las de mayor contribución.
+En conjunto, la accesibilidad a servicios y el envejecimiento son las
 dimensiones que más estructuran la variabilidad entre municipios.
 
 ```{r}
@@ -13413,7 +13400,11 @@ lugar de residencia orientado a un perfil teletrabajador.
 
 ## 6.1. Descripciones recomendador
 
-En este apartado partimos de un dataset que contiene los nombres de los municipios, la provincia a la que pertenecen y un párrafo de descripción básica del municipio. Crearemos una nueva columna con otro párrafo de descripción para cada municipio pero, en este caso, mencionando los valores exactos de las variables obtenidas anteriormente.
+En este apartado partimos de un dataset que contiene los nombres de los
+municipios, la provincia a la que pertenecen y un párrafo de descripción
+básica del municipio. Crearemos una nueva columna con otro párrafo de
+descripción para cada municipio pero, en este caso, mencionando los
+valores exactos de las variables obtenidas anteriormente.
 
 ##### Abrimos los datasets y los unimos en uno solo.
 
