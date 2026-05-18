@@ -2625,7 +2625,6 @@ municipios_valencia_base$`renta_media_hogar`[
   is.na(municipios_valencia_base$`renta_media_hogar`)
 ] <- median(municipios_valencia_base$`renta_media_hogar`, na.rm = TRUE)
 ```
-
 A continuación, seleccionamos los municipios con alquiler conocido para
 validar el modelo.
 
@@ -2707,7 +2706,10 @@ y_test_valid_xgb <- test_data$precio_m2_alquiler
 Generamos la predicción del modelo sobre la muestra de prueba.
 
 ```{r}
-pred_test_valid_xgb <- predict(modelo_alquiler_xgb_valid, X_test_valid_xgb)
+pred_test_valid_xgb <- stats::predict(
+  object = modelo_alquiler_xgb_valid,
+  newdata = X_test_valid_xgb
+)
 ```
 
 Comparamos el valor real y valor predicho en la prueba.
@@ -2816,7 +2818,10 @@ Realizamos una imputación directa de los valores faltantes de alquiler.
 municipios_valencia_base$precio_m2_alquiler[
   is.na(municipios_valencia_base$precio_m2_alquiler)
 ] <- round(
-  predict(modelo_alquiler_xgb_final, X_pred_final_xgb), 1)
+  stats::predict(
+  object = modelo_alquiler_xgb_final,
+  newdata = X_pred_final_xgb
+), 1)
 ```
 
 Calculamos la variable *esfuerzo_alquiler* de nuevo tras la imputación.
@@ -2927,7 +2932,10 @@ y_test_estudios_xgb <- test_data_estudios$pct_estudios_sup
 Realizamos una predicción del modelo sobre la muestra de prueba.
 
 ```{r}
-pred_test_estudios_xgb <- predict(modelo_estudios_xgb_valid, X_test_estudios_xgb)
+pred_test_estudios_xgb <- stats::predict(
+  object = modelo_estudios_xgb_valid,
+  newdata = X_test_estudios_xgb
+)
 ```
 
 Comparamos el valor real y valor predicho en la prueba.
@@ -3035,7 +3043,10 @@ Realizamos una imputación directa de los valores faltantes de
 municipios_valencia_base$pct_estudios_sup[
   is.na(municipios_valencia_base$pct_estudios_sup)
 ] <- round(
-  predict(modelo_estudios_xgb_final, X_pred_final_estudios_xgb), 1)
+  stats::predict(
+  object = modelo_estudios_xgb_final,
+  newdata = X_pred_final_estudios_xgb
+), 1)
 ```
 
 Comprobación rápida de los valores imputados.
@@ -4766,7 +4777,10 @@ y_test_valid_xgb <- test_data$precio_m2_alquiler
 Generamos una predicción del modelo sobre la muestra de prueba.
 
 ```{r}
-pred_test_valid_xgb <- predict(modelo_alquiler_xgb_valid, X_test_valid_xgb)
+pred_test_valid_xgb <- stats::predict(
+  object = modelo_alquiler_xgb_valid,
+  newdata = X_test_valid_xgb
+)
 
 ```
 
@@ -4876,7 +4890,10 @@ Imputamos directamente los valores faltantes de alquiler.
 municipios_bizkaia_base$precio_m2_alquiler[
   is.na(municipios_bizkaia_base$precio_m2_alquiler)
 ] <- round(
-  predict(modelo_alquiler_xgb_final, X_pred_final_xgb), 1)
+  stats::predict(
+  object = modelo_alquiler_xgb_final,
+  newdata = X_pred_final_xgb
+), 1)
 ```
 
 Calculamos nuevamente la variable *esfuerzo_alquiler* tras la
@@ -4987,7 +5004,10 @@ y_test_estudios_xgb <- test_data_estudios$pct_estudios_sup
 Realizamos una predicción del modelo sobre la muestra de prueba.
 
 ```{r}
-pred_test_estudios_xgb <- predict(modelo_estudios_xgb_valid, X_test_estudios_xgb)
+pred_test_estudios_xgb <- stats::predict(
+  object = modelo_estudios_xgb_valid,
+  newdata = X_test_estudios_xgb
+)
 ```
 
 Comparamos entre valor real y valor predicho en la prueba.
@@ -5098,7 +5118,10 @@ Imputamos directamente los valores faltantes de *pct_estudios_sup*.
 municipios_bizkaia_base$pct_estudios_sup[
   is.na(municipios_bizkaia_base$pct_estudios_sup)
 ] <- round(
-  predict(modelo_estudios_xgb_final, X_pred_final_estudios_xgb),1)
+  stats::predict(
+  object = modelo_estudios_xgb_final,
+  newdata = X_pred_final_estudios_xgb
+),1)
 ```
 
 Realizamos una comprobación rápida de los valores imputados.
@@ -5860,7 +5883,10 @@ y_test_valencia_xgb <- test_data_valencia$alquiler_m2
 Realizamos una predicción del modelo sobre la muestra de prueba.
 
 ```{r}
-pred_test_valencia_xgb <- predict(modelo_valencia_xgb_valid, X_test_valencia_xgb)
+pred_test_valencia_xgb <- stats::predict(
+  object = modelo_valencia_xgb_valid,
+  newdata = X_test_valencia_xgb
+)
 ```
 
 Comparamos entre valor real y valor predicho en la prueba.
@@ -5962,7 +5988,10 @@ Imputamos directamente el valor faltante.
 distritos_valencia_base$alquiler_m2[
   is.na(distritos_valencia_base$alquiler_m2)
 ] <- round(
-  predict(modelo_valencia_xgb_final, X_pred_final_valencia_xgb), 1)
+  stats::predict(
+  object = modelo_valencia_xgb_final,
+  newdata = X_pred_final_valencia_xgb
+), 1)
 ```
 
 Calculamos de nuevo la variable *esfuerzo_alquiler* tras la imputación.
@@ -6614,7 +6643,10 @@ Imputamos directamente el valor faltante.
 distritos_bilbao_base$alquiler_m2[
   is.na(distritos_bilbao_base$alquiler_m2)
 ] <- round(
-  predict(modelo_bilbao_xgb_final, X_pred_final_bilbao_xgb), 1)
+  stats::predict(
+  object = modelo_bilbao_xgb_final,
+  newdata = X_pred_final_bilbao_xgb
+), 1)
 ```
 
 Calculamos de nuevo la variable *esfuerzo_alquiler* tras la imputación.
@@ -10786,18 +10818,18 @@ plot(
 par(mfrow = c(1, 1))
 ```
 
-La comparación mediante silhouette muestra que el clustering jerárquico
-Ward.D2 y k-media han obtenido el mismo resultado de la silueta (0.237),
-lo que indica que han agrupado los distritos exactamente igual, y com
-mayor silueta media que PAM (0.176). Esto indica que, entre los tres
-métodos comparados, Ward.D2 y k.medias ofrecen una partición más
-consistente para *k = 3* que el algoritmo PAM.
+La comparación mediante silhouette muestra que el método de k-medias
+obtiene el mejor resultado para k = 3, con una silueta media de 0.24.
+Este valor es superior al obtenido por el clustering jerárquico Ward.D2
+(0.17) y por k-medoides/PAM (0.20), por lo que, entre los tres métodos
+comparados, k-medias ofrece la partición más consistente según este
+criterio.
 
-Por tanto, se mantiene el clustering jerárquico con método Ward.D2
-(aunque valdría de igual forma k-medias) y *k = 3* como solución
-principal. Esta elección es coherente con la distancia euclídea
-utilizada, permite representar la estructura mediante el dendrograma y
-obtiene el mejor resultado de silhouette entre los métodos comparados.
+Aunque el método Ward.D2 permite representar la estructura mediante un
+dendrograma, en este caso su menor valor de silhouette indica una peor
+separación media entre los grupos. Por ello, se decide utilizar
+k-medias con k = 3 como solución principal, ya que proporciona una
+clasificación más compacta y mejor separada de los distritos.
 
 ##### Interpretamos los resultados del clustering.
 
@@ -10863,24 +10895,27 @@ p1
 p2
 ```
 
-A partir del gráfico de puntuaciones, se observa que los tres clústeres
-presentan una distribución bastante equilibrada en el espacio de las
-componentes. El clúster 1 se sitúa claramente en el lado positivo de la
-primera componente, mientras que los clústeres 2 y 3 se agrupan en el lado
-negativo de la misma, diferenciándose entre sí principalmente por su
-posición a lo largo de la segunda componente, sin que exista ya ningún
-aislado que distorsione el análisis después de eliminar el outlier.
+A partir del gráfico de puntuaciones, se observa que los distritos se
+distribuyen de forma diferenciada en el espacio definido por las dos
+primeras componentes principales. La primera componente separa, sobre
+todo, a los distritos situados hacia la derecha, como r5, del resto de
+observaciones situadas en posiciones más centrales o negativas. Por su
+parte, la segunda componente permite diferenciar especialmente a r7, que
+aparece en la parte superior del gráfico, y a r4 y r6, situados en la
+zona inferior izquierda. Aunque ya no aparece el outlier extremo que
+distorsionaba el análisis inicial, sí se observan algunos distritos con
+perfiles más singulares dentro del conjunto.
 
-Por otro lado, el gráfico de correlaciones permite identificar que la
-primera componente principal está definida mayoritariamente por el
-índice de envejecimiento y el esfuerzo de alquiler, mientras que la
-segunda componente responde principalmente al ratio de colegios, el
-ratio de hospitales y el ratio de zonas verdes. De esta forma se explica
-la estructura observada: el clúster 1 agrupa los distritos más
-envejecidos y con mayor accesibilidad hospitalaria, mientras que el
-clúster 3 se caracteriza por su educación más accesible y el clúster 2
-se caracteriza por un mayor esfuerzo de alquiler y mayor presencia de
-zonas verdes.
+Por otro lado, el gráfico de correlaciones muestra que la primera
+componente principal está relacionada positivamente con el
+*ratio_hospital* y el *indice_envejecimiento*, mientras que se asocia de
+forma negativa con el *esfuerzo_alquiler* y el *ratio_zonas_verdes*. Esto
+indica que esta componente separa perfiles con mayor dotación sanitaria
+relativa y mayor envejecimiento frente a otros con mayor presión de
+alquiler y mayor presencia de zonas verdes. La segunda componente, en
+cambio, está definida principalmente por el *ratio_zonas_verdes* y, en
+menor medida, por el ratio_hospital, por lo que ayuda a distinguir los
+distritos con mayor peso de estas variables.
 
 Para complementar la interpretación mediante PCA, se calcula el perfil
 medio de cada clúster a partir de las variables activas utilizadas en el
@@ -10935,23 +10970,22 @@ legend("topleft",
 ```
 
 El análisis del perfil medio permite caracterizar cada clúster de
-distritos según sus rasgos estructurales, añadiendo además los valores
-del distrito anómalo. El clúster 1 destaca como el perfil más envejecido
-(índice 241,39), registrando el mayor ratio de colegios entre los grupos
-(0,29) y el menor esfuerzo de alquiler (27,74). Por su parte, el clúster
-3 se trata del perfil más joven (índice 155,05) y con el mayor esfuerzo
-de alquiler (33,70), caracterizándose por la ausencia total de
-infraestructuras hospitalarias. El clúster 2 representa un perfil de
-edad intermedio con un esfuerzo de alquiler elevado (32,82), el ratio de
-hospitales más alto y el ratio de centros educativos más bajo (0,11).
+distritos según sus rasgos estructurales, incorporando también el caso
+anómalo de Otxarkoaga. El clúster 2 destaca como el perfil más envejecido
+(231,85), con el mayor ratio de colegios (0,2740) y el mayor ratio de
+hospital (0,0783), pero también con el menor esfuerzo de alquiler
+(22,38). El clúster 3 presenta el menor envejecimiento entre los grupos (203,27),
+el ratio de colegios más bajo (0,1216) y el mayor valor de zonas verdes
+(0,0005), además del esfuerzo de alquiler más elevado entre los clústeres
+(32,43). El clúster 1 queda en una posición intermedia en envejecimiento
+y dotación, aunque mantiene también una presión residencial alta
+(32,29).
 
-Finalmente, el distrito anómalo de Otxarkoaga presenta una configuración
-extrema que justifica su exclusión del agrupamiento: supera a todos los
-clústeres en ratio de colegio (0,52) y hospitales (0,04), además de
-registrar el esfuerzo de alquiler más alto de todo el estudio (35,63).
-En conjunto, las variables más discriminantes para diferenciar estos
-perfiles y detectar la anomalía son el índice de envejecimiento, el
-ratio de colegio y el esfuerzo de alquiler.
+Por último, Otxarkoaga mantiene un perfil singular: no es el distrito más
+envejecido, pero sí destaca por el ratio de colegios más alto (0,4793),
+el mayor esfuerzo de alquiler (34,50) y el valor más alto en zonas
+verdes. Por ello, su análisis independiente resulta coherente, ya que sus
+valores podrían condicionar la interpretación del resto de clústeres.
 
 ##### Conclusión
 
@@ -10960,52 +10994,47 @@ diferenciados de distritos en Bilbao, además de un caso singular, a
 partir de variables demográficas, educativas, sanitarias y de mercado de
 vivienda. Tras el preprocesamiento de los datos y la exclusión del
 distrito de Otxarkoaga como valor atípico para evitar que distorsione el
-análisis, se ha obtenido un estadístico de Hopkins de 0,43. Aunque este
-valor refleja la continuidad propia de un entorno urbano, se valida la
-existencia de estructuras diferenciadas lo suficiente como para seguir
-con el proceso.
+análisis, se ha obtenido un estadístico de Hopkins de 0,7945849 que 
+confirma una estructura marcada en los datos pese a las pocas observaciones. 
 
-Se ha optado por una solución de k = 3 clústeres utilizando el método de
-clustering jerárquico con Ward.D2, por ser el más robusto para
-identificar grupos equilibrados en este contexto, aunque el método
-k-medias también era válido ya que la segmentación daba exactamente el
-mismo resultado. En este caso se han obtenido los 3 clústeres formados
-por 2, 2 y 3 distritos cada uno, por lo que la distribución ha resultado
-equilibrada.
+Se ha optado por una solución de k = 3 clústeres utilizando el método
+de k-medias, ya que fue el que obtuvo el mejor valor medio de
+silhouette entre los métodos comparados. Aunque Ward.D2 y PAM también
+permitían obtener una segmentación interpretable, k-medias ofreció una
+partición más consistente para este caso. La distribución de los
+distritos queda repartida en grupos de tamaño reducido, por lo que la
+interpretación debe hacerse con cierta prudencia.
 
-La interpretación de los resultados mediante PCA y perfiles medios
-muestra que las variables más influyentes son el índice de
-envejecimiento, el esfuerzo de alquiler y el ratio de centros
-educativos.
+La interpretación mediante PCA y perfiles medios muestra que las
+variables que más ayudan a diferenciar los grupos son el índice de
+envejecimiento, el esfuerzo de alquiler, el ratio de colegios, el ratio
+de hospital y las zonas verdes. Además, el distrito de Otxarkoaga se
+mantiene como caso singular y se analiza de forma independiente para no
+distorsionar la agrupación del resto de distritos.
 
 Finalmente, la caracterización propuesta de los clústeres obtenidos es
 la siguiente:
 
-c1 — Representa los distritos con el perfil demográfico más envejecido
-del estudio, con un índice de 241,39. Se caracteriza por ofrecer el
-mayor ratio de centros educativos (0,29) y, simultáneamente, presenta el
-menor esfuerzo económico para el alquiler (27,74), situándose como zonas
-consolidadas de servicios estables.
+c1 — Distritos con presión residencial alta y perfil intermedio.
+Presentan un envejecimiento moderadamente alto, un ratio de colegios
+intermedio y un esfuerzo de alquiler elevado. Su accesibilidad
+hospitalaria es baja respecto a otros grupos.
 
-c2 — Se define como un perfil de distritos con alto índice de
-envejecimiento (229,76) y que destaca por tener la oferta educativa más
-limitada de todas, con un ratio de colegios de apenas 0,11. Además,
-soporta un esfuerzo de alquiler elevado (32,82), lo que indica áreas de
-alta demanda residencial pero menor accesibilidad escolar.
+c2 — Distritos más envejecidos y con mejor dotación relativa.
+Agrupa los distritos con mayor índice de envejecimiento, mayor ratio de
+colegios y mayor ratio de hospital. Sin embargo, es el grupo con menor
+esfuerzo de alquiler.
 
-c3 — Agrupa los distritos más jóvenes de la ciudad, con el índice de
-envejecimiento más bajo (155,05) y una fuerte presión en el mercado de
-la vivienda, con un esfuerzo de alquiler de 33,70. Su rasgo más
-distintivo es la ausencia total de infraestructuras hospitalarias, (con
-un ratio de 0,00),reflejando zonas que dependen de servicios sanitarios
-de distritos cercanos.
+c3 — Distritos menos envejecidos y con mayor presión residencial.
+Presentan el menor índice de envejecimiento entre los clústeres, el
+ratio de colegios más bajo y el mayor esfuerzo de alquiler. También
+destacan por el valor más alto de zonas verdes.
 
-c4 — Corresponde al valor anómalo (Otxarkoaga), cuyos valores extremos
-justifican su tratamiento independiente fuera de los grupos principales.
-Este distrito presenta los ratios más altos de toda la muestra tanto en
-centros educativos (0,52) como en hospitales (0,04), y a su vez registra
-el esfuerzo de alquiler más costoso para el usuario (35,63),
-consolidándose como un entorno de servicios muy concentrados.
+c4 — Distrito anómalo Otxarkoaga. Caso analizado de forma independiente por 
+su perfil diferenciado, que perjudicaba el análisis si se incluía.
+Destaca por el ratio de colegios más alto, el mayor esfuerzo de alquiler
+y el valor más elevado de zonas verdes. Aunque no es el distrito más
+envejecido, sus valores extremos justifican su tratamiento separado.
 
 # 4. Objetivo 3 - Comparación Valencia y Vizcaya
 
