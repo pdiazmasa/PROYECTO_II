@@ -1,7 +1,7 @@
 ---
 title: "Memoria Proyecto II"
 author: "Grupo I A2-02"
-date: "2026-05-13"
+date: "Curso 25-26"
 output:
   html_document:
     toc: true
@@ -14,7 +14,10 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
+En este archivo se presenta el html final de nuestro proyecto donde se analizan las diferencias entre los pueblos de las provincias de Valencia y Vizcaya, a partir de datos oficiales sobre población, nacionalidad, nivel educativo, vivienda y dotación de servicios como centros educativos y sanitarios, tomando como referencia las ciudades de Valencia y Bilbao. El objetivo es identificar distintos perfiles de municipios y estudiar cómo se sitúan respecto a las capitales de cada provincia, y lo mismo a nivel de distritos de ambas cuidades.
+
+A continuación, importamos todas las librerías necesarias.
+```{r, warning=FALSE, message=FALSE}
 library(tidyverse)
 library(httr)
 library(jsonlite)
@@ -149,7 +152,7 @@ geocodificar_lista <- function(df_municipios) {
 ```
 
 ##### Ejecutamos la función para Vizcaya.
-Esta llamada hace peticiones a Nominatim y tarda varios minutos, así que la dejamos con `eval=FALSE`. El CSV de salida ya está generado en la carpeta del proyecto.
+Esta llamada hace peticiones a Nominatim.
 ```{r, eval=FALSE}
 # Extraemos y limpiamos el listado de municipios de Vizcaya
 municipios_vizcaya <- extraer_municipios(ruta_crudo_vizcaya, "Bizkaia")
@@ -159,7 +162,7 @@ coords_vizcaya <- geocodificar_lista(municipios_vizcaya)
 ```
 
 ##### Ejecutamos la función para Valencia.
-Mismo motivo que en el bloque anterior: el chunk se desactiva con `eval=FALSE` porque la geocodificación es lenta y los resultados ya están guardados.
+Esta llamada hace peticiones a Nominatim.
 ```{r, eval=FALSE}
 # Extraemos y limpiamos el listado de municipios de Bizkaia
 municipios_valencia <- extraer_municipios(ruta_crudo_valencia, "Valencia")
@@ -169,7 +172,6 @@ coords_valencia <- geocodificar_lista(municipios_valencia)
 ```
 
 ##### Guardamos los archivos en csv en la ruta indicada.
-Este chunk depende de los anteriores, así que también va con `eval=FALSE`. Los CSVs ya existen en la carpeta del proyecto.
 ```{r, eval=FALSE}
 #csv de Vizcaya
 write_csv(coords_vizcaya, ruta_output_vizcaya)
@@ -181,7 +183,7 @@ write_csv(coords_valencia, ruta_output_valencia)
 
 ### 1.1.2. Geocodificación de hospitales y centros educativos
 
-En este segundo apartado geocodificamos los servicios que después utilizaremos para calcular la accesibilidad territorial de cada municipio. En concreto, trabajamos con dos tipos de equipamientos: hospitales y centros educativos. Para ello, partimos de las bases de datos crudas de Vizcaya y Valencia, limpiamos las variables mínimas necesarias para geocodificar cada registro y, a continuación, consultamos la API de Nominatim para obtener sus coordenadas geográficas. En el caso de educación, no consideramos todos los centros de la base, sino únicamente aquellos vinculados con educación primaria y secundaria, ya que son los que utilizaremos después en la creación de los datasets para las variables *num_colegios*, *ratio_colegios* y *distancia_centro_educativo*. El resultado final de este apartado son cuatro datasets geocodificados: hospitales de Vizcaya, hospitales de Valencia, centros educativos de Vizcaya y centros educativos de Valencia.
+En este segundo apartado geocodificamos los servicios que después utilizaremos para calcular la accesibilidad territorial de cada municipio. En concreto, trabajamos con dos tipos de equipamientos: hospitales y centros educativos. Para ello, partimos de las bases de datos de Vizcaya y Valencia, limpiamos las variables mínimas necesarias para geocodificar cada registro y, a continuación, consultamos la API de Nominatim para obtener sus coordenadas geográficas. En el caso de educación, no consideramos todos los centros de la base, sino únicamente aquellos vinculados con educación primaria y secundaria, ya que son los que utilizaremos después en la creación de los datasets para las variables *num_colegios*, *ratio_colegios* y *distancia_centro_educativo*. El resultado final de este apartado son cuatro datasets geocodificados: hospitales de Vizcaya, hospitales de Valencia, centros educativos de Vizcaya y centros educativos de Valencia.
 
 ##### Fijamos las rutas de entrada (bases de datos) y de salida (datasets hechos).
 ```{r}
@@ -355,25 +357,16 @@ geocodificar_lista_servicios <- function(df_servicios) {
 ```
 
 ##### Geocodificamos los hospitales de Vizcaya.
-La geocodificación con Nominatim es lenta; el chunk se desactiva con `eval=FALSE` y el CSV final ya está disponible en la carpeta.
+La geocodificación se realiza con Nominatim.
 ```{r, eval=FALSE}
 # Leemos y limpiamos la base de hospitales de Vizcaya
 hospitales_bizkaia <- limpiar_hospitales(ruta_hospitales_bizkaia)
 
 # Aplicamos la geocodificación a todos los hospitales
 hospitales_bizkaia_coords <- geocodificar_lista_servicios(hospitales_bizkaia)
-
-# Mostramos las primeras filas para comprobar el resultado
-head(hospitales_bizkaia_coords, 5)
-
-# Prueba rápida
-hospitales_bizkaia_coords |>
-  select(nombre_hospital, municipio, lat, lon) |>
-  head(5)
 ```
 
 ##### Imputamos manualmente los faltantes.
-Depende del chunk anterior, por lo que también va desactivado.
 ```{r, eval=FALSE}
 hospitales_bizkaia_coords[2,  c("lat", "lon")] <- list(43.2969436, -2.9934568)
 hospitales_bizkaia_coords[3,  c("lat", "lon")] <- list(43.4226671, -2.7228639)
@@ -387,28 +380,15 @@ hospitales_bizkaia_coords[17, c("lat", "lon")] <- list(43.3246072, -3.0261722)
 hospitales_bizkaia_coords[18, c("lat", "lon")] <- list(43.3246072, -3.0261722)
 hospitales_bizkaia_coords[20, c("lat", "lon")] <- list(43.1683335, -2.5499465)
 hospitales_bizkaia_coords[21, c("lat", "lon")] <- list(43.2905361, -2.8553542)
-
-hospitales_bizkaia_coords |>
-  select(nombre_hospital, municipio, lat, lon) |>
-  head(21)
 ```
 
 ##### Geocodificamos los hospitales de Valencia.
-Mismo caso: chunk desactivado por lentitud; las coordenadas ya están en disco.
 ```{r, eval=FALSE}
 # Leemos y limpiamos la base de hospitales de Valencia
 hospitales_valencia <- limpiar_hospitales(ruta_hospitales_valencia)
 
 # Aplicamos la geocodificación a todos los hospitales
 hospitales_valencia_coords <- geocodificar_lista_servicios(hospitales_valencia)
-
-# Mostramos las primeras filas para comprobar el resultado
-head(hospitales_valencia_coords, 5)
-
-# Prueba rápida
-hospitales_valencia_coords |>
-  select(nombre_hospital, municipio, lat, lon) |>
-  head(5)
 ```
 
 ##### Imputamos manualmente los faltantes.
@@ -425,14 +405,9 @@ hospitales_valencia_coords[19, c("lat", "lon")] <- list(39.4698763, -0.3504978)
 hospitales_valencia_coords[25, c("lat", "lon")] <- list(39.4532418, -0.3948748)
 hospitales_valencia_coords[26, c("lat", "lon")] <- list(39.4436988, -0.3760366)
 hospitales_valencia_coords[30, c("lat", "lon")] <- list(39.0067380, -0.5102168)
-
-hospitales_valencia_coords |>
-  select(nombre_hospital, municipio, lat, lon) |>
-  head(35)
 ```
 
 ##### Geocodificamos los centros educativos de Vizcaya.
-Mismo caso de geocodificación lenta con Nominatim; chunk desactivado.
 ```{r, eval=FALSE}
 # Leemos y limpiamos la base de centros educativos de Bizkaia
 centros_bizkaia <- limpiar_centros_educativos(ruta_centros_bizkaia)
@@ -443,14 +418,6 @@ centros_bizkaia <- centros_bizkaia |>
 
 # Aplicamos la geocodificación a todos los centros educativos
 centros_bizkaia_coords <- geocodificar_lista_servicios(centros_bizkaia)
-
-# Mostramos las primeras filas para comprobar el resultado
-head(centros_bizkaia_coords, 5)
-
-# Prueba rápida
-centros_bizkaia_coords |>
-  select(nombre_centro, municipio, lat, lon) |>
-  head(5)
 ```
 
 ##### Geocodificamos los centros educativos de Valencia.
@@ -464,18 +431,9 @@ centros_valencia <- centros_valencia |>
 
 # Aplicamos la geocodificación a todos los centros educativos
 centros_valencia_coords <- geocodificar_lista_servicios(centros_valencia)
-
-# Mostramos las primeras filas para comprobar el resultado
-head(centros_valencia_coords, 5)
-
-# Prueba rápida
-centros_valencia_coords |>
-  select(nombre_centro, municipio, lat, lon) |>
-  head(5)
 ```
 
 ##### Guardamos los resultados.
-Este chunk también va con `eval=FALSE` porque depende de las variables generadas en los chunks anteriores. Los CSVs finales ya están en la carpeta.
 ```{r, eval=FALSE}
 # Nos quedamos solo con las columnas que necesitaremos en el Script 3
 hospitales_vizcaya_export <- hospitales_bizkaia_coords |>
@@ -703,7 +661,7 @@ calcular_distancia_final <- function(lat_mun, lon_mun, municipio_norm, servicios
 ```
 
 ##### Calculamos las distancias finales para Valencia.
-El cálculo de distancias por carretera con OSRM hace muchas llamadas a la API pública y tarda bastante. Lo dejamos con `eval=FALSE`; el dataset final ya está guardado.
+El cálculo de distancias por carretera con OSRM hace llamadas a la API pública.
 ```{r, eval=FALSE}
 # Calculamos la distancia a hospitales para Valencia
 dist_hospital_valencia <- map_dbl(
@@ -734,7 +692,6 @@ dataset_distancias_valencia <- municipios_valencia |>
 ```
 
 ##### Calculamos las distancias para Vizcaya.
-Mismo motivo que en Valencia: chunk desactivado por lentitud.
 ```{r, eval=FALSE}
 # Calculamos la distancia a hospitales para Vizcaya
 dist_hospital_vizcaya <- map_dbl(
@@ -765,9 +722,7 @@ dataset_distancias_vizcaya <- municipios_vizcaya |>
 ```
 
 ##### Guardamos los datasets.
-Depende de los chunks anteriores, por lo que también va con `eval=FALSE`.
 ```{r, eval=FALSE}
-# Guardamos los datasets finales de distancias
 write_csv(dataset_distancias_vizcaya, ruta_output_distancias_vizcaya)
 write_csv(dataset_distancias_valencia, ruta_output_distancias_valencia)
 ```
@@ -855,9 +810,9 @@ zonas_bilbao   <- cargar_zonas_verdes(ruta_geojson_bilbao, "Bilbao")
 ```
 
 ##### Cálculo de coordenadas.
-```{r}
+```{r, warning=FALSE, message=FALSE}
 coords_valencia <- calcular_puntos(zonas_valencia)
-coords_bilbao   <- calcular_puntos(zonas_bilbao)
+coords_bilbao <- calcular_puntos(zonas_bilbao)
 ```
 
 ##### Realizamos una revisión rápida.
@@ -900,23 +855,18 @@ El objetivo es integrar la información espacial disponible para asignar cada el
 
 ##### Fijamos las rutas de entrada y salida.
 ```{r}
-# --- Distritos ---
 ruta_distritos_valencia <- "delimitacion_distritos_valencia.geojson"
 ruta_distritos_bilbao   <- "delimitacion_distritos_bilbao.geojson"
 
-# --- Colegios ---
 ruta_colegios_valencia  <- "centros_educativos_valencia_coords.csv"
 ruta_colegios_bilbao    <- "centros_educativos_vizcaya_coords.csv"
 
-# --- Hospitales ---
 ruta_hospitales_valencia <- "hospitales_valencia_coords.csv"
 ruta_hospitales_bilbao   <- "hospitales_bizkaia_coords.csv"
 
-# --- Zonas verdes ---
 ruta_zonas_valencia <- "zonas_verdes_valencia_coords.csv"
 ruta_zonas_bilbao   <- "zonas_verdes_bilbao_coords.csv"
 
-# --- Outputs ---
 ruta_output_valencia <- "valencia_resumen.csv"
 ruta_output_bilbao   <- "bilbao_resumen.csv"
 ```
@@ -951,7 +901,6 @@ cat("Distritos Bilbao:", nrow(distritos_bilbao), "\n")
 ##### Asignamos los nombres oficiales de los distritos.
 Los GeoJSON solo contienen el número de distrito (1, 2, ...), pero el resto del proyecto trabaja con los nombres oficiales (`ALGIROS`, `DEUSTU`, etc.). Aquí construimos un diccionario número → nombre y sustituimos la columna `distrito`. Los mapeos están sacados del padrón municipal de Valencia y del censo de Bilbao.
 ```{r}
-# --- Valencia ---
 nombres_valencia <- c(
   "1"  = "CIUTAT VELLA",      "2"  = "L'EIXAMPLE",        "3"  = "EXTRAMURS",
   "4"  = "CAMPANAR",          "5"  = "LA SAIDIA",          "6"  = "EL PLA DEL REAL",
@@ -964,7 +913,6 @@ nombres_valencia <- c(
 distritos_valencia <- distritos_valencia |>
   mutate(distrito = unname(nombres_valencia[as.character(distrito)]))
 
-# --- Bilbao ---
 nombres_bilbao <- c(
   "1" = "DEUSTU",            "2" = "URIBARRI",          "3" = "OTXARKOAGA-TXURDINAGA",
   "4" = "BEGOÑA",            "5" = "IBAIONDO",          "6" = "ABANDO",
@@ -1084,6 +1032,8 @@ En este apartado se construye el dataset final de municipios de Valencia a parti
 
 Para ello, primero se prepara la base censal principal y, posteriormente, se van incorporando los distintos bloques de información mediante procesos de limpieza, normalización, agregación y unión de datos. Como resultado final, se obtiene el archivo "municipios_valencia_base_final.csv", que servirá como base para los análisis exploratorios, comparativos y de clustering posteriores.
 
+##### PREPARACIONES INICIALES
+
 ##### Creamos la función de normalización de municipios.
 ```{r}
 normalizar_municipio <- function(x) {
@@ -1120,7 +1070,6 @@ censo <- read_delim("censo_municipios_valencia.csv", delim = ";", show_col_types
 head(censo)
 dim(censo)
 colnames(censo)
-str(censo)
 ```
 
 ##### Transformamos las variables numéricas.
@@ -1167,7 +1116,6 @@ colnames(municipios_valencia_base) <- c("cod_municipio",
                                         "pob_total")
 
 head(municipios_valencia_base)
-dim(municipios_valencia_base)
 ```
 
 ##### Comprobación de duplicados y cobertura.
@@ -1240,7 +1188,7 @@ municipios_valencia_base <- left_join(municipios_valencia_base,
 head(municipios_valencia_base)
 ```
 
-##### Creamos los indicadores demográficos.
+##### Creamos los indicadores demográficos (*pct_extranjeros, indice_envejecimiento*).
 ```{r}
 municipios_valencia_base$pct_extranjeros <- 
   (municipios_valencia_base$pob_extranjera / municipios_valencia_base$pob_total) * 100
@@ -1822,7 +1770,6 @@ renta$nombre_municipio_norm <- normalizar_municipio(renta$nombre_municipio)
 
 head(renta[, c("Municipios", "cod_municipio", "nombre_municipio",
                "nombre_municipio_norm", "Total")], 5)
-str(renta)
 ```
 
 ##### Seleccionamos el indicador de renta.
@@ -1835,7 +1782,6 @@ renta_muni <- renta %>%
 
 head(renta_muni)
 dim(renta_muni)
-str(renta_muni)
 ```
 
 ##### Comprobamos si existen duplicados y la cobertura.
@@ -1945,7 +1891,6 @@ contratos_muni <- contratos_valencia %>%
 
 head(contratos_muni)
 dim(contratos_muni)
-str(contratos_muni)
 ```
 
 ##### Calculamos la variable *contratos_total*.
@@ -2240,7 +2185,6 @@ colnames(municipios_valencia_base)
 ```{r}
 head(municipios_valencia_base)
 dim(municipios_valencia_base)
-str(municipios_valencia_base)
 ```
 
 ##### ANÁLISIS EXPLORATORIO DEL DATASET FINAL DE MUNICIPIOS VALENCIA
@@ -2287,7 +2231,7 @@ Con el fin de dar respuesta al objetivo 1 del proyecto, se va a aplicar una téc
 
 La selección de variables se ha realizado a partir de un análisis previo de correlaciones (que se encuentra en el apartado "Objetivo 1" de este archivo), con el objetivo de evitar redundancias excesivas y conservar únicamente aquellas variables que aportan información relevante y complementaria para la caracterización de los municipios. En este sentido, se han priorizado indicadores expresados en porcentajes, ratios o distancias, ya que permiten comparar municipios de distinto tamaño en condiciones más homogéneas. A pesar de aún no haberse mostrado a esta altura del archivo dicho estudio de correlaciones, consideramos que los resultados obtenidos en él deben ser analizados exploratoriamente en este apartado de la creación del dataset de los municipios de Valencia debido a sus posibles posteriores tratamientos.
 
-Las variables finalmente seleccionadas recogen distintas dimensiones del fenómeno estudiado. Por una parte, *pct_extranjeros*, *indice_envejecimiento* y *pct_estudios_sup* permiten describir la composición demográfica y educativa de los municipios. Por otra, *ratio_colegios*, *distancia_centro_educativo*, *ratio_centros_salud*, *ratio_hospital* y *distancia_hospital* aportan información sobre la disponibilidad y accesibilidad de servicios básicos. A ello se suman variables de carácter socioeconómico y residencial, como *renta_media_hogar* y *esfuerzo_alquiler*, así como *pct_hogares_100mbps*, que recoge el nivel de conectividad digital. Finalmente, *pct_contratos_agricultura*, *pct_contratos_industria* y *pct_contratos_construccion* permiten aproximar la estructura productiva de cada municipio.
+Las variables finalmente seleccionadas recogen distintas dimensiones del fenómeno estudiado. Por una parte, *pct_extranjeros*, *indice_envejecimiento* y *pct_estudios_sup* permiten describir la composición demográfica y educativa de los municipios. Por otra, *ratio_colegios*, *distancia_centro_educativo*,*consultorio_local*, *ratio_centros_salud*, *ratio_hospital* y *distancia_hospital* aportan información sobre la disponibilidad y accesibilidad de servicios básicos. A ello se suman variables de carácter socioeconómico y residencial, como *esfuerzo_alquiler*, así como *pct_hogares_100mbps*, que recoge el nivel de conectividad digital. Finalmente, *pct_contratos_agricultura*, *pct_contratos_industria* y *pct_contratos_construccion* permiten aproximar la estructura productiva de cada municipio.
 
 A continuación, se realiza un análisis exploratorio en profundidad de estas variables.
 
@@ -2302,7 +2246,7 @@ colSums(is.na(municipios_valencia_base[, c(
   "ratio_centros_salud",
   "ratio_hospital",
   "distancia_hospital",
-  "renta_media_hogar",
+  "consultorio_local",
   "esfuerzo_alquiler",
   "pct_hogares_100mbps",
   "pct_contratos_agricultura",
@@ -2313,22 +2257,22 @@ colSums(is.na(municipios_valencia_base[, c(
 En las variables seleccionadas para clustering se mantiene el patrón de faltantes ya comentado previamente. Dado que la aplicación de técnicas de clustering requiere trabajar con una base sin faltantes, resulta necesario abordar estos valores ausentes antes de continuar con el análisis. Por ello, a continuación se plantean distintos procedimientos orientados a tratar los faltantes detectados y a garantizar que la base final sea adecuada para la formación de los clústeres.
 
 ##### Proceso de eliminación del municipio "Sempere".
-Se excluyó el municipio de Sempere del análisis de clustering por presentar varios valores faltantes en variables clave, como indice_envejecimiento, pct_estudios_sup, renta_media_hogar y esfuerzo_alquiler. Además, se trata de un municipio muy pequeño y con una estructura demográfica extrema, lo que dificultaba su comparabilidad con el resto. Para evitar distorsiones en la formación de los clústeres, se optó por eliminar este caso del análisis.
+Se excluyó el municipio de Sempere del análisis de clustering por presentar varios valores faltantes en variables clave, como *indice_envejecimiento, pct_estudios_sup, renta_media_hogar y esfuerzo_alquiler*. Además, se trata de un municipio muy pequeño y con una estructura demográfica extrema, lo que dificultaba su comparabilidad con el resto. Para evitar distorsiones en la formación de los clústeres, se optó por eliminar este caso del análisis.
 ```{r}
 municipios_valencia_base <- municipios_valencia_base %>%
   filter(nombre_municipio != "Sempere")
 ```
 
-##### Imputación del alquiler mediante XGBoost.
 Imputaremos los valores faltantes tanto de *alquiler_m2* como de *pct_estudios_sup* mediante un modelo de regresión XGBoost, realizando previamente una prueba del modelo con el 80% de los municipios que sí que tengan valor para entrenar al modelo, y el 20% restante para probarlo. De esta forma se podrán comparar sus valores reales en alquiler/estudios superiores con la estimación proporcionada por el modelo antes de imputar y comprobar el error del modelo.
 
+##### Imputación del alquiler mediante XGBoost.
 A continuación, seleccionamos los municipios con alquiler conocido para validar el modelo.
 ```{r}
 datos_xgb <- municipios_valencia_base %>%
   filter(!is.na(precio_m2_alquiler))
 ```
 
-Sustituimos los NA de renta_media_hogar por la mediana.
+Sustituimos los NA de *renta_media_hogar* por la mediana.
 ```{r}
 municipios_valencia_base$`renta_media_hogar`[
   is.na(municipios_valencia_base$`renta_media_hogar`)
@@ -2366,7 +2310,7 @@ y_train_valid_xgb <- train_data$precio_m2_alquiler
 ```
 
 Ajustamos el modelo XGBoost de validación.
-```{r}
+```{r, warning=FALSE, message=FALSE}
 set.seed(123)
 
 modelo_alquiler_xgb_valid <- xgboost(
@@ -2460,7 +2404,7 @@ y_train_final_xgb <- municipios_valencia_base %>%
 ```
 
 Ajustamos el modelo final con XGBoost.
-```{r}
+```{r, warning=FALSE, message=FALSE}
 set.seed(123)
 
 modelo_alquiler_xgb_final <- xgboost(
@@ -2563,7 +2507,7 @@ y_train_estudios_xgb <- train_data_estudios$pct_estudios_sup
 ```
 
 Ajustamos el modelo XGBoost de validación.
-```{r}
+```{r, warning=FALSE, message=FALSE}
 set.seed(123)
 
 modelo_estudios_xgb_valid <- xgboost(
@@ -2657,7 +2601,7 @@ y_train_final_estudios_xgb <- municipios_valencia_base %>%
 ```
 
 Realizamos el ajuste del modelo final con XGBoost.
-```{r}
+```{r, warning=FALSE, message=FALSE}
 set.seed(123)
 
 modelo_estudios_xgb_final <- xgboost(
@@ -2690,7 +2634,7 @@ X_pred_final_estudios_xgb <- municipios_valencia_base %>%
     precio_m2_alquiler = precio_m2_alquiler) %>% as.matrix()
 ```
 
-Realizamos una imputación directa de los valores faltantes de *pct_estudios_sup*
+Realizamos una imputación directa de los valores faltantes de *pct_estudios_sup*.
 ```{r}
 municipios_valencia_base$pct_estudios_sup[
   is.na(municipios_valencia_base$pct_estudios_sup)
@@ -2737,9 +2681,6 @@ boxplot(municipios_valencia_base$ratio_hospital,
 boxplot(municipios_valencia_base$distancia_hospital,
         main = "Boxplot de distancia_hospital")
 
-boxplot(municipios_valencia_base$renta_media_hogar,
-        main = "Boxplot de renta_media_hogar")
-
 boxplot(municipios_valencia_base$esfuerzo_alquiler,
         main = "Boxplot de esfuerzo_alquiler")
 
@@ -2756,7 +2697,7 @@ boxplot(municipios_valencia_base$pct_contratos_construccion,
         main = "Boxplot de pct_contratos_construccion")
 ```
 
-En general, los diagramas de caja muestran la presencia de valores atípicos en varias de las variables seleccionadas para clustering. Los casos más destacados aparecen en *indice_envejecimiento*, *pct_estudios_sup*, *ratio_colegios*, *ratio_centros_salud*, *ratio_hospital*, *distancia_hospital* y en las variables de estructura productiva, especialmente *pct_contratos_agricultura*, *pct_contratos_industria* y *pct_contratos_construccion*. En la mayoría de los casos, estos valores extremos parecen responder a municipios con perfiles muy diferenciados, más que a errores en la construcción de las variables. Por su parte, variables como *pct_extranjeros*, *renta_media_hogar* y *esfuerzo_alquiler* presentan una distribución más concentrada y un número menor de valores atípicos, mientras que *pct_hogares_100mbps* muestra una variabilidad reducida.
+En general, los diagramas de caja muestran la presencia de valores atípicos en varias de las variables seleccionadas para clustering. Los casos más destacados aparecen en *indice_envejecimiento*, *pct_estudios_sup*, *ratio_colegios*, *ratio_centros_salud*, *ratio_hospital*, *distancia_hospital* y en las variables de estructura productiva, especialmente *pct_contratos_agricultura*, *pct_contratos_industria* y *pct_contratos_construccion*. En la mayoría de los casos, estos valores extremos parecen responder a municipios con perfiles muy diferenciados, más que a errores en la construcción de las variables. Por su parte, variables como *pct_extranjeros* y *esfuerzo_alquiler* presentan una distribución más concentrada y un número menor de valores atípicos, mientras que *pct_hogares_100mbps* muestra una variabilidad reducida.
 
 ##### Distribución de variables numéricas.
 ```{r}
@@ -2792,10 +2733,6 @@ hist(municipios_valencia_base$distancia_hospital,
      main = "Histograma de distancia_hospital",
      xlab = "distancia_hospital")
 
-hist(municipios_valencia_base$renta_media_hogar,
-     main = "Histograma de renta_media_hogar",
-     xlab = "renta_media_hogar")
-
 hist(municipios_valencia_base$esfuerzo_alquiler,
      main = "Histograma de esfuerzo_alquiler",
      xlab = "esfuerzo_alquiler")
@@ -2817,11 +2754,11 @@ hist(municipios_valencia_base$pct_contratos_construccion,
      xlab = "pct_contratos_construccion")
 ```
 
-Los histogramas muestran que las variables seleccionadas para clustering presentan distribuciones heterogéneas, algo esperable dado que recogen dimensiones muy distintas del perfil municipal. Variables como *pct_extranjeros*, *pct_estudios_sup*, *renta_media_hogar* y *esfuerzo_alquiler* presentan distribuciones relativamente más concentradas, aunque con cierta asimetría a la derecha. En cambio, *indice_envejecimiento* muestra una asimetría mucho más acusada, con una fuerte concentración de municipios en valores bajos o intermedios y una cola larga hacia valores elevados.
+Los histogramas muestran que las variables seleccionadas para clustering presentan distribuciones heterogéneas, algo esperable dado que recogen dimensiones muy distintas del perfil municipal. Variables como *pct_extranjeros*, *pct_estudios_sup* y *esfuerzo_alquiler* presentan distribuciones relativamente más concentradas, aunque con cierta asimetría a la derecha. En cambio, *indice_envejecimiento* muestra una asimetría mucho más acusada, con una fuerte concentración de municipios en valores bajos o intermedios y una cola larga hacia valores elevados.
 
 Por su parte, en variables como *ratio_colegios*, *ratio_centros_salud*, *ratio_hospital*, *distancia_centro_educativo* y *distancia_hospital* se observa una acumulación importante en valores bajos o próximos a cero, algo coherente con la propia naturaleza de estas medidas, ya que muchos municipios presentan una dotación reducida o distancias cortas a determinados servicios, mientras que unos pocos se sitúan en valores claramente más altos. De forma similar, *pct_contratos_agricultura*, *pct_contratos_industria* y *pct_contratos_construccion* muestran distribuciones muy asimétricas a la derecha, con muchos municipios concentrados en porcentajes bajos y unos pocos con especialización sectorial más marcada.
 
-Finalmente, *pct_hogares_100mbps* se concentra en valores muy altos, próximos al 100, lo que resulta coherente tanto con la elevada extensión actual de la conectividad digital como con el enfoque del proyecto hacia perfiles residenciales en los que este factor puede ser especialmente relevante, como ocurre en el caso de la población teletrabajadora. En conjunto, estas distribuciones no invalidan el análisis de clustering, pero sí muestran la necesidad de trabajar posteriormente con variables estandarizadas para evitar que las diferencias de escala condicionen en exceso la formación de los grupos.
+Finalmente, *pct_hogares_100mbps* se concentra en valores muy altos, próximos al 100, lo que resulta coherente tanto con la elevada extensión actual de la conectividad digital como con el enfoque del proyecto hacia perfiles de población teletrabajadora. En conjunto, estas distribuciones no invalidan el análisis de clustering, pero sí muestran la necesidad de trabajar posteriormente con variables estandarizadas para evitar que las diferencias de escala condicionen en exceso la formación de los grupos.
 
 ##### Revisión de variables binarias.
 ```{r}
@@ -2928,7 +2865,6 @@ colnames(municipios_bizkaia_base) <- c("cod_municipio",
                                        "pob_total")
 
 head(municipios_bizkaia_base)
-dim(municipios_bizkaia_base)
 ```
 
 ##### Comprobamos los duplicados y la cobertura.
@@ -3686,7 +3622,6 @@ if (!is.na(col_total)) {
       contratos_total_fuente = NA_real_)}
 
 head(contratos_muni)
-str(contratos_muni)
 ```
 
 ##### Construimos las variables anuales por municipio.
@@ -3797,7 +3732,7 @@ sum(is.na(municipios_bizkaia_base$pct_contratos_servicios))
 municipios_bizkaia_base$suma_pct_contratos <- NULL
 ```
 
-##### Creación de la naturaleza contractual de los municipios: Seleccionamos las variables de contratos utilizadas
+##### Creación de la naturaleza contractual de los municipios: Seleccionamos las variables de contratos utilizadas.
 ```{r}
 vars_contratos <- c(
   "pct_contratos_agricultura",
@@ -4023,7 +3958,6 @@ colnames(municipios_bizkaia_base)
 ```{r}
 head(municipios_bizkaia_base)
 dim(municipios_bizkaia_base)
-str(municipios_bizkaia_base)
 ```
 
 ##### ANÁLISIS EXPLORATORIO DEL DATASET FINAL
@@ -4070,7 +4004,7 @@ Con el fin de dar respuesta al objetivo 1 del proyecto, se va a aplicar una téc
 
 La selección de variables se ha realizado a partir de un análisis previo de correlaciones (que se encuentra en el apartado "Objetivo 1" de este archivo), con el objetivo de evitar redundancias excesivas y conservar únicamente aquellas variables que aportan información relevante y complementaria para la caracterización de los municipios. En este sentido, se han priorizado indicadores expresados en porcentajes, ratios o distancias, ya que permiten comparar municipios de distinto tamaño en condiciones más homogéneas. A pesar de aún no haberse mostrado a esta altura del archivo dicho estudio de correlaciones, consideramos que los resultados obtenidos en él deben ser analizados exploratoriamente en este apartado de la creación del dataset de los municipios de Vizcaya debido a sus posibles posteriores tratamientos.
 
-Las variables finalmente seleccionadas recogen distintas dimensiones del fenómeno estudiado. Por una parte, *pct_extranjeros*, *indice_envejecimiento* y *pct_estudios_sup* permiten describir la composición demográfica y educativa de los municipios. Por otra, *ratio_colegios*, *distancia_centro_educativo*, *ratio_centros_salud*, *ratio_hospital* y *distancia_hospital* aportan información sobre la disponibilidad y accesibilidad de servicios básicos. A ello se suman variables de carácter socioeconómico y residencial, como *renta_media_hogar* y *esfuerzo_alquiler*, así como *pct_hogares_100mbps*, que recoge el nivel de conectividad digital. Finalmente, *pct_contratos_agricultura*, *pct_contratos_industria* y *pct_contratos_construccion* permiten aproximar la estructura productiva de cada municipio.
+Las variables finalmente seleccionadas recogen distintas dimensiones del fenómeno estudiado. Por una parte, *pct_extranjeros*, *indice_envejecimiento* y *pct_estudios_sup* permiten describir la composición demográfica y educativa de los municipios. Por otra, *ratio_colegios*, *distancia_centro_educativo*,*consultorio_local* *ratio_centros_salud*, *ratio_hospital* y *distancia_hospital* aportan información sobre la disponibilidad y accesibilidad de servicios básicos. A ello se suman variables de carácter socioeconómico y residencial, como *esfuerzo_alquiler*, así como *pct_hogares_100mbps*, que recoge el nivel de conectividad digital. Finalmente, *pct_contratos_agricultura*, *pct_contratos_industria* y *pct_contratos_construccion* permiten aproximar la estructura productiva de cada municipio.
 
 A continuación, se realiza un análisis exploratorio en profundidad de estas variables.
 
@@ -4085,7 +4019,7 @@ colSums(is.na(municipios_bizkaia_base[, c(
   "ratio_centros_salud",
   "ratio_hospital",
   "distancia_hospital",
-  "renta_media_hogar",
+  "consultorio_local",
   "esfuerzo_alquiler",
   "pct_hogares_100mbps",
   "pct_contratos_agricultura",
@@ -4142,7 +4076,7 @@ y_train_valid_xgb <- train_data$precio_m2_alquiler
 ```
 
 Ajustamos el modelo XGBoost de validación.
-```{r}
+```{r, warning=FALSE, message=FALSE}
 set.seed(123)
 
 modelo_alquiler_xgb_valid <- xgboost(
@@ -4238,7 +4172,7 @@ y_train_final_xgb <- municipios_bizkaia_base %>%
 ```
 
 Ajustamos el modelo final con XGBoost.
-```{r}
+```{r, warning=FALSE, message=FALSE}
 set.seed(123)
 
 modelo_alquiler_xgb_final <- xgboost(
@@ -4340,7 +4274,7 @@ y_train_estudios_xgb <- train_data_estudios$pct_estudios_sup
 ```
 
 Ajustamos el modelo XGBoost de validación.
-```{r}
+```{r, warning=FALSE, message=FALSE}
 set.seed(123)
 
 modelo_estudios_xgb_valid <- xgboost(
@@ -4436,7 +4370,7 @@ y_train_final_estudios_xgb <- municipios_bizkaia_base %>%
 ```
 
 Ajustamos el modelo final con XGBoost.
-```{r}
+```{r, warning=FALSE, message=FALSE}
 set.seed(123)
 
 modelo_estudios_xgb_final <- xgboost(
@@ -4518,9 +4452,6 @@ boxplot(municipios_bizkaia_base$ratio_hospital,
 boxplot(municipios_bizkaia_base$distancia_hospital,
         main = "Boxplot de distancia_hospital")
 
-boxplot(municipios_bizkaia_base$renta_media_hogar,
-        main = "Boxplot de renta_media_hogar")
-
 boxplot(municipios_bizkaia_base$esfuerzo_alquiler,
         main = "Boxplot de esfuerzo_alquiler")
 
@@ -4537,7 +4468,7 @@ boxplot(municipios_bizkaia_base$pct_contratos_construccion,
         main = "Boxplot de pct_contratos_construccion")
 ```
 
-En general, los diagramas de caja muestran la presencia de valores atípicos en varias de las variables seleccionadas para clustering. Los casos más claros aparecen en *indice_envejecimiento*, *distancia_centro_educativo*, *ratio_centros_salud*, *ratio_hospital*, *distancia_hospital* y *esfuerzo_alquiler*. También se observan valores extremos en las variables de estructura productiva, especialmente en *pct_contratos_agricultura* y *pct_contratos_industria*, y de forma más moderada en *pct_contratos_construccion*. Por el contrario, variables como *pct_extranjeros*, *pct_estudios_sup*, *ratio_colegios*, *renta_media_hogar* y *pct_hogares_100mbps* presentan distribuciones más concentradas y apenas muestran valores atípicos. En conjunto, estos casos extremos parecen reflejar municipios con perfiles muy diferenciados, más que errores en la construcción de la base.
+En general, los diagramas de caja muestran la presencia de valores atípicos en varias de las variables seleccionadas para clustering. Los casos más claros aparecen en *indice_envejecimiento*, *distancia_centro_educativo*, *ratio_centros_salud*, *ratio_hospital*, *distancia_hospital* y *esfuerzo_alquiler*. También se observan valores extremos en las variables de estructura productiva, especialmente en *pct_contratos_agricultura* y *pct_contratos_industria*, y de forma más moderada en *pct_contratos_construccion*. Por el contrario, variables como *pct_extranjeros*, *pct_estudios_sup*, *ratio_colegios* y *pct_hogares_100mbps* presentan distribuciones más concentradas y apenas muestran valores atípicos. En conjunto, estos casos extremos parecen reflejar municipios con perfiles muy diferenciados, más que errores en la construcción de la base.
 
 ##### Distribución de variables numéricas.
 ```{r}
@@ -4572,10 +4503,6 @@ hist(municipios_bizkaia_base$ratio_hospital,
 hist(municipios_bizkaia_base$distancia_hospital,
      main = "Histograma de distancia_hospital",
      xlab = "distancia_hospital")
-
-hist(municipios_bizkaia_base$renta_media_hogar,
-     main = "Histograma de renta_media_hogar",
-     xlab = "renta_media_hogar")
 
 hist(municipios_bizkaia_base$esfuerzo_alquiler,
      main = "Histograma de esfuerzo_alquiler",
@@ -4673,7 +4600,6 @@ censo <- readxl::read_excel("censo_distritos_valencia.xls", skip = 2)
 head(censo)
 dim(censo)
 colnames(censo)
-str(censo)
 ```
 
 ##### Creamos el dataset base y columnas de identificación.
@@ -4716,7 +4642,6 @@ dim(distritos_valencia_base)
 ##### BLOQUE DEMOGRÁFICO
 
 ##### Calculamos el índice de envejecimiento.
-El índice de envejecimiento se calcula como el cociente entre la población mayor de 65 años y la población menor de 16 años, expresado en tanto por ciento. Recoge la proporción relativa de personas mayores frente a jóvenes en cada distrito.
 ```{r}
 distritos_valencia_base$indice_envejecimiento <-
   (distritos_valencia_base$pob_mayor_65 / distritos_valencia_base$pob_menor_16) * 100
@@ -4858,7 +4783,6 @@ dim(renta)
 ```
 
 ##### Incorporación de la variable *renta_media_hogar*.
-Como ya se ha mencionado anteriormente, se une la tabla de renta con el dataset principal mediante el número de distrito.
 ```{r}
 distritos_valencia_base <- distritos_valencia_base %>%
   left_join(
@@ -4887,25 +4811,6 @@ sum(is.na(distritos_valencia_base$esfuerzo_alquiler))
 ```
 
 El distrito 17 "Pobles del Nord" no dispone de datos de alquiler y, por tanto, tampoco se puede calcular su esfuerzo de alquiler.
-
-##### Revisamos los distritos con mayor esfuerzo de alquiler.
-Este listado permite identificar los distritos donde el alquiler de una vivienda de 80 m² supone un mayor esfuerzo económico para el hogar medio.
-```{r}
-distritos_valencia_base %>%
-  filter(!is.na(esfuerzo_alquiler)) %>%
-  select(nombre_distrito, pob_total, alquiler_m2, renta_media_hogar, esfuerzo_alquiler) %>%
-  arrange(desc(esfuerzo_alquiler)) %>%
-  head(10)
-```
-
-##### Revisamos los distritos con menor esfuerzo de alquiler.
-```{r}
-distritos_valencia_base %>%
-  filter(!is.na(esfuerzo_alquiler)) %>%
-  select(nombre_distrito, pob_total, alquiler_m2, renta_media_hogar, esfuerzo_alquiler) %>%
-  arrange(esfuerzo_alquiler) %>%
-  head(9)
-```
 
 ##### BLOQUE DE ZONAS VERDES
 
@@ -4972,7 +4877,6 @@ colnames(distritos_valencia_base)
 ##### Vista general del dataset final.
 ```{r}
 head(distritos_valencia_base)
-str(distritos_valencia_base)
 dim(distritos_valencia_base)
 ```
 
@@ -5062,7 +4966,7 @@ y_train_valencia_xgb <- train_data_valencia$alquiler_m2
 ```
 
 Ajustamos el modelo XGBoost de validación.
-```{r}
+```{r, warning=FALSE, message=FALSE}
 set.seed(123)
 
 modelo_valencia_xgb_valid <- xgboost(
@@ -5151,7 +5055,7 @@ y_train_final_valencia_xgb <- distritos_valencia_base %>%
 ```
 
 Ajustamos el modelo final con XGBoost.
-```{r}
+```{r, warning=FALSE, message=FALSE}
 set.seed(123)
 
 modelo_valencia_xgb_final <- xgboost(
@@ -5312,7 +5216,6 @@ censo <- read_csv("censo_distritos_bilbao_agrupado.csv", show_col_types = FALSE)
 head(censo)
 dim(censo)
 colnames(censo)
-str(censo)
 ```
 
 ##### Creamos el dataset base y las columnas de identificación.
@@ -5354,7 +5257,6 @@ dim(distritos_bilbao_base)
 ##### BLOQUE DEMOGRÁFICO
 
 ##### Calculamos el índice de envejecimiento.
-El índice de envejecimiento se calcula como el cociente entre la población mayor de 65 años y la población menor de 16 años, expresado en tanto por ciento. Recoge la proporción relativa de personas mayores frente a jóvenes en cada distrito.
 ```{r}
 distritos_bilbao_base$indice_envejecimiento <-
   (distritos_bilbao_base$pob_mayor_65 / distritos_bilbao_base$pob_menor_16) * 100
@@ -5527,25 +5429,6 @@ sum(is.na(distritos_bilbao_base$renta_media_hogar))
 sum(is.na(distritos_bilbao_base$esfuerzo_alquiler))
 ```
 
-##### Revisamos los distritos con mayor esfuerzo de alquiler.
-Este listado permite identificar los distritos donde el alquiler de una vivienda de 80 m² supone un mayor esfuerzo económico para el hogar medio.
-```{r}
-distritos_bilbao_base %>%
-  filter(!is.na(esfuerzo_alquiler)) %>%
-  select(nombre_distrito, pob_total, alquiler_m2, renta_media_hogar, esfuerzo_alquiler) %>%
-  arrange(desc(esfuerzo_alquiler)) %>%
-  head(8)
-```
-
-##### Revisamos los distritos con menor esfuerzo de alquiler.
-```{r}
-distritos_bilbao_base %>%
-  filter(!is.na(esfuerzo_alquiler)) %>%
-  select(nombre_distrito, pob_total, alquiler_m2, renta_media_hogar, esfuerzo_alquiler) %>%
-  arrange(esfuerzo_alquiler) %>%
-  head(8)
-```
-
 ##### BLOQUE DE ZONAS VERDES
 
 ##### Incorporación de la variable *num_zonas_verdes*.
@@ -5606,7 +5489,6 @@ colnames(distritos_bilbao_base)
 ##### Vista general del dataset final.
 ```{r}
 head(distritos_bilbao_base)
-str(distritos_bilbao_base)
 dim(distritos_bilbao_base)
 ```
 
@@ -5658,7 +5540,6 @@ colSums(is.na(distritos_bilbao_base[, c(
 En las variables seleccionadas para el clustering, el patrón de faltantes es prácticamente inexistente. En concreto, *indice_envejecimiento*, *ratio_colegio*, *ratio_hospital* y *ratio_zonas_verdes* no presentan valores ausentes, mientras que *esfuerzo_alquiler* registra un único valor faltante, el cual se va a arreglar a continuación mediante la imputación del valor faltante existente en *alquiler_m2*.
 
 ##### Imputación del precio del alquiler mediante XGBoost.
-
 Seleccionamos los distritos con *alquiler_m2* conocido para entrenar el modelo.
 ```{r}
 datos_xgb_bilbao <- distritos_bilbao_base %>%
@@ -5685,7 +5566,7 @@ y_train_bilbao_xgb <- datos_xgb_bilbao$alquiler_m2
 ```
 
 Ajustamos el modelo XGBoost con el 100% de los distritos con *alquiler_m2* conocido.
-```{r}
+```{r, warning=FALSE, message=FALSE}
 set.seed(123)
 
 modelo_bilbao_xgb_final <- xgboost(
@@ -5828,12 +5709,10 @@ municipios_vizcaya <- read_csv("municipios_vizcaya_base_final.csv")
 head(municipios_valencia)
 dim(municipios_valencia)
 colnames(municipios_valencia)
-str(municipios_valencia)
 
 head(municipios_vizcaya)
 dim(municipios_vizcaya)
 colnames(municipios_vizcaya)
-str(municipios_vizcaya)
 ```
 
 ##### Revisamos las diferencias de estructura entre ambas bases.
@@ -5890,7 +5769,6 @@ municipios_base <- bind_rows(municipios_valencia, municipios_vizcaya)
 head(municipios_base)
 dim(municipios_base)
 colnames(municipios_base)
-str(municipios_base)
 ```
 
 ##### Comprobamos el número de municipios por provincia.
@@ -5931,31 +5809,6 @@ valores_perdidos <- municipios_base %>%
   arrange(desc(n_na))
 
 valores_perdidos
-```
-
-##### Calculamos del porcentaje de valores faltantes por variable.
-```{r}
-porcentaje_perdidos <- municipios_base %>%
-  summarise(across(everything(), ~ mean(is.na(.)) * 100)) %>%
-  pivot_longer(cols = everything(),
-               names_to = "variable",
-               values_to = "pct_na") %>%
-  arrange(desc(pct_na))
-
-porcentaje_perdidos
-```
-
-##### Unificamos la información sobre valores faltantes.
-```{r}
-resumen_perdidos <- left_join(valores_perdidos, porcentaje_perdidos, by = "variable")
-
-resumen_perdidos
-```
-
-##### Revisamos las variables con valores faltantes.
-```{r}
-resumen_perdidos %>%
-  filter(n_na > 0)
 ```
 
 ##### REVISIÓN DE LA VARIABILIDAD DE LAS VARIABLES NUMÉRICAS
@@ -6037,7 +5890,6 @@ municipios_corr_base <- municipios_base %>%
 head(municipios_corr_base)
 dim(municipios_corr_base)
 colnames(municipios_corr_base)
-str(municipios_corr_base)
 ```
 
 ##### PRIMERA DEPURACIÓN DE VARIABLES ANTES DEL CÁLCULO DE CORRELACIONES
@@ -6082,7 +5934,7 @@ st(municipios_corr_principal)
 ```
 
 ##### Calculamos de la matriz de correlación de Pearson.
-```{r}
+```{r,warning=FALSE, message=FALSE}
 cor_pearson <- cor(municipios_corr_principal,
                    use = "pairwise.complete.obs",
                    method = "pearson")
@@ -6090,23 +5942,13 @@ cor_pearson <- cor(municipios_corr_principal,
 cor_pearson
 ```
 
-##### Redondeamos la matriz de correlación de Pearson.
-```{r}
-round(cor_pearson, 3)
-```
-
 ##### Calculamos la matriz de correlación de Spearman.
-```{r}
+```{r, warning=FALSE, message=FALSE}
 cor_spearman <- cor(municipios_corr_principal,
                     use = "pairwise.complete.obs",
                     method = "spearman")
 
 cor_spearman
-```
-
-##### Redondeamos la matriz de correlación de Spearman.
-```{r}
-round(cor_spearman, 3)
 ```
 
 ##### REVISIÓN DE VARIABLES PROBLEMÁTICAS ANTES DE LA VISUALIZACIÓN
@@ -6148,7 +5990,7 @@ sum(is.infinite(cor_pearson))
 ```
 
 ##### Construccimos una versión limpia de Spearman para la visualización.
-```{r}
+```{r, warning=FALSE, message=FALSE}
 cor_spearman <- cor(municipios_corr_principal_limpia,
                     use = "pairwise.complete.obs",
                     method = "spearman")
@@ -6238,7 +6080,7 @@ relaciones_altas
 
 ##### APOYO A LA INTERPRETACIÓN MEDIANTE GRÁFICOS DE DISPERSIÓN
 
-##### Representamos algunos pares de variables relevantes
+##### Representamos algunos pares de variables relevantes.
 ```{r}
 ggplot(municipios_base, aes(x = pob_extranjera, y = pct_extranjeros)) +
   geom_point() +
@@ -6387,8 +6229,8 @@ Finalmente, se guarda la matriz estandarizada con el nombre*matriz_clustering*, 
 matriz_clustering <- datos_clustering_scaled
 ```
 
-##### Elección de la medida de distancia y tendencia de agrupamiento
-Una vez preparada la matriz numérica estandarizada, se selecciona lamedida de distancia que se utilizará para cuantificar la disimilitud entre municipios. Como las variables activas son numéricas y han sido previamente centradas y escaladas, se emplea la distancia euclídea.
+##### Elección de la medida de distancia y tendencia de agrupamiento.
+Una vez preparada la matriz numérica estandarizada, se selecciona la medida de distancia que se utilizará para cuantificar la disimilitud entre municipios. Como las variables activas son numéricas y han sido previamente centradas y escaladas, se emplea la distancia euclídea.
 
 Esta medida resulta adecuada porque permite comparar los municipios en un espacio multidimensional donde todas las variables contribuyen en una escala común. Además, la distancia euclídea es una de las medidas más utilizadas en combinación con métodos como el clustering jerárquico con criterio de Ward y el algoritmo k-means.
 
@@ -6401,19 +6243,21 @@ dist_municipios <- dist(
   matriz_clustering,
   method = "euclidean")
 
-dist_municipios
+as.matrix(dist_municipios)[1:10, 1:10]
 ```
 
 ##### Visualizamos la matriz de distancias.
-```{r}
+```{r, warning=FALSE, message=FALSE}
 fviz_dist(
   dist_municipios,
   show_labels = FALSE)
 ```
 
+La visualización de la matriz de distancias muestra diferencias apreciables entre municipios, con zonas de menor y mayor disimilitud representadas mediante distintos niveles de color. Se observan algunos bloques más homogéneos y ciertas estructuras lineales más marcadas, lo que sugiere la existencia de municipios con perfiles relativamente similares y otros claramente diferenciados respecto al conjunto. En conjunto, el gráfico indica que los datos presentan cierta estructura agrupable, lo que apoya la aplicación de técnicas de clustering.
+
 ##### Calculamos la tendencia de agrupamiento con el estadístico de Hopkins.
 Valores cercanos a 0,5 indican una distribución aproximadamente aleatoria, mientras que valores más próximos a 1 sugieren una mayor tendencia a formar clústeres.
-```{r}
+```{r, warning=FALSE, message=FALSE}
 set.seed(123)
 
 hopkins_municipios <- get_clust_tendency(
@@ -6473,7 +6317,7 @@ sustantivo frente al estadístico.
 En este apartado se comparan distintos métodos de clustering aplicados sobre la misma matriz de datos previamente escalada. Como en la fase anterior se ha seleccionado una solución de seis clústeres, todos los métodos se aplican con `k = 6`. De esta forma, la comparación entre métodos es coherente y permite valorar si las agrupaciones obtenidas son similares o si dependen mucho del algoritmo utilizado.
 
 En primer lugar, se aplica clustering jerárquico con el método de Ward, ya que este método busca formar grupos homogéneos minimizando la variabilidad dentro de los clústeres.
-```{r}
+```{r, warning=FALSE, message=FALSE}
 clustering_jerarquico <- hclust(
   d = dist_municipios,
   method = "ward.D2")
@@ -6523,7 +6367,7 @@ municipios_cluster <- municipios_cluster %>%
 table(municipios_cluster$cluster_kmeans)
 ```
 
-En tercer lugar, se aplica el método PAM (Partitioning Around Medoids), también conocido como k-medoides. Al igual que k-medias, es un método de partición, pero en lugar de representar cada clúster mediante un centroide promedio, utiliza observaciones reales como representantes de los grupos. Esto puede hacerlo más robusto frente a observacionesextremas.
+En tercer lugar, se aplica el método PAM (Partitioning Around Medoids), también conocido como k-medoides, el cual es más robusto frente a observaciones extremas.
 ```{r}
 # Clustering mediante PAM / k-medoides
 set.seed(123)
@@ -6541,7 +6385,7 @@ municipios_cluster <- municipios_cluster %>%
 table(municipios_cluster$cluster_pam)
 ```
 
-El método PAM también divide los municipios en seis grupos, pero lo hace utilizando medoides, es decir, municipios reales que actúan como representantes de cada clúster. La tabla anterior permite comprobar si la solución obtenida con PAM reparte los municipios de forma similar alos métodos anteriores o si genera una partición diferente.
+El método PAM también divide los municipios en seis grupos, pero lo hace utilizando medoides, es decir, municipios reales que actúan como representantes de cada clúster. La tabla anterior permite comprobar si la solución obtenida con PAM reparte los municipios de forma similar a los métodos anteriores o si genera una partición diferente.
 
 Para comparar los tres métodos utilizados, se construyen tablas cruzadas entre la clasificación jerárquica, la clasificación de k-medias y la clasificación PAM.
 ```{r}
@@ -6567,10 +6411,10 @@ tabla_kmeans_pam <- table(
 tabla_kmeans_pam
 ```
 
-Las tablas cruzadas permiten comparar las asignaciones obtenidas por los distintos métodos. En la comparación entre jerárquico y k-medias se aprecian correspondencias parciales entre algunos grupos, aunque ladistribución de municipios entre clústeres difiere de forma notable, lo que es esperable dado que ambos métodos siguen estrategias deoptimización distintas. La comparación con PAM muestra un grado de acuerdo moderado. En conjunto, la correspondencia entre métodos no es total, lo que indica que la elección del algoritmo tiene un impacto real
+Las tablas cruzadas permiten comparar las asignaciones obtenidas por los distintos métodos. En la comparación entre jerárquico y k-medias se aprecian correspondencias parciales entre algunos grupos, aunque ladistribución de municipios entre clústeres difiere de forma notable, lo que es esperable dado que ambos métodos siguen estrategias de optimización distintas. La comparación con PAM muestra un grado de acuerdo moderado. En conjunto, la correspondencia entre métodos no es total, lo que indica que la elección del algoritmo tiene un impacto real
 en la clasificación de los municipios con perfiles más intermedios o próximos a las fronteras entre grupos.
 
-También se puede visualizar la solución obtenida mediante k-medias sobrelas dos primeras dimensiones principales.
+También se puede visualizar la solución obtenida mediante k-medias sobre las dos primeras dimensiones principales.
 ```{r}
 fviz_cluster(
   clustering_kmeans,
@@ -6606,7 +6450,7 @@ fviz_cluster(
   main = "Clustering PAM con k = 6 - Municipios Valencia")
 ```
 
-La solución PAM muestra una distribución de los municipios más compactaen algunos grupos respecto al método jerárquico, aunque también presenta mayor solapamiento entre clústeres adyacentes en el espacio
+La solución PAM muestra una distribución de los municipios más compacta en algunos grupos respecto al método jerárquico, aunque también presenta mayor solapamiento entre clústeres adyacentes en el espacio
 bidimensional.
 
 A continuación, mostramos los gráficos de silueta para los tres métodos.
@@ -6650,11 +6494,11 @@ plot(
 par(mfrow = c(1, 1))
 ```
 
-Tras aplicar los tres métodos con k = 6, se opta por k-medias como solución principal, ya que obtiene la anchura de silueta media más alta (0,18), frente a WARD y K-MEDOIDES, ambos con 0,16. Si bien WARD presenta el clúster 1 con valor negativo (-0,02) y un clúster 5 deapenas 2 municipios, lo que refleja la tendencia del método jerárquico a generar grupos muy pequeños con observaciones atípicas, k-medias también presenta el clúster 5 en negativo (-0,01) y el clúster 6 con un valor muy bajo (0,04). K-MEDOIDES registra el clúster 1 prácticamente en cero (-0,004) y los clústeres 5 y 6 con valores bajos. En este contexto, k-medias ofrece la distribución más equilibrada de municipios entre grupos (ningún grupo con menos de 5 observaciones) y la mejor calidad global de agrupamiento, por lo que se selecciona como método principal para la interpretación.
+Tras aplicar los tres métodos con k = 6, se opta por k-medias como solución principal, ya que obtiene la anchura de silueta media más alta (0,18), frente a WARD y K-MEDOIDES, ambos con 0,16. Si bien WARD presenta el clúster 1 con valor negativo (-0,02) y un clúster 5 de apenas 2 municipios, lo que refleja la tendencia del método jerárquico a generar grupos muy pequeños con observaciones atípicas, k-medias también presenta el clúster 5 en negativo (-0,01) y el clúster 6 con un valor muy bajo (0,04). K-MEDOIDES registra el clúster 1 prácticamente en cero (-0,004) y los clústeres 5 y 6 con valores bajos. En este contexto, k-medias ofrece la distribución más equilibrada de municipios entre grupos (ningún grupo con menos de 5 observaciones) y la mejor calidad global de agrupamiento, por lo que se selecciona como método principal para la interpretación.
 
 ##### Interpretamos los resultados.
 En primer lugar, vamos a realizar un análisis PCA completo para ver qué variables utilizadas en el clustering contribuyen más a la separación de los municipios de Valencia. Como las variables ya se han centrado yescalado previamente para el clustering, aplicamos el PCA sobre *matriz_clustering* con *scaling = "none"*.
-```{r}
+```{r, warning=FALSE, message=FALSE}
 vars_clustering <- c(
   "pct_extranjeros",
   "indice_envejecimiento",
@@ -6693,7 +6537,7 @@ knitr::kable(
   digits = 2,
   caption = "Varianza explicada por las primeras componentes principales")
 ```
-En principio, se revisa cuánta variabilidad explican las primerascomponentes principales. Para la interpretación gráfica se seleccionan cuatro componentes, de forma que se pueda visualizar la PC1 frente a la PC2 y la PC3 frente a la PC4, sin repetir componentes.
+En principio, se revisa cuánta variabilidad explican las primeras componentes principales. Para la interpretación gráfica se seleccionan cuatro componentes, de forma que se pueda visualizar la PC1 frente a la PC2 y la PC3 frente a la PC4, sin repetir componentes.
 ```{r}
 p1 <- pcaPlot(
   miPCA,
@@ -7043,7 +6887,7 @@ dist_municipios <- dist(
   matriz_clustering,
   method = "euclidean")
 
-dist_municipios
+as.matrix(dist_municipios)[1:10, 1:10]
 ```
 
 ##### Visualizamos dicha matriz de distancias.
@@ -7593,12 +7437,10 @@ distritos_bilbao <- read_csv("distritos_bilbao_base_final.csv")
 head(distritos_valencia)
 dim(distritos_valencia)
 colnames(distritos_valencia)
-str(distritos_valencia)
 
 head(distritos_bilbao)
 dim(distritos_bilbao)
 colnames(distritos_bilbao)
-str(distritos_bilbao)
 ```
 
 ##### Revisamos de las diferencias de estructura entre ambas bases.
@@ -7642,7 +7484,6 @@ distritos_base <- bind_rows(distritos_valencia, distritos_bilbao)
 head(distritos_base)
 dim(distritos_base)
 colnames(distritos_base)
-str(distritos_base)
 ```
 
 ##### Comprobamos el número de distritos por ciudad.
@@ -7683,31 +7524,6 @@ valores_perdidos <- distritos_base %>%
   arrange(desc(n_na))
 
 valores_perdidos
-```
-
-##### Calculamos el porcentaje de valores faltantes por variable.
-```{r}
-porcentaje_perdidos <- distritos_base %>%
-  summarise(across(everything(), ~ mean(is.na(.)) * 100)) %>%
-  pivot_longer(cols = everything(),
-               names_to = "variable",
-               values_to = "pct_na") %>%
-  arrange(desc(pct_na))
-
-porcentaje_perdidos
-```
-
-##### Unificamos la información sobre valores faltantes.
-```{r}
-resumen_perdidos <- left_join(valores_perdidos, porcentaje_perdidos, by = "variable")
-
-resumen_perdidos
-```
-
-##### Revisamos las variables con valores perdidos.
-```{r}
-resumen_perdidos %>%
-  filter(n_na > 0)
 ```
 
 ##### REVISIÓN DE LA VARIABILIDAD DE LAS VARIABLES NUMÉRICAS
@@ -7769,7 +7585,6 @@ distritos_corr_base <- distritos_base %>%
 head(distritos_corr_base)
 dim(distritos_corr_base)
 colnames(distritos_corr_base)
-str(distritos_corr_base)
 ```
 
 ##### PRIMERA DEPURACIÓN DE VARIABLES ANTES DEL CÁLCULO DE CORRELACIONES
@@ -7822,11 +7637,6 @@ cor_pearson <- cor(distritos_corr_principal,
 cor_pearson
 ```
 
-##### Redondeamos la matriz de correlación de Pearson.
-```{r}
-round(cor_pearson, 3)
-```
-
 ##### Calculamos la matriz de correlación de Spearman.
 ```{r}
 cor_spearman <- cor(distritos_corr_principal,
@@ -7834,11 +7644,6 @@ cor_spearman <- cor(distritos_corr_principal,
                     method = "spearman")
 
 cor_spearman
-```
-
-##### Redondeamos la matriz de correlación de Spearman.
-```{r}
-round(cor_spearman, 3)
 ```
 
 ##### REVISIÓN DE VARIABLES PROBLEMÁTICAS ANTES DE LA VISUALIZACIÓN
@@ -8484,7 +8289,7 @@ legend(
 ##### Conclusión
 El análisis de clustering sobre los 19 distritos de Valencia ha permitido identificar cinco perfiles diferenciados a partir de variables demográficas, de equipamiento urbano y de mercado residencial: índice de envejecimiento, ratio de colegios, ratio de hospitales, esfuerzo de alquiler y ratio de zonas verdes. Tras preparar y escalar los datos, el estadístico de Hopkins obtuvo un valor de 0,64, que en el contexto de tan solo 19 observaciones es indicativo de una tendencia de agrupamiento moderada. Para la elección de k = 5, el gráfico de Silhouette muestra una silueta media de ≈ 0,30 con una distribución interpretable, mientras que el método del codo refleja una suavización progresiva a partir de k = 5, lo que indica un equilibrio adecuado entre calidad estadística e interpretabilidad.
 
-Se compararon tres métodos: clustering jerárquico con Ward.D2, k-medias y PAM. Se ha optado por **PAM (k-medoides)** como solución principal al obtener la distribución más equilibrada entre grupos (4, 6, 1, 5 y 3 distritos) con un único caso singular, frente a Ward y k-medias que producen dos clústeres de observación única y limitan la interpretabilidad.
+Se compararon tres métodos: clustering jerárquico con Ward.D2, k-medias y PAM. Se ha optado por PAM (k-medoides) como solución principal al obtener la distribución más equilibrada entre grupos (4, 6, 1, 5 y 3 distritos) con un único caso singular, frente a Ward y k-medias que producen dos clústeres de observación única y limitan la interpretabilidad.
 
 El análisis PCA retiene tres componentes que acumulan el 87,4% de la varianza. La PC1 (41,9%) está dominada por *esfuerzo_alquiler*, *ratio_colegio*, *ratio_hospital* y *ratio_zonas_verdes*, y separa principalmente el clúster 5 del resto. La PC2 (24,5%) recoge variabilidad adicional asociada principalmente a *esfuerzo_alquiler*, diferenciando el clúster 1. La PC3 (21,0%) está dominada por el *indice_envejecimiento*, que es la variable que más estructura la variabilidad residual entre distritos.
 
@@ -9128,7 +8933,7 @@ resumen_demografico
 ```
 La tabla muestra que los municipios de Valencia presentan un porcentaje medio y mediano de población extranjera superior al de Vizcaya. En concreto, Valencia alcanza una media del 8,43% y una mediana del 7,88%, mientras que Vizcaya presenta una media del 5,89% y una mediana del 5,52%. Esto indica que, en términos generales, la presencia relativa de población extranjera es mayor en los municipios valencianos incluidos en el análisis.
 
-En cuanto al indice_envejecimiento, las diferencias entre ambas provincias son más reducidas. La media es ligeramente superior en Valencia, mientras que la mediana es más alta en Vizcaya. Esto sugiere que el envejecimiento municipal es relativamente parecido en ambos territorios.
+En cuanto al *indice_envejecimiento*, las diferencias entre ambas provincias son más reducidas. La media es ligeramente superior en Valencia, mientras que la mediana es más alta en Vizcaya. Esto sugiere que el envejecimiento municipal es relativamente parecido en ambos territorios.
 
 Representamos de forma conjunta el bloque demográfico para visualizar las conclusiones obtenidas tras analizar la tabla anterior. 
 ```{r}
@@ -9169,7 +8974,7 @@ La tabla muestra diferencias claras entre ambas provincias en el porcentaje de p
 
 Esta diferencia indica que, en términos generales, los municipios vizcaínos incluidos en el análisis presentan un mayor nivel formativo que los municipios valencianos. Además, aunque el valor máximo es ligeramente superior en Valencia, los valores centrales son mucho más altos en Vizcaya, por lo que la diferencia no parece deberse únicamente a casos extremos, sino a una tendencia general del conjunto de municipios.
 
-Para completar la comparación, representamos la distribución de pct_estudios_sup mediante un boxplot. Este gráfico permite observar no solo los valores centrales, sino también la dispersión de los municipios dentro de cada provincia.
+Para completar la comparación, representamos la distribución de *pct_estudios_sup* mediante un boxplot. Este gráfico permite observar no solo los valores centrales, sino también la dispersión de los municipios dentro de cada provincia.
 ```{r}
 ggplot(municipios_comparacion, aes(x = provincia, y = pct_estudios_sup, fill = provincia)) +
   geom_boxplot(alpha = 0.7) +
@@ -9209,7 +9014,7 @@ La tabla muestra diferencias claras entre ambas provincias en las variables de s
 
 En cuanto a los servicios sanitarios, las diferencias en ratio de centros de salud son reducidas y las medianas son 0 en ambas provincias, lo que indica que muchos municipios no disponen directamente de centro de salud. Una mediana igual a 0 no indica un error en los datos, sino que más de la mitad de los municipios no cuentan con ese equipamiento de forma directa. En cambio, el porcentaje de municipios con consultorio local es mayor en Valencia, con un 70,33%, frente al 52,63% de Vizcaya. Por tanto, aunque los centros de salud no estén presentes de forma generalizada, Valencia muestra una mayor presencia de consultorios locales.
 
-Por último, la distancia al hospital también es mayor en Valencia, con una media de 10,91 km y una mediana de 8,11 km, mientras que Vizcaya presenta una media de 4,78 km y una mediana de 3,68 km. 
+Por último, la distancia al hospital también es mayor en Valencia, con una media de 10,70 km y una mediana de 7,79 km, mientras que Vizcaya presenta una media de 4,76 km y una mediana de 3,23 km. 
 
 En conjunto, Vizcaya destaca por menores distancias a servicios educativos y hospitalarios, mientras que Valencia presenta mayor presencia relativa de colegios y consultorios locales.
 
@@ -9260,7 +9065,7 @@ resumen_residencial
 ```
 La tabla muestra diferencias muy claras entre ambas provincias en el bloque residencial y económico. Los municipios de Vizcaya presentan un precio medio del alquiler notablemente superior al de Valencia. Esta diferencia aparece tanto en la media como en la mediana, por lo que no parece depender únicamente de casos extremos.
 
-Al mismo tiempo, Vizcaya presenta una renta media del hogar más elevada. Sin embargo, este mayor nivel de renta no compensa completamente el mayor coste del alquiler, ya que el esfuerzo de alquiler también es claramente superior en Vizcaya. En concreto, la media del esfuerzo de alquiler alcanza el 20,33% en Vizcaya, frente al 11,64% en Valencia.
+Al mismo tiempo, Vizcaya presenta una renta media del hogar más elevada. Sin embargo, este mayor nivel de renta no compensa completamente el mayor coste del alquiler, ya que el esfuerzo de alquiler también es claramente superior en Vizcaya. En concreto, la media del esfuerzo de alquiler alcanza el 20,32% en Vizcaya, frente al 11,65% en Valencia.
 
 En conjunto, los municipios vizcaínos incluidos en el análisis presentan mayor renta, pero también una presión residencial más elevada. Por el contrario, los municipios valencianos muestran menores niveles de renta media, pero también precios de alquiler y esfuerzo residencial más bajos.
 
@@ -9525,7 +9330,7 @@ distritos_comparacion %>% count(ciudad)
 colnames(distritos_comparacion)
 ```
 
-Tal y como se describe en los primeros pasos de este análisis, confirmamos que en la nueva tabla se encuentran todas las observaciones de los dos datasets iniciales (19 distritos de Valencia y 8 de Bilbao) y que los nombres de las variables coinciden
+Tal y como se describe en los primeros pasos de este análisis, confirmamos que en la nueva tabla se encuentran todas las observaciones de los dos datasets iniciales (19 distritos de Valencia y 8 de Bilbao) y que los nombres de las variables coinciden.
 
 Por último, comprobamos si existen valores faltantes en la base conjunta. Esta revisión es importante porque algunos gráficos y resúmenes pueden verse afectados si alguna variable contiene valores no disponibles.
 ```{r}
@@ -9559,7 +9364,7 @@ resumen_general
 
 La tabla anterior muestra una diferencia clara en el número de distritos analizados, teniendo valencia una mayor cantidad de ellos, lo que probablemente se deba a que Valencia tiene más del doble de población que Bilbao.
 
-Sin embargo, al observar la población media por distrito, Bilbao muestra valores más elevados. Esto indica que, aunque Valencia tiene más distritos y más población total, sus distritos tienden a ser de menor tamaño poblacional, mientras que en Bilbao la población está más concentrada en el reducido número de distritos. También se puede observar en el mínimo de población, que en valencia es un valor muy bajo (6744), mientras que en Bilbao es un valor considerablemente más alto. Al contrario, el distrito de mayor población de valencia tiene un volumen considerablemente mayor que el más poblado de Bilbao.
+Sin embargo, al observar la población media por distrito, Bilbao muestra valores más elevados. Esto indica que, aunque Valencia tiene más distritos y más población total, sus distritos tienden a ser de menor tamaño poblacional, mientras que en Bilbao la población está más concentrada en el reducido número de distritos. También se puede observar en el mínimo de población, que en Valencia es un valor muy bajo (6744), mientras que en Bilbao es un valor considerablemente más alto. Al contrario, el distrito de mayor población de valencia tiene un volumen considerablemente mayor que el más poblado de Bilbao.
 
 Estos valores probablemente se deban a que Valencia incluye como distritos algunos formados por pedanías situadas al sur o al norte del municipio y que contienen muy poca población, pero al mismo tiempo sus distritos más céntricos tienen un volumen de población muy alto. Por el contrario, en la ciudad de Bilbao toda la población se concentra en menos distritos teniendo todos ellos un mayor volumen de población.
 
@@ -9608,7 +9413,7 @@ ggplot(demografico_largo, aes(x = ciudad, y = valor, fill = ciudad)) +
 El gráfico de cajas confirma visualmente la brecha detectada en la tabla resumen. Se observa claramente que la distribución de Bilbao se sitúa en niveles muy superiores, con una mediana que sobrepasa los valores de la mayor parte de los distritos valencianos. Además, la mayor amplitud de la caja roja indica que en Bilbao existe una heterogeneidad interna más marcada en cuanto a la edad de sus barrios, mientras que Valencia presenta una estructura sensiblemente más joven, a excepción de un distrito atípico que aparece como un valor extremo aislado. 
 
 A continuación representamos los tres distritos de cada ciudad con la población más joven y los tres con la más envejecida.
-```{r}
+```{r,warning=FALSE, message=FALSE}
 extremos_edad <- distritos_comparacion %>%
   group_by(ciudad) %>%
   filter(min_rank(indice_envejecimiento) <= 3 | min_rank(desc(indice_envejecimiento)) <= 3) %>%
@@ -10451,7 +10256,7 @@ ggplot(mat_long, aes(x = Variable, y = cluster, fill = Valor)) +
         panel.grid   = element_blank())
 ```
 
-El heatmap permite comparar los perfiles municipales de Valencia y Vizcaya a partir de valores estandarizados, sin comparar directamente los números de clúster. En Valencia, la diferenciación entre grupos viene marcada sobre todo por el envejecimiento y las distancias a servicios, destacando **VAL-c5** como perfil envejecido y con peor accesibilidad educativa y hospitalaria. También aparece un valor extremo en *ratio_hospital* en **VAL-c1**.En Vizcaya, **VIZ-c2** concentra la mayor presión de alquiler, mientras que **VIZ-c3** representa un perfil más rural con mayores distancias a servicios. En conjunto, el gráfico muestra que Valencia se diferencia más por envejecimiento y accesibilidad, mientras que Vizcaya separa mejor entre presión residencial, ruralidad y dotación de servicios.
+El heatmap permite comparar los perfiles municipales de Valencia y Vizcaya a partir de valores estandarizados, sin comparar directamente los números de clúster. En Valencia, la diferenciación entre grupos viene marcada sobre todo por el envejecimiento y las distancias a servicios, destacando VAL-c5 como perfil envejecido y con peor accesibilidad educativa y hospitalaria. También aparece un valor extremo en *ratio_hospital* en VAL-c1.En Vizcaya, VIZ-c2 concentra la mayor presión de alquiler, mientras que VIZ-c3 representa un perfil más rural con mayores distancias a servicios. En conjunto, el gráfico muestra que Valencia se diferencia más por envejecimiento y accesibilidad, mientras que Vizcaya separa mejor entre presión residencial, ruralidad y dotación de servicios.
 
 ##### Mostramos las variables más discriminantes por provincia.
 ```{r, fig.width=9, fig.height=5}
@@ -10526,7 +10331,7 @@ ggplot(mat_dis, aes(x = Variable, y = cluster, fill = Valor)) +
         plot.title   = element_text(face = "bold"),
         panel.grid   = element_blank())
 ```
-El heatmap permite comparar los perfiles medios de los clústeres de distritos. En Valencia destaca **VAL-c3** por sus valores extremos en *ratio_hospital* y *ratio_zonas_verdes*. **VAL-c1** combina mayor esfuerzo de alquiler y ratio de colegios, el perfil más tensionado de Valencia ciudad. En Bilbao, los contrastes son menos extremos: **BIL-c2** acumula alto envejecimiento, presión de alquiler y zonas verdes, mientras que **BIL-c3** destaca por menor envejecimiento y menor dotación sanitaria. En conjunto, Valencia presenta una mayor polarización interna (cambios de color más drásticos) entre distritos, mientras que Bilbao ofrece perfiles menos diferenciados.
+El heatmap permite comparar los perfiles medios de los clústeres de distritos. En Valencia destaca VAL-c3 por sus valores extremos en *ratio_hospital* y *ratio_zonas_verdes*. VAL-c1 combina mayor esfuerzo de alquiler y ratio de colegios, el perfil más tensionado de Valencia ciudad. En Bilbao, los contrastes son menos extremos: BIL-c2 acumula alto envejecimiento, presión de alquiler y zonas verdes, mientras que BIL-c3 destaca por menor envejecimiento y menor dotación sanitaria. En conjunto, Valencia presenta una mayor polarización interna (cambios de color más drásticos) entre distritos, mientras que Bilbao ofrece perfiles menos diferenciados.
 
 ##### Mostramos las variables más discriminantes por ciudad.
 ```{r, fig.width=9, fig.height=4.5}
