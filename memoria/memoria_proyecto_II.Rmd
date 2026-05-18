@@ -6605,6 +6605,7 @@ fviz_cluster(
   ellipse.type = "convex",
   main = "Clustering PAM con k = 6 - Municipios Valencia")
 ```
+
 La solución PAM muestra una distribución de los municipios más compactaen algunos grupos respecto al método jerárquico, aunque también presenta mayor solapamiento entre clústeres adyacentes en el espacio
 bidimensional.
 
@@ -6733,6 +6734,7 @@ p2
 p3
 p4
 ```
+
 A partir de los gráficos de puntuaciones, se observa que en el plano PC1-PC2 los clústeres 1, 4 y 6 quedan claramente separados del resto, mientras que los clústeres 2, 3 y 5 se concentran en la zona central con
 mayor solapamiento. En el plano PC3-PC4, el clúster 1 se separa notablemente en el eje vertical, lo que indica que tiene un perfil diferencial también en las componentes de menor peso.
 
@@ -6792,6 +6794,7 @@ legend(
   ncol = 1,
   xpd = TRUE)
 ```
+
 El análisis de clustering de los municipios de la provincia de Valencia ha permitido identificar seis perfiles diferenciados a partir de variables demográficas, socioeconómicas, educativas, sanitarias, digitales y de accesibilidad. Tras comprobar una tendencia de agrupamiento clara (Hopkins = 0,832), se optó por k = 6 clústeres,
 apoyándose en la estabilidad de la curva de Silhouette y la suavización del codo a partir de k = 5. De los tres métodos comparados, k-medias se selecciona como solución principal al obtener la mayor silueta media
 (0,18) y la distribución más equilibrada entre grupos. El PCA muestra que las variables más discriminantes son la distancia al hospital, la distancia al centro educativo y el índice de envejecimiento. Por último, la variable *naturaleza_contratos* no determina la formación de los clústeres, aunque revela patrones complementarios relevantes como la orientación a servicios del clúster 1 (60%) o el carácter industrial del clúster 3 (33,33%).
@@ -7049,6 +7052,7 @@ fviz_dist(
   dist_municipios,
   show_labels = FALSE)
 ```
+
 La visualización de la matriz de distancias muestra que aunque no aparece una separación totalmente marcada en bloques, sí se aprecia cierta estructura interna en los datos, lo que sugiere que puede tener sentido aplicar técnicas de clustering para identificar grupos de municipios con características similares.
 
 ##### Calculamos la tendencia de agrupamiento con el estadístico de Hopkins.
@@ -7105,6 +7109,7 @@ p2 <- fviz_nbclust(
 
 grid.arrange(p1, p2, nrow = 1)
 ```
+
 El gráfico de Silhouette alcanza su valor máximo en k = 2, aunque esta solución no es muy lógica para el objetivo del análisis. A partir de k = 3 los valores se estabilizan en torno a 0,15–0,17, sin degradarse de forma apreciable al aumentar el número de clústeres. Por su parte, el método del codo muestra una caída pronunciada de la suma de cuadrados intra-clúster hasta k = 4–5, punto a partir del cual la pendiente se suaviza considerablemente. Teniendo en cuenta ambos criterios de forma conjunta, y con el objetivo de obtener una clasificación suficientemente granular que permita caracterizar perfiles diferenciados de municipios de Vizcaya, se opta por una solución de *k = 5* clústeres.
 
 ##### Comparamos los métodos de clustering
@@ -7129,6 +7134,7 @@ fviz_dend(
   cex = 0.3,
   lwd = 0.4)
 ```
+
 El dendrograma muestra la estructura jerárquica obtenida mediante el método de Ward y la distancia euclídea. Al cortar el árbol en k = 5 clústeres, se obtiene una partición de los municipios en cinco grupos diferenciados. Se aprecian dos grandes bloques principales que se fusionan a una altura elevada (superior a 12), lo que indica diferencias sustanciales entre ellos. Dentro de cada bloque, los subgrupos se forman a alturas más moderadas, sugiriendo mayor similitud interna. Esta solución es coherente con el objetivo de clasificación del análisis.
 
 A partir del corte del dendrograma en los grupos seleccionados, se asigna a cada municipio su clúster correspondiente. La siguiente tabla de frecuencias permite comprobar el tamaño de cada grupo y valorar si la partición obtenida está equilibrada o si uno de los clústeres concentra una mayor proporción de municipios.
@@ -7209,6 +7215,7 @@ fviz_cluster(
   ellipse.type = "convex",
   main = "Clustering k-medias con k = 5")
 ```
+
 La visualización de k-medias muestra una separación razonablemente clara entre los cinco grupos en el espacio de las dos primeras componentes principales, con grupos compactos y bien delimitados, aunque con cierta superposición en la zona derecha del gráfico.
 
 De forma complementaria, se puede visualizar también la solución jerárquica.
@@ -7221,6 +7228,7 @@ fviz_cluster(
   ellipse.type = "convex",
   main = "Clustering jerárquico con k = 5")
 ```
+
 La solución de k-medias presenta una estructura general similar a la jerárquica, con grupos bien separados en los extremos del espacio PCA. Sin embargo, se aprecian diferencias notables en la zona central, donde los clústeres 3 y 5 del jerárquico se reorganizan de forma distinta en k-medias. El clúster 5 jerárquico, situado en la parte superior con solo 2 municipios, pasa a integrarse como clúster 4 en k-medias con mayor tamaño, mientras que el clúster 1 jerárquico, compacto y bien separado a la izquierda, se mantiene con una estructura similar en ambos métodos.
 
 Por último, se visualiza también la solución obtenida mediante PAM.
@@ -7232,6 +7240,7 @@ fviz_cluster(
   ellipse.type = "convex",
   main = "Clustering PAM con k = 5")
 ```
+
 La solución PAM muestra una distribución de los municipios más compacta en algunos grupos respecto a los otros métodos, aunque también presenta mayor solapamiento entre clústeres adyacentes en el espacio bidimensional.
 
 A continuación, mostramos los gráficos de silueta para los tres métodos.
@@ -7307,6 +7316,7 @@ miPCA <- pca(
 # Gráfico de varianza explicada
 pcaPlot(miPCA, type = "scree")
 ```
+
 A continuación, se consulta la varianza explicada por las primeras componentes principales para decidir cuántas componentes utilizar en la interpretación.
 ```{r}
 K <- 4
@@ -7359,6 +7369,7 @@ p2
 p3
 p4
 ```
+
 A partir de los gráficos de puntuaciones, se observa que en el plano PC1-PC2 el clúster 4 queda claramente aislado en la zona inferior, con valores muy negativos en PC2, mientras que los clústeres 1, 2 y 5 presentan cierto solapamiento en la zona central y el clúster 3 se sitúa a la izquierda bien diferenciado. En el plano PC3-PC4, la separación entre grupos es menor y el solapamiento aumenta notablemente, lo que indica que las tercera y cuarta componentes aportan información complementaria pero menos discriminante.
 
 Los gráficos de correlaciones muestran que en PC1-PC2 las variables más discriminantes son distancia_hospital, distancia_centro_educativo y pct_estudios_sup hacia valores negativos de PC1, frente a pct_hogares_100mbps, esfuerzo_alquiler y ratio_centros_salud en sentido positivo. En PC3-PC4 destaca el índice de envejecimiento como la variable de mayor contribución, seguida del esfuerzo de alquiler y el consultorio_local. En conjunto, la accesibilidad a servicios, el nivel formativo y el envejecimiento son las dimensiones que más estructuran la variabilidad entre los municipios de Vizcaya.
@@ -7419,6 +7430,7 @@ legend(
   bty = "n",
   ncol = 1)
 ```
+
 El análisis del perfil medio de los cinco clústeres permite caracterizar cada grupo a partir de las variables activas utilizadas en el clustering. El índice de envejecimiento es la variable que presenta mayor variabilidad entre clústeres, con el clúster 3 destacando como el más envejecido, seguido de cerca por los clústeres 2 y 4. En el extremo opuesto, el clúster 4 registra los valores más bajos de envejecimiento, apuntando a un perfil de municipios más jóvenes. El esfuerzo de alquiler y el porcentaje de hogares con 100 Mbps son las otras dos variables que más diferencian los grupos, con el clúster 2 destacando en ambas. La distancia al hospital presenta un comportamiento dispar, siendo especialmente elevada en el clúster 4. En cambio, variables como el ratio de centros de salud, el ratio de colegios o el ratio de hospital muestran valores bajos y similares en todos los grupos, contribuyendo menos a la diferenciación. En conjunto, el envejecimiento, la presión del alquiler y la conectividad digital son las dimensiones que más estructuran los perfiles municipales de Vizcaya.
 
 ##### Relacionamos los clústeres con la naturaleza de los contratos
@@ -8097,6 +8109,7 @@ fviz_dist(
   dist_distritos,
   show_labels = FALSE)
 ```
+
 La visualización de la matriz de distancias muestra diferencias apreciables entre distritos, con zonas de menor y mayor disimilitud. Se observan bloques más homogéneos que podrían corresponder a grupos de distritos con perfiles similares, lo que sugiere la existencia de cierta estructura agrupable en los datos.
 
 ##### Calculamos la tendencia de agrupamiento con el estadístico de Hopkins.
@@ -8602,6 +8615,7 @@ fviz_dist(
   dist_distritos,
   show_labels = FALSE)
 ```
+
 La visualización de la matriz de distancias muestra diferencias apreciables entre algunos distritos. No se observan tan claramente unas líneas verticales y horizontales con colores más intensos debido a la reducida muestra, pero sí hay varios cuadros pintados de azul que corresponden a distritos que presentan mayor disimilitud respecto a otras observaciones.
 
 ##### Calculamos la tendencia de agrupamiento con el estadístico de Hopkins.
@@ -8715,6 +8729,7 @@ fviz_dend(
   cex = 0.5,
   lwd = 0.4)
 ```
+
 El dendrograma permite visualizar cómo se van fusionando progresivamente los distritos hasta formar una estructura jerárquica. Al cortar el árbol en tres clústeres, se obtiene una partición formada por tres grupos equilibrados.
 
 A continuación, se asigna a cada distrito el clúster correspondiente según el corte del dendrograma en tres grupos.
@@ -8976,6 +8991,7 @@ legend("topleft",
        bty = "n",
        ncol = 1)
 ```
+
 El análisis del perfil medio permite caracterizar cada clúster de distritos según sus rasgos estructurales, añadiendo además los valores del distrito anómalo. El clúster 1 destaca como el perfil más envejecido (índice 241,39), registrando el mayor ratio de colegios entre los grupos (0,29) y el menor esfuerzo de alquiler (27,74). Por su parte, el clúster 3 se trata del perfil más joven (índice 155,05) y con el mayor esfuerzo de alquiler (33,70), caracterizándose por la ausencia total de infraestructuras hospitalarias. El clúster 2 representa un perfil de edad intermedio con un esfuerzo de alquiler elevado (32,82), el ratio de hospitales más alto y el ratio de centros educativos más bajo (0,11).
 
 Finalmente, el distrito anómalo de Otxarkoaga presenta una configuración extrema que justifica su exclusión del agrupamiento: supera a todos los clústeres en ratio de colegio (0,52) y hospitales (0,04), además de registrar el esfuerzo de alquiler más alto de todo el estudio (35,63). En conjunto, las variables más discriminantes para diferenciar estos perfiles y detectar la anomalía son el índice de envejecimiento, el ratio de colegio y el esfuerzo de alquiler.
@@ -9164,6 +9180,7 @@ ggplot(municipios_comparacion, aes(x = provincia, y = pct_estudios_sup, fill = p
   theme_minimal() +
   theme(legend.position = "none")
 ```
+
 El gráfico confirma la diferencia observada en la tabla resumen. Por otro lado, en Valencia, la mayoría de municipios se concentran en valores más bajos, aunque aparecen varios valores atípicos con porcentajes elevados de estudios superiores. Esto muestra que existen algunos municipios valencianos con un perfil educativo alto, pero no representan la tendencia general de la provincia. En cambio, en Vizcaya los valores altos son más habituales dentro del conjunto de municipios analizados.
 
 ##### Comparación bloque de servicios y accesibilidad
@@ -9221,6 +9238,7 @@ ggplot(servicios_largo, aes(x = provincia, y = valor, fill = provincia)) +
   theme_minimal() +
   theme(legend.position = "none")
 ```
+
 Los gráficos confirman que la principal diferencia entre ambas provincias está en la accesibilidad. Los municipios de Vizcaya presentan menores distancias tanto al centro educativo como al hospital más cercano, mientras que Valencia muestra valores más altos y mayor dispersión. En cambio, los ratios sanitarios son bajos en ambas provincias, especialmente en el caso de hospitales, por lo que las diferencias más relevantes no están tanto en la existencia de dichos centros, sino en la distancia a ellos.
 
 ##### Comparación bloque residencial y económico
@@ -9275,6 +9293,7 @@ ggplot(residencial_largo, aes(x = provincia, y = valor, fill = provincia)) +
   theme_minimal() +
   theme(legend.position = "none")
 ```
+
 El gráfico confirma de forma visual las diferencias observadas en la tabla respecto a Vizcaya y Valencia. Además, en Valencia se observa una mayor presencia de valores atípicos en la renta media del hogar, lo que indica que algunos municipios presentan rentas elevadas respecto al conjunto provincial. Sin embargo, la tendencia general sigue siendo inferior a la de Vizcaya. En conjunto, el gráfico refuerza la idea de que Vizcaya presenta municipios con mayor nivel de renta, pero también con un mercado de alquiler más caro y una mayor presión residencial.
 
 ##### Comparación bloque digital
@@ -9307,6 +9326,7 @@ ggplot(municipios_comparacion, aes(x = provincia, y = pct_hogares_100mbps, fill 
   theme_minimal() +
   theme(legend.position = "none")
 ```
+
 Dentro de este conjunto ya filtrado, ambas provincias presentan valores muy elevados y relativamente similares. Valencia muestra una media y una mediana ligeramente superiores, mientras que Vizcaya mantiene también niveles altos de cobertura, con un mínimo por encima del 90%. En consecuencia, la variable *pct_hogares_100mbps* no permite diferenciar claramente entre ambas provincias en esta fase del análisis, ya que la baja conectividad fue utilizada como criterio de exclusión previo.
 
 ##### Comparación bloque laboral
@@ -9365,6 +9385,7 @@ ggplot(contratos_largo, aes(x = provincia, y = valor, fill = provincia)) +
   theme_minimal() +
   theme(legend.position = "none")
 ```
+
 Como podemos observar, el gráfico confirma las conclusiones obtenidas anteriormente. 
 
 Por último, analizamos la variable *naturaleza_contratos*, que resume el perfil contractual predominante de cada municipio. En este caso, se utiliza una tabla que muestra cuántos municipios de cada provincia pertenecen a cada categoría contractual y qué porcentaje representan sobre el total de municipios de su provincia.
@@ -9389,6 +9410,7 @@ ggplot(naturaleza_resumen,
     fill = "Naturaleza de contratos") +
   theme_minimal()
 ```
+
 En conclusión, Valencia muestra una estructura contractual más diversificada, mientras que Vizcaya presenta un perfil más terciarizado y menos vinculado al sector agrícola.
 
 ##### Conclusión
@@ -9447,6 +9469,7 @@ ggplot(perfil_global,
     fill = "Provincia") +
   theme_minimal()
 ```
+
 El gráfico facilita la comparación visual del perfil medio de ambas provincias, donde Vizcaya aparece claramente por encima de Valencia en las variables residenciales y económicas, especialmente en *precio_m2_alquiler*, *esfuerzo_alquiler* y *renta_media_hogar*. También destaca en *pct_estudios_sup* y en *pct_contratos_servicios*. 
 
 Por el contrario, Valencia se sitúa por encima en variables asociadas a una mayor heterogeneidad territorial, como *pct_extranjeros*, *pct_contratos_agricultura*, *pct_contratos_industria* y *ratio_colegios*. Además, en las variables de distancia, Vizcaya presenta valores negativos, lo que indica menores distancias medias a servicios educativos y hospitalarios, reforzando su mejor accesibilidad territorial dentro de los municipios analizados.
@@ -9581,6 +9604,7 @@ ggplot(demografico_largo, aes(x = ciudad, y = valor, fill = ciudad)) +
   theme_minimal() +
   theme(legend.position = "none")
 ```
+
 El gráfico de cajas confirma visualmente la brecha detectada en la tabla resumen. Se observa claramente que la distribución de Bilbao se sitúa en niveles muy superiores, con una mediana que sobrepasa los valores de la mayor parte de los distritos valencianos. Además, la mayor amplitud de la caja roja indica que en Bilbao existe una heterogeneidad interna más marcada en cuanto a la edad de sus barrios, mientras que Valencia presenta una estructura sensiblemente más joven, a excepción de un distrito atípico que aparece como un valor extremo aislado. 
 
 A continuación representamos los tres distritos de cada ciudad con la población más joven y los tres con la más envejecida.
@@ -9647,6 +9671,7 @@ ggplot(servicios_largo, aes(x = ciudad, y = valor, fill = ciudad)) +
   theme_minimal() +
   theme(legend.position = "none")
 ```
+
 Estos diagramas de caja reafirman visualmente la superioridad de Bilbao en cuanto a la dotación de servicios básicos por habitante.
 
 En educación, se observa que casi todos los distritos de Bilbao se sitúan por encima de la mediana de Valencia, cuya red escolar es mucho más limitada. En sanidad, el gráfico es aún más revelador, ya que mientras en Bilbao la infraestructura está algo más repartida por el territorio, en Valencia la mediana en cero confirma que la inmensa mayoría de los barrios carecen de hospital propio, dependiendo de unos pocos distritos donde se concentra toda la oferta sanitaria, de los cuales se destacan en la gráfica dos valores anómalos.
@@ -9691,6 +9716,7 @@ ggplot(extremos_sanidad, aes(x = reorder(nombre_distrito_norm, ratio_hospital),
        x = NULL, y = "Ratio Hospitales") +
   theme(legend.position = "none")
 ```
+
 En un principio las gráficas pretenden representar únicamente los tres distritos con ratio más alto y bajo, pero al haber una gran cantidad de distritos sin hospitales en valencia se representan todos aquellos que dependan no tengan hospital y dependan de otros ubicados en distritos cercanos. 
 
 El gráfico de educación muestra un liderazgo claro de Otxarkoaga en Bilbao, que casi duplica el ratio del mejor distrito valenciano (Poblats Marítims). Llama la atención que en Bilbao todos los distritos analizados tienen cobertura, mientras que en Valencia aparecen distritos sin ningún tipo de oferta educativa en las pedanías, obligando a los residentes a desplazarse a otras zonas sí o sí.
@@ -9750,6 +9776,7 @@ ggplot(residencial_largo, aes(x = ciudad, y = valor, fill = ciudad)) +
   theme_minimal() +
   theme(legend.position = "none")
 ```
+
 Los diagramas de cajas confirman que el mercado de alquiler en Bilbao es estructuralmente más caro, ya que incluso sus precios más bajos igualan a los más altos de Valencia. Sin embargo, en la renta media se observa que aunque Bilbao tiene niveles algo superiores y más estables, Valencia presenta una desigualdad interna mucho mayor. Sus "bigotes" son más largos y tiene valores atípicos muy altos, lo que indica que en Valencia conviven barrios de rentas y alquiler más bajos con distritos extremadamente ricos que superan los valores de Bilbao (excepto por otro valor atípico en Bilbao que probablemente sea el mismo para los gráficos de alquiler y renta).
 
 El gráfico de esfuerzo es el que mejor resume la situación: Bilbao mantiene a casi todos sus distritos bajo una presión residencial elevada, mientras que Valencia ofrece un escenario más desahogado y asequible. En definitiva, Bilbao es una ciudad de costes altos y homogéneos, mientras que Valencia es más barata en general, pero con mucha más diferencia económica entre sus barrios.
@@ -9780,6 +9807,7 @@ ggplot(distritos_comparacion, aes(x = renta_media_hogar,
   theme_minimal()
 
 ```
+
 Observando el gráfico la primera clara es la diferencia de en el posicionamiento de los puntos entre ciudades. Mientras que los distritos de Bilbao (círculos) tienden a concentrarse en la parte superior con rentas y alquileres generalmente más altos, Valencia (triángulos) muestra una dispersión mucho mayor. El distrito de Abando en Bilbao se desmarca como el punto más exclusivo, liderando tanto en ingresos como en precio. Por el contrario, en la parte baja de la tabla encontramos una zona de vivienda asequible dominada por distritos valencianos como Jesús o Pobles de l’Oest, donde tanto la renta como el alquiler son significativamente más bajos que la media.
 
 Lo más interesante aparece al observar el color de los puntos, que revela dónde está el verdadero estrés financiero. Los puntos más rojizos, como Ibaiondo, Otxarkoaga o Poblats Marítims, son zonas críticas: aunque no tienen los alquileres más altos en valor absoluto, sus habitantes deben dedicar un porcentaje muy elevado de sus ingresos a la vivienda. En el lado opuesto está El Pla del Real en Valencia, ya que aunque es un distrito de alquiler caro, aparece en un color amarillento. Esto indica que, gracias a su altísimo nivel de renta, el esfuerzo que realizan sus vecinos para pagar el alquiler es mucho menor y más sostenible que en barrios teóricamente más humildes.
@@ -9811,6 +9839,7 @@ ggplot(distritos_comparacion, aes(x = ciudad, y = ratio_zonas_verdes, fill = ciu
   theme_minimal() +
   theme(legend.position = "none")
 ```
+
 El boxplot confirma visualmente que Bilbao ofrece casi el doble de zonas verdes por habitante que Valencia, con una mediana claramente superior. Aunque ambas ciudades mantienen una distribución interna muy equilibrada y compacta, los puntos aislados revelan distritos específicos en ambas capitales que funcionan como verdaderos pulmones verdes, destacando masivamente sobre la media de sus respectivos barrios.
 
 La siguiente gráfica identifica los 3 distritos con mayor y menor disponibilidad de espacios verdes por habitante.
@@ -9835,6 +9864,7 @@ ggplot(extremos_zonas_verdes, aes(x = reorder(nombre_distrito_norm, ratio_zonas_
   theme(legend.position = "none",
         axis.text.y = element_text(size = 9))
 ```
+
 Esta gráfica de piruletas demuestra gráficamente la superioridad de Bilbao en infraestructura verde, situando a Otxarkoaga y Basurto como los principales proveedores de entornos verdes de la ciudad. En Valencia, la distribución es mucho más desigual, ya que mientras que Campanar destaca masivamente como un caso excepcional, las pedanías periféricas aparecen en el extremo opuesto con ratios nulos. Esto indica que, aunque Bilbao tiene más verde en general, Valencia concentra sus mejores espacios naturales en unos pocos puntos clave, dejando a los distritos de la periferia con un acceso muy limitado a zonas ajardinadas.
 
 ##### ANÁLISIS GENERALES
@@ -9913,6 +9943,7 @@ ggplot(datos_heatmap, aes(x = Variable, y = reorder(Distrito, ciudad), fill = Va
         strip.text.y = element_text(angle = 0, face = "bold"))
 
 ```
+
 El mapa de calor muestra una clara polarización, ya que Bilbao domina los valores altos en servicios y costes, mientras que Valencia tiende a valores por debajo de la media. Mientras Bilbao ofrece un perfil más equilibrado de alta calidad y alto coste en casi todos sus barrios, Valencia funciona mediante puntos muy concretos donde se concentran los servicios y la riqueza.
 
 En el aspecto económico, Bilbao sufre una presión residencial generalizada, con un esfuerzo de alquiler alto en casi todo su mapa. Valencia, en cambio, presenta una mayor desigualdad, ya que aunque es más barata en general, tiene distritos como El Pla del Real que superan el valor de renta de los barrios más ricos de Bilbao, evidenciando una fuerte segmentación social.
@@ -9936,6 +9967,7 @@ ggplot(perfil_global,
     fill = "Ciudad") +
   theme_minimal()
 ```
+
 Este gráfico resume la esencia del estudio: ambas ciudades funcionan como espejos opuestos. Bilbao se consolida en el lado positivo con un modelo de altos servicios, mayor renta y gran ratio de zonas verdes, pero a cambio de precios altos y una población envejecida. Valencia ocupa el lado negativo, definiéndose como una ciudad más joven, dinámica y asequible, aunque con una infraestructura pública más ajustada.
 
 Las mayores distancias se dan en el alquiler y el envejecimiento, donde Bilbao se desmarca radicalmente. Esta diferencia de coste se traduce en una mejor calidad urbana, aunque penaliza el bolsillo de los ciudadanos. La barra del esfuerzo confirma que vivir en Bilbao exige un sacrificio financiero mayor que en la capital valenciana.
@@ -10121,6 +10153,7 @@ ggplot(base_z_larga, aes(x = valor_z, y = variable)) +
     plot.title = element_text(face = "bold"),
     legend.position = "bottom")
 ```
+
 El gráfico muestra que Valencia y Bilbao presentan perfiles urbanos diferenciados dentro del conjunto de municipios analizados. En general, ambas ciudades se sitúan por encima de la media en varias variables asociadas a entornos urbanos consolidados, aunque no siempre ocupan posiciones extremas dentro de la distribución.
 
 Bilbao destaca especialmente en las variables residenciales y económicas. En *precio_m2_alquiler* y *esfuerzo_alquiler* aparece claramente por encima de la mayor parte de municipios, lo que confirma que la presión residencial en Bilbao es elevada no solo respecto a Valencia, sino también en relación con el conjunto municipal. Además, también presenta una *renta_media_hogar* superior a la media.
@@ -10182,6 +10215,7 @@ ggplot(perfil_ciudades,
     fill = "Ciudad") +
   theme_minimal()
 ```
+
 El perfil estandarizado confirma las diferencias principales observadas en la comparación. Bilbao presenta valores superiores en *precio_m2_alquiler*, *esfuerzo_alquiler* y *renta_media_hogar*, lo que refleja un perfil económico con mayor renta media, pero también con una presión residencial más elevada.
 
 Valencia destaca más en *pct_estudios_sup* y *pct_extranjeros*, lo que apunta a una ciudad con mayor peso de población formada y mayor diversidad demográfica. También presenta valores positivos en *pct_hogares_100mbps*, aunque esta variable no diferencia de forma clara a ambas ciudades, ya que Bilbao también muestra una conectividad elevada.
@@ -10229,6 +10263,7 @@ ggplot(contratos_ciudades, aes(x = ciudad, y = porcentaje, fill = sector)) +
     axis.text.x = element_text(size = 11, face = "bold"),
     plot.title = element_text(face = "bold"))
 ```
+
 El gráfico muestra que ambas ciudades presentan una estructura contractual claramente dominada por el sector servicios. Tanto en Valencia como en Bilbao, este sector concentra la gran mayoría de los contratos, lo que refleja un perfil económico urbano y terciarizado.
 
 Aun así, existen algunas diferencias secundarias. Bilbao presenta un mayor peso relativo de la industria, mientras que Valencia muestra una proporción algo superior de contratos agrícolas. Sin embargo, estas diferencias no modifican la conclusión principal: en ambas ciudades el sector servicios es claramente predominante.
