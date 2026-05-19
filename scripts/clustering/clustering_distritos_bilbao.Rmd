@@ -238,7 +238,7 @@ clustering_jerarquico <- hclust(
 
 fviz_dend(
   clustering_jerarquico,
-  k = 3,
+  k = 2,
   show_labels = TRUE,
   rect = TRUE,
   rect_fill = FALSE,
@@ -258,7 +258,7 @@ A continuación, se asigna a cada distrito el clúster correspondiente según el
 ```{r}
 cluster_jerarquico <- cutree(
   clustering_jerarquico,
-  k = 3
+  k = 2
 )
 
 distritos_cluster <- info_distritos_completo %>%
@@ -274,7 +274,7 @@ Después se aplica el método de k-medias, también con tres clústeres, para co
 ```{r}
 set.seed(123)
 
-clustering_kmeans <- kmeans(x = matriz_clustering,centers = 3,nstart = 25)
+clustering_kmeans <- kmeans(x = matriz_clustering,centers = 2,nstart = 25)
 
 distritos_cluster <- distritos_cluster %>%
   mutate(cluster_kmeans = as.factor(clustering_kmeans$cluster))
@@ -287,7 +287,7 @@ En tercer lugar, se aplica el método PAM (Partitioning Around Medoids), tambié
 ```{r}
 set.seed(123)
 
-clustering_pam <- pam(x = matriz_clustering, k = 3,metric = "euclidean")
+clustering_pam <- pam(x = matriz_clustering, k = 2,metric = "euclidean")
 
 distritos_cluster <- distritos_cluster %>%
   mutate(cluster_pam = as.factor(clustering_pam$clustering))

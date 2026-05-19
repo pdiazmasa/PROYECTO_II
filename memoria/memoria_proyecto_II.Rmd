@@ -10533,25 +10533,26 @@ grid.arrange(p1, p2, nrow = 1)
 
 El gráfico de Silhouette muestra su valor máximo para *k = 2*, lo que
 indica que una división en dos grupos presenta la mayor separación media
-entre clústeres. Sin embargo, esta solución resulta demasiado general
-para el objetivo del análisis, ya que agrupa los distritos en perfiles
-muy amplios y reduce la capacidad de interpretar diferencias internas
-más específicas.
+entre clústeres. Por tanto, este criterio apunta de forma clara a una
+solución sencilla de dos grupos, evitando generar particiones demasiado
+forzadas en un conjunto de distritos reducido.
 
-Por su parte, el método del codo muestra una reducción importante de la
-suma de cuadrados intra-clúster al pasar de k = 1 a k = 3. A partir
-de ese punto la disminución continúa, pero de forma más progresiva, por
-lo que una solución con tres clústeres mantiene un equilibrio razonable
-entre compactación interna e interpretabilidad.
+Por su parte, el método del codo muestra una disminución continua de la
+suma de cuadrados intra-clúster conforme aumenta el número de grupos. No
+obstante, la reducción entre *k = 1* y *k = 2* ya es considerable, y a
+partir de ahí la mejora se produce de forma más progresiva. Esto indica
+que añadir más clústeres mejora la compactación interna, pero también
+aumenta la fragmentación de los grupos.
 
-Aunque el criterio de Silhouette favorece una solución más simple de
-k = 2, se opta por k = 3 porque permite diferenciar mejor los
-perfiles de distritos sin generar una clasificación excesivamente
-fragmentada. De este modo, se obtiene una solución más informativa para
-el análisis posterior, manteniendo un número de grupos manejable y
-fácilmente interpretable.
+En conjunto, ambos criterios permiten justificar una solución de *k = 2*.
+El método Silhouette la señala como la opción con mejor separación media,
+mientras que el método del codo muestra que esta solución ya consigue una
+reducción relevante de la variabilidad interna. Además, al tratarse de un
+número reducido de distritos, una partición en dos grupos facilita una
+interpretación más estable y evita obtener clústeres excesivamente
+pequeños.
 
-Por tanto, se continúa con una solución de *k = 3*.
+Por tanto, se continúa con una solución de *k = 2*.
 
 A continuación, representamos el dendrograma del clustering jerárquico
 utilizando la distancia euclídea y el método de Ward.D2. Este
@@ -10565,7 +10566,7 @@ clustering_jerarquico <- hclust(
 
 fviz_dend(
   clustering_jerarquico,
-  k = 3,
+  k = 2,
   show_labels = TRUE,
   rect = TRUE,
   rect_fill = FALSE,
@@ -10578,26 +10579,25 @@ fviz_dend(
 ```
 
 El dendrograma muestra la estructura jerárquica obtenida mediante el
-método de Ward y la distancia euclídea. Al cortar el árbol en *k = 3*
-clústeres, se observa una división formada por tres grupos bastante
+método de Ward y la distancia euclídea. Al cortar el árbol en *k = 2*
+clústeres, se observa una división formada por dos grupos bastante
 equilibrados en cuanto al número de distritos. Esta solución es
-coherente con la decisión de trabajar con *k = 3*, y de haber eliminado
+coherente con la decisión de trabajar con *k = 2*, y de haber eliminado
 el valor anómalo, ya que permite captar más matices que la partición
 realizada incluyendo ese valor.
 
 A diferencia del caso de los municipios, el número más reducido de
 distritos permite visualizar las etiquetas en el dendrograma, lo que
 facilita identificar directamente qué distritos quedan agrupados en cada
-rama. En este caso, el dendrograma sugiere una estructura donde cada
-distrito es emparejado al menos con otro, destacando un grupo que
-contiene 3 de ellos.
+rama. En este caso, el dendrograma sugiere una estructura donde no hay
+ningún grupo que haya quedado con tan solo uno o dos distritos en él
 
 ##### Comparamos los métodos de clustering.
 
 En este apartado se comparan distintos métodos de clustering aplicados
 sobre la misma matriz de datos previamente escalada. Como en la fase
 anterior se ha decidido continuar con una solución de tres clústeres,
-todos los métodos se aplican con *k = 3*. De esta forma, la comparación
+todos los métodos se aplican con *k = 2*. De esta forma, la comparación
 entre métodos es coherente y permite valorar si las agrupaciones
 obtenidas son similares o si dependen mucho del algoritmo utilizado.
 
@@ -10612,7 +10612,7 @@ clustering_jerarquico <- hclust(
 
 fviz_dend(
   clustering_jerarquico,
-  k = 3,
+  k = 2,
   show_labels = TRUE,
   rect = TRUE,
   rect_fill = FALSE,
@@ -10626,16 +10626,16 @@ fviz_dend(
 
 El dendrograma permite visualizar cómo se van fusionando progresivamente
 los distritos hasta formar una estructura jerárquica. Al cortar el árbol
-en tres clústeres, se obtiene una partición formada por tres grupos
+en dos clústeres, se obtiene una partición formada por dos grupos
 equilibrados.
 
 A continuación, se asigna a cada distrito el clúster correspondiente
-según el corte del dendrograma en tres grupos.
+según el corte del dendrograma en dos grupos.
 
 ```{r}
 cluster_jerarquico <- cutree(
   clustering_jerarquico,
-  k = 3)
+  k = 2)
 
 distritos_cluster <- info_distritos_completo %>%
   mutate(cluster_jerarquico = as.factor(cluster_jerarquico))
@@ -10646,14 +10646,14 @@ table(distritos_cluster$cluster_jerarquico)
 La tabla anterior muestra cuántos distritos quedan asignados a cada uno
 de los clústeres.
 
-Después se aplica el método de k-medias, también con tres clústeres,
+Después se aplica el método de k-medias, también con dos clústeres,
 para comparar sus resultados con los obtenidos mediante clustering
 jerárquico.
 
 ```{r}
 set.seed(123)
 
-clustering_kmeans <- kmeans(x = matriz_clustering,centers = 3,nstart = 25)
+clustering_kmeans <- kmeans(x = matriz_clustering,centers = 2,nstart = 25)
 
 distritos_cluster <- distritos_cluster %>%
   mutate(cluster_kmeans = as.factor(clustering_kmeans$cluster))
@@ -10671,7 +10671,7 @@ extremas.
 ```{r}
 set.seed(123)
 
-clustering_pam <- pam(x = matriz_clustering, k = 3,metric = "euclidean")
+clustering_pam <- pam(x = matriz_clustering, k = 2,metric = "euclidean")
 
 distritos_cluster <- distritos_cluster %>%
   mutate(cluster_pam = as.factor(clustering_pam$clustering))
@@ -10679,11 +10679,11 @@ distritos_cluster <- distritos_cluster %>%
 table(distritos_cluster$cluster_pam)
 ```
 
-El método PAM también divide los distritos en tres grupos, pero lo hace
+El método PAM también divide los distritos en dos grupos, pero lo hace
 utilizando medoides, es decir, distritos reales que actúan como
 representantes de cada clúster. La tabla anterior permite comprobar si
-la solución obtenida con PAM reparte los distritos de forma similar a
-los métodos anteriores o si genera una partición diferente.
+que la solución obtenida con PAM reparte los distritos de forma diatinta
+a los métodos anteriores, de forma menos equilibrada.
 
 Para comparar los tres métodos utilizados, se construyen tablas cruzadas
 entre la clasificación jerárquica, la clasificación de k-medias y la
@@ -10734,7 +10734,7 @@ fviz_cluster(
   data = matriz_clustering,
   geom = "point",
   ellipse.type = "convex",
-  main = "Clustering k-medias con k = 3")
+  main = "Clustering k-medias con k = 2")
 ```
 
 De forma complementaria, se puede visualizar también la solución
@@ -10747,7 +10747,7 @@ fviz_cluster(
     cluster = distritos_cluster$cluster_jerarquico),
   geom = "point",
   ellipse.type = "convex",
-  main = "Clustering jerárquico con k = 3")
+  main = "Clustering jerárquico con k = 2")
 ```
 
 Por último, se visualiza también la solución obtenida mediante PAM.
@@ -10758,7 +10758,7 @@ fviz_cluster(
   data = matriz_clustering,
   geom = "point",
   ellipse.type = "convex",
-  main = "Clustering PAM con k = 3")
+  main = "Clustering PAM con k = 2")
 ```
 
 A continuación, se muestra el gráfico de Silueta para comparar los tres
@@ -10818,18 +10818,19 @@ plot(
 par(mfrow = c(1, 1))
 ```
 
-La comparación mediante silhouette muestra que el método de k-medias
-obtiene el mejor resultado para k = 3, con una silueta media de 0.24.
-Este valor es superior al obtenido por el clustering jerárquico Ward.D2
-(0.17) y por k-medoides/PAM (0.20), por lo que, entre los tres métodos
-comparados, k-medias ofrece la partición más consistente según este
-criterio.
+Aunque Ward.D2 obtiene una silueta media superior, su partición genera un
+clúster formado por un único distrito, lo que dificulta la interpretación
+territorial de los resultados. Por ello, se opta por utilizar k-medias
+con *k = 2*, ya que ofrece una distribución más equilibrada entre grupos
+y permite comparar perfiles de forma más estable. Esta decisión prioriza
+la interpretabilidad del clustering, manteniendo una calidad de
+agrupación razonable.
 
-Aunque el método Ward.D2 permite representar la estructura mediante un
-dendrograma, en este caso su menor valor de silhouette indica una peor
-separación media entre los grupos. Por ello, se decide utilizar
-k-medias con k = 3 como solución principal, ya que proporciona una
-clasificación más compacta y mejor separada de los distritos.
+Finalmente, se mantiene el clustering con el método kmeans y
+*k = 2* como solución principal. Esta elección es coherente con la
+distancia euclídea utilizada. Además, al tratarse de un número reducido de distritos,
+esta solución facilita una interpretación más clara y estable de los
+grupos obtenidos.
 
 ##### Interpretamos los resultados del clustering.
 
@@ -10896,26 +10897,30 @@ p2
 ```
 
 A partir del gráfico de puntuaciones, se observa que los distritos se
-distribuyen de forma diferenciada en el espacio definido por las dos
-primeras componentes principales. La primera componente separa, sobre
-todo, a los distritos situados hacia la derecha, como r5, del resto de
-observaciones situadas en posiciones más centrales o negativas. Por su
-parte, la segunda componente permite diferenciar especialmente a r7, que
-aparece en la parte superior del gráfico, y a r4 y r6, situados en la
-zona inferior izquierda. Aunque ya no aparece el outlier extremo que
-distorsionaba el análisis inicial, sí se observan algunos distritos con
-perfiles más singulares dentro del conjunto.
+organizan en dos grupos principales dentro del espacio definido por las
+dos primeras componentes principales. El clúster 1 se sitúa
+principalmente en la parte derecha del gráfico, especialmente por la
+posición de r5, mientras que el clúster 2 agrupa distritos más desplazados
+hacia la izquierda o hacia posiciones centrales. Además, la segunda
+componente permite distinguir algunos perfiles más singulares dentro del
+clúster 2, como r4 en la zona superior y r7 en la zona inferior.
 
 Por otro lado, el gráfico de correlaciones muestra que la primera
 componente principal está relacionada positivamente con el
-*ratio_hospital* y el *indice_envejecimiento*, mientras que se asocia de
-forma negativa con el *esfuerzo_alquiler* y el *ratio_zonas_verdes*. Esto
-indica que esta componente separa perfiles con mayor dotación sanitaria
-relativa y mayor envejecimiento frente a otros con mayor presión de
-alquiler y mayor presencia de zonas verdes. La segunda componente, en
-cambio, está definida principalmente por el *ratio_zonas_verdes* y, en
-menor medida, por el ratio_hospital, por lo que ayuda a distinguir los
-distritos con mayor peso de estas variables.
+*ratio_colegio*, el *ratio_hospital* el *indice_envejecimiento*, 
+mientras que se asocia negativamente con el *esfuerzo_alquiler* y el 
+*ratio_zonas_verdes*. Por tanto, esta componente separa perfiles con mayor
+dotación educativa y sanitaria relativa frente a otros con mayor peso
+del esfuerzo de alquiler y de zonas verdes.
+
+La segunda componente principal está marcada sobre todo por el
+*ratio_colegio* en sentido positivo, y por el *ratio_hospital* y el
+*ratio_zonas_verdes* en sentido negativo. Esto ayuda a diferenciar
+distritos con mayor presencia relativa de colegios frente a otros donde
+destacan más las variables sanitarias o de zonas verdes. En conjunto, el
+PCA confirma que la separación entre los dos clústeres se apoya
+principalmente en la dotación educativa y sanitaria, el esfuerzo de
+alquiler, las zonas verdes y el envejecimiento.
 
 Para complementar la interpretación mediante PCA, se calcula el perfil
 medio de cada clúster a partir de las variables activas utilizadas en el
@@ -10925,11 +10930,11 @@ medios.
 
 ```{r}
 mediasCluster <- datos_interpretacion %>%
-  group_by(cluster_jerarquico) %>%
+  group_by(cluster_kmeans) %>%
   summarise(across(all_of(vars_clustering), ~ mean(.x, na.rm = TRUE)), .groups = "drop")
 
 mediasCluster_matriz <- as.data.frame(mediasCluster)
-rownames(mediasCluster_matriz) <- paste0("c", mediasCluster_matriz$cluster_jerarquico)
+rownames(mediasCluster_matriz) <- paste0("c", mediasCluster_matriz$cluster_kmeans)
 mediasCluster_matriz <- mediasCluster_matriz[, -1]
 
 outlier_otxarkoaga[, c("nombre_distrito_norm","indice_envejecimiento", "ratio_colegio", "ratio_hospital", "esfuerzo_alquiler", "ratio_zonas_verdes")]
@@ -10941,7 +10946,7 @@ También se representa gráficamente el perfil medio de los clústeres para
 observar de forma visual qué variables diferencian más a cada grupo.
 
 ```{r}
-colores_plot <- c("#E41A1C", "#377EB8", "#4DAF4A")
+colores_plot <- c("#E41A1C", "#377EB8")
 
 medias_escaladas <- apply(mediasCluster_matriz, 2, function(x) (x - min(x)) / (max(x) - min(x)))
 
@@ -10969,41 +10974,40 @@ legend("topleft",
        ncol = 1)
 ```
 
-El análisis del perfil medio permite caracterizar cada clúster de
-distritos según sus rasgos estructurales, incorporando también el caso
-anómalo de Otxarkoaga. El clúster 2 destaca como el perfil más envejecido
-(231,85), con el mayor ratio de colegios (0,2740) y el mayor ratio de
-hospital (0,0783), pero también con el menor esfuerzo de alquiler
-(22,38). El clúster 3 presenta el menor envejecimiento entre los grupos (203,27),
-el ratio de colegios más bajo (0,1216) y el mayor valor de zonas verdes
-(0,0005), además del esfuerzo de alquiler más elevado entre los clústeres
-(32,43). El clúster 1 queda en una posición intermedia en envejecimiento
-y dotación, aunque mantiene también una presión residencial alta
-(32,29).
+El análisis del perfil medio permite caracterizar los dos clústeres de
+distritos según sus rasgos estructurales principales. El clúster 1
+presenta valores más altos en *indice_envejecimiento*, *ratio_colegio* y
+*ratio_hospital*, por lo que agrupa distritos más envejecidos y con mayor
+dotación relativa de servicios educativos y sanitarios. Sin embargo,
+muestra valores más bajos en *esfuerzo_alquiler* y *ratio_zonas_verdes*.
 
-Por último, Otxarkoaga mantiene un perfil singular: no es el distrito más
-envejecido, pero sí destaca por el ratio de colegios más alto (0,4793),
-el mayor esfuerzo de alquiler (34,50) y el valor más alto en zonas
-verdes. Por ello, su análisis independiente resulta coherente, ya que sus
-valores podrían condicionar la interpretación del resto de clústeres.
+Por el contrario, el clúster 2 muestra el patrón opuesto: menor
+envejecimiento y menor dotación relativa de colegios y hospitales, pero
+mayores valores de *esfuerzo_alquiler* y *ratio_zonas_verdes*. Esto
+permite interpretarlo como un grupo de distritos menos envejecidos, con
+mayor presión residencial y mayor presencia relativa de zonas verdes.
+
+Por último, Otxarkoaga se mantiene como un caso singular analizado de
+forma independiente. Su tratamiento separado resulta coherente, ya que
+presenta valores diferenciados que podrían condicionar la interpretación
+del resto de distritos si se incluyera dentro del agrupamiento principal.
 
 ##### Conclusión
 
-El análisis de clustering ha permitido identificar tres perfiles
-diferenciados de distritos en Bilbao, además de un caso singular, a
-partir de variables demográficas, educativas, sanitarias y de mercado de
-vivienda. Tras el preprocesamiento de los datos y la exclusión del
-distrito de Otxarkoaga como valor atípico para evitar que distorsione el
-análisis, se ha obtenido un estadístico de Hopkins de 0,7945849 que 
-confirma una estructura marcada en los datos pese a las pocas observaciones. 
+El análisis de clustering ha permitido identificar dos perfiles principales
+de distritos en Bilbao, además de un caso singular, a partir de variables
+demográficas, educativas, sanitarias y de mercado de vivienda. Tras el
+preprocesamiento de los datos y el tratamiento independiente del distrito
+de Otxarkoaga como valor atípico, se ha obtenido un estadístico de
+Hopkins de 0,7945849, lo que confirma una estructura marcada en los datos
+pese al reducido número de observaciones.
 
-Se ha optado por una solución de k = 3 clústeres utilizando el método
-de k-medias, ya que fue el que obtuvo el mejor valor medio de
-silhouette entre los métodos comparados. Aunque Ward.D2 y PAM también
-permitían obtener una segmentación interpretable, k-medias ofreció una
-partición más consistente para este caso. La distribución de los
-distritos queda repartida en grupos de tamaño reducido, por lo que la
-interpretación debe hacerse con cierta prudencia.
+Se ha optado por una solución de k = 2 clústeres, ya que el gráfico de
+Silhouette alcanza su valor máximo con dos grupos. Además, la comparación
+entre métodos muestra que Ward.D2 y k-medias ofrecen una partición
+equivalente, por lo que se mantiene el método jerárquico Ward.D2 como
+solución principal. Esta elección permite representar la estructura
+mediante el dendrograma y evita generar clústeres excesivamente pequeños.
 
 La interpretación mediante PCA y perfiles medios muestra que las
 variables que más ayudan a diferenciar los grupos son el índice de
@@ -11015,26 +11019,22 @@ distorsionar la agrupación del resto de distritos.
 Finalmente, la caracterización propuesta de los clústeres obtenidos es
 la siguiente:
 
-c1 — Distritos con presión residencial alta y perfil intermedio.
-Presentan un envejecimiento moderadamente alto, un ratio de colegios
-intermedio y un esfuerzo de alquiler elevado. Su accesibilidad
-hospitalaria es baja respecto a otros grupos.
+c1 — Distritos más envejecidos y con mejor dotación relativa. Agrupa
+distritos con mayor índice de envejecimiento, mayor ratio de colegios y
+mayor ratio de hospital, aunque presenta  un esfuerzo de alquiler
+más bajo que el otro grupo.
 
-c2 — Distritos más envejecidos y con mejor dotación relativa.
-Agrupa los distritos con mayor índice de envejecimiento, mayor ratio de
-colegios y mayor ratio de hospital. Sin embargo, es el grupo con menor
-esfuerzo de alquiler.
+c2 — Distritos menos envejecidos y con mayor presión residencial. Agrupa
+distritos con menor índice de envejecimiento y menor dotación relativa
+de colegios y hospitales, pero con mayor esfuerzo de alquiler y mayor
+presencia relativa de zonas verdes.
 
-c3 — Distritos menos envejecidos y con mayor presión residencial.
-Presentan el menor índice de envejecimiento entre los clústeres, el
-ratio de colegios más bajo y el mayor esfuerzo de alquiler. También
-destacan por el valor más alto de zonas verdes.
-
-c4 — Distrito anómalo Otxarkoaga. Caso analizado de forma independiente por 
-su perfil diferenciado, que perjudicaba el análisis si se incluía.
-Destaca por el ratio de colegios más alto, el mayor esfuerzo de alquiler
-y el valor más elevado de zonas verdes. Aunque no es el distrito más
-envejecido, sus valores extremos justifican su tratamiento separado.
+c3 — Distrito anómalo Otxarkoaga. Caso analizado de forma independiente
+por su perfil diferenciado, ya que su inclusión condicionaba la
+interpretación del resto de clústeres. Destaca por el ratio de colegios
+más alto, el mayor esfuerzo de alquiler y el valor más elevado de zonas
+verdes. Aunque no es el distrito más envejecido, sus valores justifican
+su tratamiento separado.
 
 # 4. Objetivo 3 - Comparación Valencia y Vizcaya
 
@@ -12050,12 +12050,12 @@ La tabla refleja una ventaja clara de Bilbao en la dotación de servicios
 públicos por habitante en comparación con Valencia. En el ámbito
 educativo, Bilbao presenta una media y mediana de ratio de colegios
 significativamente superior, llegando a duplicar el valor de Valencia
-(0,12 en ambos indicadores). Esto sugiere que la red escolar en Bilbao
+(0,10 y 0,11 respectivamente). Esto sugiere que la red escolar en Bilbao
 está mucho mejor repartida entre su población que en el caso valenciano.
 
 En cuanto a los servicios hospitalarios, se repite la tendencia de una
 mayor cobertura en la capital vizcaína. Mientras que en Bilbao la
-mediana es de 0,02 (indicando que la mayoría de sus distritos cuentan
+mediana es de 0,03 (indicando que la mayoría de sus distritos cuentan
 con presencia hospitalaria), en Valencia la mediana cae a 0,00. Este
 valor de cero no es un error, sino que confirma que más de la mitad de
 los distritos de Valencia no disponen de un hospital, lo que obliga a
@@ -12193,7 +12193,7 @@ resumen_residencial
 
 La tabla refleja una realidad económica distinta para los distritos de
 ambas ciudades en el ámbito residencial. En primer lugar, Bilbao
-presenta un precio medio del alquiler de 12,78 €/m², superando los 10,73
+presenta un precio medio del alquiler de 12,72 €/m², superando los 10,72
 €/m² de Valencia. Esta diferencia se mantiene constante al observar las
 medianas, lo que confirma que el mercado inmobiliario de Bilbao es, en
 términos generales, más costoso que el valenciano.
@@ -12207,7 +12207,7 @@ hogar típico en ambas ciudades dispone de unos ingresos similares.
 
 Esta combinación de alquileres más caros con rentas medianas casi
 idénticas explica el esfuerzo de alquiler. En Bilbao, el esfuerzo medio
-alcanza el 31,49%, mientras que en Valencia se mantiene en un 27,43%. En
+alcanza el 31,51%, mientras que en Valencia se mantiene en un 27,75%. En
 conclusión, mientras que en Valencia los ingresos y el coste de la
 vivienda guardan un equilibrio más saludable, en Bilbao la presión
 residencial es notablemente superior, obligando a los hogares a realizar
@@ -13098,6 +13098,15 @@ vars_dis <- c(
 
 ##### Cargamos las bases finales de municipios y distritos de Valencia y Vizcaya.
 
+En el caso de los distritos de Bilbao, el distrito de Otxarkoaga no se
+incluye en los análisis comparativos posteriores, ya que fue tratado como
+un caso anómalo independiente. Aunque en la caracterización final del
+clustering se presenta como c3 para facilitar su comparación con el resto
+de perfiles, no forma parte del cálculo de las siluetas, perfiles medios
+ni gráficos comparativos principales. De este modo, el análisis se centra
+en los dos clústeres obtenidos por el algoritmo, evitando que este caso
+singular distorsione la interpretación conjunta.
+
 ```{r}
 municipios_valencia <- read_csv("municipios_valencia_base_final.csv",
   show_col_types = FALSE)
@@ -13136,15 +13145,15 @@ datos_clustering <- distritos_bilbao_base %>% select(all_of(vars_dis))
 filas_completas  <- complete.cases(datos_clustering)
 datos_cc_bil     <- datos_clustering[filas_completas, ]
 datos_scaled_bil <- scale(datos_cc_bil)
-dist_bil         <- dist(datos_scaled_bil, method = "euclidean")
-hc_bil           <- hclust(dist_bil, method = "ward.D2")
-cluster_bil      <- cutree(hc_bil, k = 3)
+set.seed(123)
+km_bil      <- kmeans(datos_scaled_bil, centers = 2, nstart = 25)
+cluster_bil <- km_bil$cluster
 
 
 # Siluetas 
 sil_viz  <- mean(silhouette(cluster_viz,  dist(datos_scaled_viz))[, 3])
 sil_val  <- mean(silhouette(cluster_val,  dist(datos_scaled_val))[, 3])
-sil_bil  <- mean(silhouette(cluster_bil,  dist_bil)[, 3])
+sil_bil <- mean(silhouette(cluster_bil, dist(datos_scaled_bil))[, 3])
 sil_dval <- mean(silhouette(cluster_dval, dist(datos_scaled_dval))[, 3])
 ```
 
@@ -13156,9 +13165,9 @@ tabla_meta <- tibble(
                           "Distritos Bilbao",   "Distritos Valencia"),
   `Nº observaciones` = c(nrow(datos_cc_viz), nrow(datos_cc_val),
                           nrow(datos_cc_bil),  nrow(datos_cc_dval)),
-  Hopkins             = c("0.992", "0.832", "0.43", "0.64"),
-  `K elegido`         = c(5, 6, 3, 5),
-  `Método final`      = c("K-medias", "K-medias", "Ward", "PAM"),
+  Hopkins             = c("0.996", "0.999", "0.794", "0.609"),
+  `K elegido`         = c(5, 6, 2, 5),
+  `Método final`      = c("K-medias", "K-medias", "K.medias", "PAM"),
   `Silueta media`     = round(c(sil_viz, sil_val, sil_bil, sil_dval), 3))
 
 kable(tabla_meta,
@@ -13191,13 +13200,13 @@ ggplot(datos_sil, aes(x = Análisis, y = Silueta, fill = Territorio)) +
         strip.text = element_text(face = "bold"))
 ```
 
-El gráfico muestra que los distritos se agrupan con mayor calidad que
-los municipios en ambos territorios (siluetas 0.24–0.28 frente a
-0.18–0.19). Esto indica que los perfiles urbanos están algo mejor
-definidos que los municipales. Aun así, las siluetas son
+El gráfico muestra que los distritos se agrupan con una calidad algo
+superior a los municipios, con siluetas cercanas a 0,25 frente a valores
+próximos a 0,18 y 0,19 en la escala municipal. Esto indica que los perfiles
+urbanos quedan ligeramente mejor definidos. Aun así, las siluetas son
 bajas-moderadas, por lo que los clústeres deben interpretarse como
-perfiles territoriales orientativos y no como grupos perfectamente
-separados.
+perfiles orientativos y no como grupos perfectamente separados. En Bilbao,
+la silueta se calcula sin Otxarkoaga, al tratarse como caso anómalo aparte.
 
 ##### COMPARAMOS LOS PERFILES DE LOS MUNICIPIOS
 
@@ -13257,15 +13266,16 @@ ggplot(mat_long, aes(x = Variable, y = cluster, fill = Valor)) +
 El heatmap permite comparar los perfiles municipales de Valencia y
 Vizcaya a partir de valores estandarizados, sin comparar directamente
 los números de clúster. En Valencia, la diferenciación entre grupos
-viene marcada sobre todo por el envejecimiento y las distancias a
-servicios, destacando VAL-c5 como perfil envejecido y con peor
-accesibilidad educativa y hospitalaria. También aparece un valor extremo
-en *ratio_hospital* en VAL-c1.En Vizcaya, VIZ-c2 concentra la mayor
-presión de alquiler, mientras que VIZ-c3 representa un perfil más rural
-con mayores distancias a servicios. En conjunto, el gráfico muestra que
-Valencia se diferencia más por envejecimiento y accesibilidad, mientras
-que Vizcaya separa mejor entre presión residencial, ruralidad y dotación
-de servicios.
+viene marcada por variables como el envejecimiento, las distancias a
+servicios, el esfuerzo de alquiler y algunos valores extremos, destacando
+VAL-c2 por mayor envejecimiento y distancia a servicios, VAL-c3 por mayor
+ratio de centros de salud y VAL-c1 por un valor muy elevado en
+ratio_hospital. En Vizcaya, VIZ-c2 concentra la mayor presión de
+alquiler, VIZ-c3 representa un perfil más rural con mayores distancias a
+servicios y VIZ-c5 destaca por su elevado ratio_hospital. En conjunto,
+el gráfico muestra que ambos territorios presentan perfiles diferenciados,
+aunque las variables que más separan los grupos no son exactamente las
+mismas en cada caso.
 
 ##### Mostramos las variables más discriminantes por provincia.
 
@@ -13294,16 +13304,16 @@ ggplot(datos_disc_mun,
   theme(plot.title = element_text(face = "bold"))
 ```
 
-El gráfico muestra que *ratio_hospital* es la variable con mayor
+El gráfico muestra que ratio_hospital es la variable con mayor
 capacidad discriminante en ambas provincias. En Vizcaya destacan más
-*esfuerzo_alquiler*, *pct_estudios_sup* y *pct_hogares_100mbps*,
-apuntando a una mayor separación por presión residencial y perfil
-urbano. En Valencia, *indice_envejecimiento*, *consultorio_local* y
-*ratio_centros_salud* tienen más peso, lo que indica que la estructura
-municipal se diferencia principalmente por envejecimiento y cobertura
-sanitaria básica. En conjunto, el gráfico confirma que las tipologías
-municipales no se construyen sobre exactamente las mismas variables en
-ambos territorios.
+esfuerzo_alquiler, pct_estudios_sup y pct_hogares_100mbps, lo que
+apunta a una mayor separación por presión residencial, nivel formativo y
+conectividad digital. En Valencia tienen más peso
+indice_envejecimiento, consultorio_local y ratio_centros_salud, por
+lo que la diferenciación municipal se relaciona más con la estructura
+demográfica y la cobertura sanitaria básica. En conjunto, el gráfico
+confirma que las tipologías municipales no se construyen exactamente
+sobre las mismas variables en ambos territorios.
 
 ##### COMPARAMOS LOS PERFILES DE DISTRITOS
 
@@ -13334,7 +13344,7 @@ mat_dis <- bind_rows(perfiles_bil, perfiles_dval) %>%
   mutate(
     Territorio = ifelse(str_starts(cluster, "BIL"), "Bilbao", "Valencia ciudad"),
     cluster    = factor(cluster, levels = c(
-      paste0("BIL-c", 1:3), paste0("VAL-c", 1:5))))
+      paste0("BIL-c", 1:2), paste0("VAL-c", 1:5))))
 
 ggplot(mat_dis, aes(x = Variable, y = cluster, fill = Valor)) +
   geom_tile(color = "white", linewidth = 0.5) +
@@ -13355,14 +13365,14 @@ ggplot(mat_dis, aes(x = Variable, y = cluster, fill = Valor)) +
 
 El heatmap permite comparar los perfiles medios de los clústeres de
 distritos. En Valencia destaca VAL-c3 por sus valores extremos en
-*ratio_hospital* y *ratio_zonas_verdes*. VAL-c1 combina mayor esfuerzo
-de alquiler y ratio de colegios, el perfil más tensionado de Valencia
-ciudad. En Bilbao, los contrastes son menos extremos: BIL-c2 acumula
-alto envejecimiento, presión de alquiler y zonas verdes, mientras que
-BIL-c3 destaca por menor envejecimiento y menor dotación sanitaria. En
-conjunto, Valencia presenta una mayor polarización interna (cambios de
-color más drásticos) entre distritos, mientras que Bilbao ofrece
-perfiles menos diferenciados.
+*ratio_hospital* y *ratio_zonas_verdes*, mientras que VAL-c1 combina
+mayor esfuerzo de alquiler y mayor ratio de colegios. En Bilbao, BIL-c2
+destaca por mayor dotación relativa de colegios y hospitales, aunque con
+menor esfuerzo de alquiler y menor presencia de zonas verdes. En cambio,
+BIL-c1 presenta valores más próximos a la media, con algo más de esfuerzo
+de alquiler y zonas verdes. En conjunto, Valencia muestra contrastes más
+marcados entre clústeres, mientras que Bilbao presenta una diferenciación
+más moderada, sin incluir aquí el caso anómalo de Otxarkoaga.
 
 ##### Mostramos las variables más discriminantes por ciudad.
 
@@ -13396,32 +13406,32 @@ ggplot(datos_disc_dis,
     name   = "Ciudad") +
   coord_flip() +
   labs(title    = "Capacidad discriminante de cada variable — Distritos",
-       subtitle = "Rango normalizado entre centroides de clústeres de distritos",
+       subtitle = "Rango normalizado entre centros de clústeres de distritos",
        x = NULL, y = "Rango normalizado (0–1)") +
   theme_minimal(base_size = 12) +
   theme(plot.title = element_text(face = "bold"))
 ```
 
-El gráfico muestra que en Valencia, destacan sobre todo
+El gráfico muestra que en Valencia destacan sobre todo
 *ratio_zonas_verdes* y *ratio_hospital*, lo que indica que la
 diferenciación entre distritos se explica principalmente por la dotación
 de zonas verdes y servicios sanitarios. En Bilbao, las variables más
-discriminantes son *ratio_colegios*, *indice_envejecimiento* y
-*ratio_hospital,* mostrando que sus clústeres se separan más por
-estructura demográfica y dotación educativa y sanitaria. En conjunto, el
-gráfico confirma que las tipologías distritales no se construyen sobre
-las mismas dimensiones en ambas ciudades.
+discriminantes son *esfuerzo_alquiler* y *ratio_hospital*, mientras que
+*ratio_colegios* e *indice_envejecimiento* tienen menor peso relativo.
+En conjunto, el gráfico confirma que las tipologías distritales no se
+construyen sobre las mismas dimensiones en ambas ciudades.
 
 ##### Conclusión
 
-En conjunto, los resultados muestran que Valencia y Bizkaia presentan
-lógicas territoriales distintas. En Valencia, tanto a escala municipal
-como distrital, los clústeres reflejan una mayor polarización entre
-zonas con buena dotación de servicios y zonas más envejecidas o con peor
-accesibilidad. En Vizcaya/Bilbao, las diferencias son menos extremas y
-responden más a una transición gradual entre perfiles urbanos,
-residenciales y rurales. Por tanto, el clustering no solo permite
-clasificar territorios, sino identificar qué factores explican la
+En conjunto, los resultados muestran que Valencia y Bizkaia/Bilbao
+presentan lógicas territoriales distintas. En Valencia, tanto a escala
+municipal como distrital, los clústeres reflejan una mayor polarización
+entre zonas con distinta dotación de servicios, accesibilidad y presión
+residencial. En Vizcaya/Bilbao, las diferencias tienden a ser más
+moderadas, especialmente en el caso de los distritos, donde se distinguen
+dos perfiles principales y un caso singular analizado de
+forma independiente. Por tanto, el clustering no solo permite clasificar
+territorios, sino también identificar qué factores explican la
 desigualdad interna de cada provincia y ciudad.
 
 # 5. Objetivo 4 - Visualización
